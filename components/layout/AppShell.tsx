@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
+import { PageTransition } from "./PageTransition";
 import type { UserRole } from "@/lib/supabase/types";
 
 interface AppShellProps {
@@ -30,7 +31,7 @@ export function AppShell({ children, role, userName, userAvatar }: AppShellProps
         onSignOut={handleSignOut}
       />
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <PageTransition>{children}</PageTransition>
       </main>
     </div>
   );

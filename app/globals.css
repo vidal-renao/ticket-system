@@ -77,6 +77,40 @@ body {
 ::-webkit-scrollbar-thumb  { background: var(--color-surface-600); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-surface-500); }
 
+/* ── Login Hero — Swiss Glassmorphism ── */
+.login-hero {
+  background: radial-gradient(ellipse at 55% 0%, #0d1729 0%, var(--color-surface-950) 65%);
+}
+
+.login-orb-primary {
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.14) 0%, transparent 65%);
+}
+
+.login-orb-secondary {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 65%);
+}
+
+.login-orb-deep {
+  background: radial-gradient(circle, rgba(30, 58, 138, 0.10) 0%, transparent 65%);
+}
+
+.login-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.9) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.025;
+}
+
+.login-glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.login-brand-icon {
+  box-shadow: 0 8px 32px rgba(79, 70, 229, 0.45), 0 0 0 1px rgba(129, 140, 248, 0.25);
+}
+
 /* ── Selection ── */
 ::selection {
   background: color-mix(in srgb, var(--color-brand-500) 30%, transparent);
