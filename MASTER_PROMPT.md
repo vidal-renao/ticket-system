@@ -32,10 +32,11 @@ OBJETIVO: Transformación integral a SaaS Global Trilingüe (ES, EN, DE) - Ecosi
 - Smart Auto-reply: Botón '✨ AI Suggest Response' (staff only) en TicketComments — Server Action `app/actions/suggest-reply.ts` → Claude Sonnet 4.6, idioma detectado, tono conciliador para frustrated/angry, editable antes de enviar. ✅
 - AI Real-time Translation: Botón discreto '🌐 Translate → [LOCALE]' en descripción del ticket y por cada comentario — Server Action `app/actions/translate-text.ts` → Claude Sonnet 4.6, locale activo como target (DE/EN/ES), traducción cacheada en estado local (sin re-llamadas), toggle show/hide, texto en itálica con fondo indigo sutil. `TranslateButton` client component reutilizable. ✅
 
-5. AUDITORÍA, QA & COMPLIANCE:
-- Compliance: Toggle 'PII Scrubbing' (Swiss DSG/LPD).
-- Calidad: Auditoría de accesibilidad (ARIA) y performance.
-- README: Estándar SME (Badges, Business Context, Performance).
+5. AUDITORÍA, QA & COMPLIANCE: ✅ IMPLEMENTADO
+- PII Scrubbing: Toggle admin en /settings — Server Action `org-settings.ts` lee/escribe `organizations.settings.pii_scrubbing_enabled` (JSONB, sin migración). `lib/ai/pii-scrubber.ts` con regex (email, Swiss/intl phones, IPv4). Inyectado en `runAITriage()` antes de llamar a Claude. `PIIScrubbingToggle` client component con `role="switch"` ARIA. ✅
+- ARIA Accessibility: `aria-current="page"` en nav activo, `aria-label` en botones icon-only, `htmlFor`/`id` en todos los form inputs, `role="list/listitem"` en ticket list, `aria-hidden="true"` en iconos decorativos. ✅
+- LocaleSwitcher: `components/layout/LocaleSwitcher.tsx` — `role="group"`, `aria-pressed` per locale button, keyboard-navigable, integrado en Sidebar. `i18n/navigation.ts` con `createNavigation`. ✅
+- README L99: Shields.io (Next.js, TS, Supabase, Tailwind, Claude, Vercel, DSG/LPD, i18n), Business Context Swiss market, AI Pipeline diagram, DSG/nDSG compliance table, Feature Matrix por rol, Project Structure. ✅
 
 ---
 *Nota: Este archivo se actualiza con cada mejora implementada en el Ecosistema.*

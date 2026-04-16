@@ -1,0 +1,122 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "noData": "No data",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "submit": "Submit",
+    "back": "Back",
+    "new": "New"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signInTitle": "Sign in to your account",
+    "email": "Email",
+    "password": "Password",
+    "emailPlaceholder": "you@company.ch",
+    "passwordPlaceholder": "••••••••",
+    "privacyNote": "Protected by DSG/LPD · Swiss data privacy standards"
+  },
+  "nav": {
+    "tickets": "Tickets",
+    "queue": "Queue",
+    "dashboard": "Dashboard",
+    "newTicket": "New Ticket",
+    "signOut": "Sign out"
+  },
+  "tickets": {
+    "myTickets": "My Tickets",
+    "allTickets": "All Tickets",
+    "newTicket": "New Ticket",
+    "noTickets": "No tickets yet",
+    "noTicketsCustomer": "Submit your first support request.",
+    "noTicketsStaff": "No tickets in your organization.",
+    "totalCount": "{count} tickets total",
+    "submitRequest": "Submit a Request",
+    "aiDescription": "Describe your issue — our AI will prioritize and route it automatically.",
+    "description": "Description"
+  },
+  "queue": {
+    "title": "Queue",
+    "summary": "{total} open · {urgent} urgent",
+    "urgentSla": "Urgent / SLA Breached",
+    "empty": "Queue is clear",
+    "emptyDesc": "No open tickets right now."
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "subtitle": "Real-time operations overview",
+    "openTickets": "Open Tickets",
+    "critical": "Critical",
+    "resolved": "Resolved",
+    "slaBreached": "SLA Breached",
+    "recentTickets": "Recent Tickets",
+    "aiPerformance": "AI Performance",
+    "acceptanceRate": "Acceptance rate",
+    "avgConfidence": "Avg confidence",
+    "aiBasedOn": "Based on {count} analyzed tickets",
+    "byCategory": "By Category",
+    "noData": "No data yet"
+  },
+  "ticket": {
+    "slaDeadline": "SLA Deadline",
+    "slaBreached": "SLA breached",
+    "piiWarning": "PII",
+    "aiTriage": "AI Triage",
+    "aiProcessing": "Processing...",
+    "uncategorized": "Uncategorized",
+    "internal": "Internal"
+  },
+  "priority": {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical"
+  },
+  "status": {
+    "open": "Open",
+    "in_progress": "In progress",
+    "pending_customer": "Pending customer",
+    "pending_third_party": "Pending 3rd party",
+    "resolved": "Resolved",
+    "closed": "Closed"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Organization configuration and compliance",
+    "compliance": "Compliance & Privacy (DSG/LPD)",
+    "piiScrubbing": "PII Scrubbing",
+    "piiScrubbingDesc": "Automatically redact emails, phone numbers, and IP addresses from ticket content before AI analysis. Recommended for organizations processing personal data.",
+    "piiActive": "Active",
+    "piiInactive": "Inactive",
+    "saved": "Settings saved",
+    "saveError": "Failed to save settings",
+    "dsgNote": "Required by Swiss DSG/nDSG Art. 6 for organizations handling personal data in support contexts."
+  },
+  "analytics": {
+    "title": "Analytics",
+    "subtitle": "AI performance, sentiment analysis and SLA forecasting",
+    "aiAnalyzed": "AI Analyzed",
+    "avgConfidence": "Avg Confidence",
+    "piiDetected": "PII Detected",
+    "slaAtRisk": "SLA at Risk (4h)",
+    "sentimentTitle": "Sentiment Distribution",
+    "priorityDistribution": "Priority Distribution (open)",
+    "slaBreachPrediction": "SLA Breach Prediction",
+    "aiAccuracy": "AI Accuracy",
+    "categoryAcceptance": "Category Acceptance",
+    "basedOn": "Based on {count} analyzed tickets",
+    "remaining": "remaining",
+    "noSlaRisk": "No SLA at risk in the next 4 hours",
+    "noData": "No data yet",
+    "sentiment": {
+      "calm": "Calm",
+      "neutral": "Neutral",
+      "frustrated": "Frustrated",
+      "urgent": "Urgent",
+      "angry": "Angry"
+    }
+  }
+}

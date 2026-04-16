@@ -1,0 +1,122 @@
+{
+  "common": {
+    "loading": "Laden...",
+    "noData": "Keine Daten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "submit": "Absenden",
+    "back": "Zurück",
+    "new": "Neu"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signInTitle": "Bei Ihrem Konto anmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "emailPlaceholder": "sie@unternehmen.ch",
+    "passwordPlaceholder": "••••••••",
+    "privacyNote": "Geschützt durch DSG/nDSG · Schweizer Datenschutzstandards"
+  },
+  "nav": {
+    "tickets": "Tickets",
+    "queue": "Warteschlange",
+    "dashboard": "Dashboard",
+    "newTicket": "Neues Ticket",
+    "signOut": "Abmelden"
+  },
+  "tickets": {
+    "myTickets": "Meine Tickets",
+    "allTickets": "Alle Tickets",
+    "newTicket": "Neues Ticket",
+    "noTickets": "Noch keine Tickets",
+    "noTicketsCustomer": "Reichen Sie Ihre erste Support-Anfrage ein.",
+    "noTicketsStaff": "Keine Tickets in Ihrer Organisation.",
+    "totalCount": "{count} Tickets insgesamt",
+    "submitRequest": "Anfrage einreichen",
+    "aiDescription": "Beschreiben Sie Ihr Problem — unsere KI priorisiert und leitet es automatisch weiter.",
+    "description": "Beschreibung"
+  },
+  "queue": {
+    "title": "Warteschlange",
+    "summary": "{total} offen · {urgent} dringend",
+    "urgentSla": "Dringend / SLA verletzt",
+    "empty": "Warteschlange ist leer",
+    "emptyDesc": "Momentan keine offenen Tickets."
+  },
+  "dashboard": {
+    "title": "Executive Dashboard",
+    "subtitle": "Echtzeit-Betriebsübersicht",
+    "openTickets": "Offene Tickets",
+    "critical": "Kritisch",
+    "resolved": "Gelöst",
+    "slaBreached": "SLA verletzt",
+    "recentTickets": "Letzte Tickets",
+    "aiPerformance": "KI-Leistung",
+    "acceptanceRate": "Akzeptanzrate",
+    "avgConfidence": "Ø Konfidenz",
+    "aiBasedOn": "Basierend auf {count} analysierten Tickets",
+    "byCategory": "Nach Kategorie",
+    "noData": "Noch keine Daten"
+  },
+  "ticket": {
+    "slaDeadline": "SLA-Frist",
+    "slaBreached": "SLA verletzt",
+    "piiWarning": "PII",
+    "aiTriage": "KI-Triage",
+    "aiProcessing": "Wird verarbeitet...",
+    "uncategorized": "Unkategorisiert",
+    "internal": "Intern"
+  },
+  "priority": {
+    "low": "Niedrig",
+    "medium": "Mittel",
+    "high": "Hoch",
+    "critical": "Kritisch"
+  },
+  "status": {
+    "open": "Offen",
+    "in_progress": "In Bearbeitung",
+    "pending_customer": "Warte auf Kunde",
+    "pending_third_party": "Warte auf Dritte",
+    "resolved": "Gelöst",
+    "closed": "Geschlossen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "subtitle": "Organisationskonfiguration und Compliance",
+    "compliance": "Compliance & Datenschutz (DSG/nDSG)",
+    "piiScrubbing": "PII-Bereinigung",
+    "piiScrubbingDesc": "E-Mails, Telefonnummern und IP-Adressen in Ticket-Inhalten automatisch vor der KI-Analyse entfernen. Empfohlen für Organisationen, die personenbezogene Daten verarbeiten.",
+    "piiActive": "Aktiv",
+    "piiInactive": "Inaktiv",
+    "saved": "Einstellungen gespeichert",
+    "saveError": "Einstellungen konnten nicht gespeichert werden",
+    "dsgNote": "Erforderlich gemäss Schweizer DSG/nDSG Art. 6 für Organisationen, die personenbezogene Daten in Support-Kontexten verarbeiten."
+  },
+  "analytics": {
+    "title": "Analytik",
+    "subtitle": "KI-Leistung, Stimmungsanalyse und SLA-Prognose",
+    "aiAnalyzed": "KI-analysiert",
+    "avgConfidence": "Ø Konfidenz",
+    "piiDetected": "PII erkannt",
+    "slaAtRisk": "SLA-Risiko (4h)",
+    "sentimentTitle": "Stimmungsverteilung",
+    "priorityDistribution": "Prioritätsverteilung (offen)",
+    "slaBreachPrediction": "SLA-Verletzungsvorhersage",
+    "aiAccuracy": "KI-Genauigkeit",
+    "categoryAcceptance": "Kategorie-Akzeptanz",
+    "basedOn": "Basierend auf {count} analysierten Tickets",
+    "remaining": "verbleibend",
+    "noSlaRisk": "Kein SLA-Risiko in den nächsten 4 Stunden",
+    "noData": "Noch keine Daten",
+    "sentiment": {
+      "calm": "Ruhig",
+      "neutral": "Neutral",
+      "frustrated": "Frustriert",
+      "urgent": "Dringend",
+      "angry": "Verärgert"
+    }
+  }
+}

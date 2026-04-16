@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import {
   TicketIcon,
   LayoutDashboard,
@@ -98,7 +99,7 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-0.5">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -106,6 +107,7 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
             <Link
               key={`${item.href}-${item.label}`}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
                 isActive
@@ -113,15 +115,20 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
                   : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-primary)]"
               )}
             >
-              <Icon className="w-4 h-4 shrink-0" />
+              <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
               {item.label}
               {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
               )}
             </Link>
           );
         })}
       </nav>
+
+      {/* Locale switcher */}
+      <div className="border-t border-[var(--color-surface-600)]">
+        <LocaleSwitcher />
+      </div>
 
       {/* User footer */}
       <div className="px-3 py-4 border-t border-[var(--color-surface-600)]">
@@ -138,10 +145,10 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
           </div>
           <button
             onClick={onSignOut}
+            aria-label="Sign out"
             className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-            title="Sign out"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>

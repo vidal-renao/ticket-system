@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { triageTicket } from "@/lib/ai/triage";
+import { scrubPII } from "@/lib/ai/pii-scrubber";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -32,7 +33,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
-  // Create ticket with defaults — AI will update priority/category
   const { data: ticket, error } = await supabase
     .from("tickets")
     .insert({
@@ -52,33 +52,81 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Fire AI triage — async, non-blocking
-  runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id, supabase)
-    .catch((err) => console.error("[AI Triage] Failed for ticket", ticket.id, err));
+  // Fire AI triage — uses service client, fully decoupled from request lifecycle
+  runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
+    .catch((err) => console.error("[AI Triage] Unhandled failure for ticket", ticket.id, err));
 
   return NextResponse.json({ ticket }, { status: 201 });
 }
+
+const AI_TRIAGE_TIMEOUT_MS = 30_000;
 
 async function runAITriage(
   ticketId: string,
   title: string,
   description: string,
   orgId: string,
-  supabase: Awaited<ReturnType<typeof createClient>>
 ) {
-  const startTime = Date.now();
-  const result = await triageTicket(title, description);
+  // Service client: independent of request cookies — safe for post-response async ops
+  const svc = await createServiceClient();
 
-  // Resolve category_id
-  const { data: category } = await supabase
+  // Check org-level PII scrubbing setting
+  const { data: org } = await svc
+    .from("organizations")
+    .select("settings")
+    .eq("id", orgId)
+    .single();
+
+  const piiEnabled =
+    org?.settings &&
+    typeof org.settings === "object" &&
+    !Array.isArray(org.settings) &&
+    (org.settings as Record<string, unknown>).pii_scrubbing_enabled === true;
+
+  const triageTitle = piiEnabled ? scrubPII(title) : title;
+  const triageDescription = piiEnabled ? scrubPII(description) : description;
+
+  let result;
+  try {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), AI_TRIAGE_TIMEOUT_MS);
+    try {
+      result = await triageTicket(triageTitle, triageDescription);
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (err) {
+    // Anthropic failed — persist a failed analysis row so the UI can reflect "pending"
+    await svc.from("ai_analysis").insert({
+      ticket_id: ticketId,
+      suggested_category: "Other",
+      suggested_priority: "medium",
+      confidence_score: 0,
+      sentiment: "neutral",
+      detected_language: "en",
+      summary: "AI triage unavailable — manual review required.",
+      keywords: [],
+      smart_response: "",
+      estimated_resolution_hours: 24,
+      reasoning: `Triage failed: ${err instanceof Error ? err.message : String(err)}`,
+      contains_pii_detected: false,
+      model_used: "n/a",
+      input_tokens: 0,
+      output_tokens: 0,
+      processing_time_ms: 0,
+    });
+    console.error("[AI Triage] Anthropic error for ticket", ticketId, err);
+    return;
+  }
+
+  const { data: category } = await svc
     .from("categories")
     .select("id")
     .eq("organization_id", orgId)
     .eq("name", result.suggested_category)
     .single();
 
-  // Store AI analysis
-  await supabase.from("ai_analysis").insert({
+  await svc.from("ai_analysis").insert({
     ticket_id: ticketId,
     suggested_category: result.suggested_category,
     suggested_priority: result.suggested_priority,
@@ -97,7 +145,6 @@ async function runAITriage(
     processing_time_ms: result.processing_time_ms,
   });
 
-  // Update ticket with AI suggestions (only if confidence >= 60)
   const patch: Record<string, unknown> = {
     detected_language: result.detected_language,
     contains_pii: result.contains_pii,
@@ -108,5 +155,5 @@ async function runAITriage(
     if (category?.id) patch.category_id = category.id;
   }
 
-  await supabase.from("tickets").update(patch).eq("id", ticketId);
+  await svc.from("tickets").update(patch).eq("id", ticketId);
 }

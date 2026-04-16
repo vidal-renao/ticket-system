@@ -143,14 +143,19 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
                 type="button"
                 onClick={handleAISuggest}
                 disabled={suggesting}
+                aria-label="Generate AI suggested response"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                <Sparkles className={`w-3 h-3 ${suggesting ? "animate-pulse" : ""}`} />
+                <Sparkles className={`w-3 h-3 ${suggesting ? "animate-pulse" : ""}`} aria-hidden="true" />
                 {suggesting ? "Generating…" : "✨ AI Suggest Response"}
               </button>
             </div>
           )}
+          <label htmlFor="comment-content" className="sr-only">
+            {isInternal ? "Internal note" : "Reply"}
+          </label>
           <textarea
+            id="comment-content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder={isInternal ? "Add internal note (visible to staff only)..." : "Write a reply..."}

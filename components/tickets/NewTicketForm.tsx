@@ -52,26 +52,29 @@ export function NewTicketForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <Card className="p-5 space-y-4">
         <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Summary <span className="text-red-400">*</span>
+          <label htmlFor="ticket-title" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+            Summary <span className="text-red-400" aria-label="required">*</span>
           </label>
           <input
+            id="ticket-title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Cannot connect to VPN since this morning"
             required
             maxLength={200}
+            aria-describedby="ticket-title-hint"
             className={inputClass}
           />
-          <p className="text-xs text-[var(--color-text-muted)] mt-1">{title.length}/200</p>
+          <p id="ticket-title-hint" className="text-xs text-[var(--color-text-muted)] mt-1">{title.length}/200</p>
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Description <span className="text-red-400">*</span>
+          <label htmlFor="ticket-description" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+            Description <span className="text-red-400" aria-label="required">*</span>
           </label>
           <textarea
+            id="ticket-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe the issue in detail — what happened, when it started, what you've already tried..."

@@ -1,0 +1,122 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "noData": "Sin datos",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "submit": "Enviar",
+    "back": "Volver",
+    "new": "Nuevo"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signInTitle": "Accede a tu cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "emailPlaceholder": "tu@empresa.ch",
+    "passwordPlaceholder": "••••••••",
+    "privacyNote": "Protegido por DSG/LPD · Estándares suizos de privacidad"
+  },
+  "nav": {
+    "tickets": "Tickets",
+    "queue": "Cola",
+    "dashboard": "Panel",
+    "newTicket": "Nuevo Ticket",
+    "signOut": "Cerrar sesión"
+  },
+  "tickets": {
+    "myTickets": "Mis Tickets",
+    "allTickets": "Todos los Tickets",
+    "newTicket": "Nuevo Ticket",
+    "noTickets": "Aún no hay tickets",
+    "noTicketsCustomer": "Envía tu primera solicitud de soporte.",
+    "noTicketsStaff": "No hay tickets en tu organización.",
+    "totalCount": "{count} tickets en total",
+    "submitRequest": "Enviar Solicitud",
+    "aiDescription": "Describe tu problema — nuestra IA lo priorizará y enrutará automáticamente.",
+    "description": "Descripción"
+  },
+  "queue": {
+    "title": "Cola",
+    "summary": "{total} abiertos · {urgent} urgentes",
+    "urgentSla": "Urgente / SLA Incumplido",
+    "empty": "La cola está vacía",
+    "emptyDesc": "No hay tickets abiertos en este momento."
+  },
+  "dashboard": {
+    "title": "Panel Ejecutivo",
+    "subtitle": "Visión operativa en tiempo real",
+    "openTickets": "Tickets Abiertos",
+    "critical": "Crítico",
+    "resolved": "Resueltos",
+    "slaBreached": "SLA Incumplido",
+    "recentTickets": "Tickets Recientes",
+    "aiPerformance": "Rendimiento IA",
+    "acceptanceRate": "Tasa de aceptación",
+    "avgConfidence": "Confianza media",
+    "aiBasedOn": "Basado en {count} tickets analizados",
+    "byCategory": "Por Categoría",
+    "noData": "Sin datos aún"
+  },
+  "ticket": {
+    "slaDeadline": "Plazo SLA",
+    "slaBreached": "SLA incumplido",
+    "piiWarning": "PII",
+    "aiTriage": "Triage IA",
+    "aiProcessing": "Procesando...",
+    "uncategorized": "Sin categoría",
+    "internal": "Interno"
+  },
+  "priority": {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "critical": "Crítica"
+  },
+  "status": {
+    "open": "Abierto",
+    "in_progress": "En progreso",
+    "pending_customer": "Esperando cliente",
+    "pending_third_party": "Esperando tercero",
+    "resolved": "Resuelto",
+    "closed": "Cerrado"
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Configuración de la organización y cumplimiento normativo",
+    "compliance": "Cumplimiento y Privacidad (DSG/LPD)",
+    "piiScrubbing": "Eliminación de PII",
+    "piiScrubbingDesc": "Redactar automáticamente correos, teléfonos y direcciones IP del contenido de los tickets antes del análisis de IA. Recomendado para organizaciones que procesan datos personales.",
+    "piiActive": "Activo",
+    "piiInactive": "Inactivo",
+    "saved": "Configuración guardada",
+    "saveError": "No se pudo guardar la configuración",
+    "dsgNote": "Requerido por el Art. 6 de la DSG/LPD suiza para organizaciones que gestionan datos personales en contextos de soporte."
+  },
+  "analytics": {
+    "title": "Analítica",
+    "subtitle": "Rendimiento IA, análisis de sentimiento y previsión SLA",
+    "aiAnalyzed": "Analizados por IA",
+    "avgConfidence": "Confianza media",
+    "piiDetected": "PII detectados",
+    "slaAtRisk": "SLA en riesgo (4h)",
+    "sentimentTitle": "Distribución de sentimientos",
+    "priorityDistribution": "Distribución por prioridad (abiertos)",
+    "slaBreachPrediction": "Predicción de incumplimiento SLA",
+    "aiAccuracy": "Precisión de la IA",
+    "categoryAcceptance": "Aceptación de categoría",
+    "basedOn": "Basado en {count} tickets analizados",
+    "remaining": "restante",
+    "noSlaRisk": "Sin riesgo SLA en las próximas 4 horas",
+    "noData": "Sin datos aún",
+    "sentiment": {
+      "calm": "Tranquilo",
+      "neutral": "Neutral",
+      "frustrated": "Frustrado",
+      "urgent": "Urgente",
+      "angry": "Enfadado"
+    }
+  }
+}
