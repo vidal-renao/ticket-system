@@ -1,0 +1,103 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Zap } from "lucide-react";
+import { toast } from "sonner";
+
+export function NewTicketForm() {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const inputClass = [
+    "w-full px-3 py-2.5 rounded-lg text-sm",
+    "bg-[var(--color-surface-800)] border border-[var(--color-surface-600)]",
+    "text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]",
+    "focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30",
+    "transition-colors",
+  ].join(" ");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !description.trim()) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), description: description.trim() }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to create ticket");
+      }
+
+      const { ticket } = await res.json();
+      toast.success("Ticket submitted — AI triage in progress");
+      router.push(`/tickets/${ticket.id}`);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Card className="p-5 space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+            Summary <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Cannot connect to VPN since this morning"
+            required
+            maxLength={200}
+            className={inputClass}
+          />
+          <p className="text-xs text-[var(--color-text-muted)] mt-1">{title.length}/200</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+            Description <span className="text-red-400">*</span>
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe the issue in detail — what happened, when it started, what you've already tried..."
+            required
+            rows={6}
+            className={`${inputClass} resize-none`}
+          />
+        </div>
+      </Card>
+
+      {/* AI notice */}
+      <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
+        <Zap className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+        <p className="text-xs text-indigo-300">
+          Our AI will automatically classify your request, assign a priority, and prepare a response for your technician.
+        </p>
+      </div>
+
+      <Button
+        type="submit"
+        loading={loading}
+        disabled={!title.trim() || !description.trim()}
+        className="w-full"
+      >
+        Submit Request
+      </Button>
+    </form>
+  );
+}

@@ -1,0 +1,152 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { MessageSquare, Lock } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { formatRelativeTime } from "@/lib/utils";
+import { toast } from "sonner";
+
+interface Comment {
+  id: string;
+  content: string;
+  is_internal: boolean;
+  is_ai_generated: boolean;
+  created_at: string;
+  profiles: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+interface TicketCommentsProps {
+  ticketId: string;
+  comments: Comment[];
+  currentUserId: string;
+  isStaff: boolean;
+}
+
+export function TicketComments({ ticketId, comments: initial, currentUserId, isStaff }: TicketCommentsProps) {
+  const supabase = createClient();
+  const [comments, setComments] = useState(initial);
+  const [content, setContent] = useState("");
+  const [isInternal, setIsInternal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!content.trim()) return;
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("ticket_comments")
+      .insert({
+        ticket_id: ticketId,
+        author_id: currentUserId,
+        content: content.trim(),
+        is_internal: isInternal,
+      })
+      .select(`*, profiles(full_name, avatar_url)`)
+      .single();
+
+    if (error) {
+      toast.error("Failed to post comment");
+    } else {
+      setComments((prev) => [...prev, data]);
+      setContent("");
+      toast.success(isInternal ? "Internal note added" : "Reply sent");
+    }
+    setLoading(false);
+  }
+
+  const inputClass = [
+    "w-full px-3 py-2.5 rounded-lg text-sm resize-none",
+    "bg-[var(--color-surface-800)] border border-[var(--color-surface-600)]",
+    "text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]",
+    "focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30",
+    "transition-colors",
+  ].join(" ");
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-[var(--color-text-muted)]" />
+          <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+            Activity ({comments.length})
+          </span>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {comments.length === 0 && (
+          <p className="text-sm text-[var(--color-text-muted)] text-center py-4">No activity yet.</p>
+        )}
+
+        {comments.map((comment) => (
+          <div key={comment.id} className={`flex gap-3 ${comment.is_internal ? "opacity-80" : ""}`}>
+            <div className="w-7 h-7 rounded-full bg-[var(--color-surface-700)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] shrink-0">
+              {comment.profiles?.full_name?.charAt(0).toUpperCase() ?? "?"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+                  {comment.profiles?.full_name ?? "Unknown"}
+                </span>
+                {comment.is_internal && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
+                    <Lock className="w-2.5 h-2.5" /> Internal
+                  </span>
+                )}
+                {comment.is_ai_generated && (
+                  <span className="text-[10px] text-indigo-400">· AI</span>
+                )}
+                <span className="text-[10px] text-[var(--color-text-muted)]">
+                  {formatRelativeTime(comment.created_at)}
+                </span>
+              </div>
+              <div className={`text-sm text-[var(--color-text-primary)] leading-relaxed p-3 rounded-lg ${
+                comment.is_internal
+                  ? "bg-amber-400/5 border border-amber-400/15"
+                  : "bg-[var(--color-surface-800)] border border-[var(--color-surface-600)]"
+              }`}>
+                {comment.content}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Comment form */}
+        <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-[var(--color-surface-600)]">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder={isInternal ? "Add internal note (visible to staff only)..." : "Write a reply..."}
+            rows={3}
+            className={inputClass}
+          />
+          <div className="flex items-center justify-between">
+            {isStaff && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-amber-400"
+                />
+                <span className="text-xs text-[var(--color-text-muted)]">Internal note</span>
+              </label>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              loading={loading}
+              disabled={!content.trim()}
+              className="ml-auto"
+            >
+              {isInternal ? "Add Note" : "Send Reply"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
