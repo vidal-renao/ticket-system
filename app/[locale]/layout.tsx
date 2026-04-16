@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
+import { HtmlLang } from "@/components/layout/HtmlLang";
 import "../globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
 
@@ -41,7 +39,7 @@ export async function generateMetadata({
       siteName: "HelpDesk AI",
       locale: OG_LOCALE[locale] ?? "de_CH",
     },
-    robots: { index: false, follow: false }, // Private SaaS — no public indexing
+    robots: { index: false, follow: false },
   };
 }
 
@@ -68,29 +66,27 @@ export default async function LocaleLayout({
   };
 
   return (
-    <html lang={locale} className="dark">
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    <>
+      <HtmlLang locale={locale} />
+      {/* JSON-LD structured data — Google indexes from <body> fine */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <NextIntlClientProvider messages={messages}>
+        {children}
+        <Toaster
+          position="bottom-right"
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: "var(--color-surface-800)",
+              border: "1px solid var(--color-surface-600)",
+              color: "var(--color-text-primary)",
+            },
+          }}
         />
-      </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-          <Toaster
-            position="bottom-right"
-            theme="dark"
-            toastOptions={{
-              style: {
-                background: "var(--color-surface-800)",
-                border: "1px solid var(--color-surface-600)",
-                color: "var(--color-text-primary)",
-              },
-            }}
-          />
-        </NextIntlClientProvider>
-      </body>
-    </html>
+      </NextIntlClientProvider>
+    </>
   );
 }
