@@ -30,7 +30,7 @@ OBJETIVO: Transformación integral a SaaS Global Trilingüe (ES, EN, DE) - Ecosi
 - /tickets: Data-table trilingüe con badge 'AI Priority' (⚡ indigo, confidence ≥ 60%, diff only). ✅
 - /analytics: KPIs (AI analyzed, avg confidence, PII detected, SLA at risk), Sentiment Distribution, Priority Distribution, SLA Breach Prediction, AI Accuracy. ✅
 - Smart Auto-reply: Botón '✨ AI Suggest Response' (staff only) en TicketComments — Server Action `app/actions/suggest-reply.ts` → Claude Sonnet 4.6, idioma detectado, tono conciliador para frustrated/angry, editable antes de enviar. ✅
-- AI Real-time Translation: Pendiente.
+- AI Real-time Translation: Botón discreto '🌐 Translate → [LOCALE]' en descripción del ticket y por cada comentario — Server Action `app/actions/translate-text.ts` → Claude Sonnet 4.6, locale activo como target (DE/EN/ES), traducción cacheada en estado local (sin re-llamadas), toggle show/hide, texto en itálica con fondo indigo sutil. `TranslateButton` client component reutilizable. ✅
 
 5. AUDITORÍA, QA & COMPLIANCE:
 - Compliance: Toggle 'PII Scrubbing' (Swiss DSG/LPD).

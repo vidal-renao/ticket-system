@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { suggestReply } from "@/app/actions/suggest-reply";
+import { TranslateButton } from "@/components/tickets/TranslateButton";
 
 interface Comment {
   id: string;
@@ -23,9 +24,10 @@ interface TicketCommentsProps {
   comments: Comment[];
   currentUserId: string;
   isStaff: boolean;
+  targetLocale: string;
 }
 
-export function TicketComments({ ticketId, comments: initial, currentUserId, isStaff }: TicketCommentsProps) {
+export function TicketComments({ ticketId, comments: initial, currentUserId, isStaff, targetLocale }: TicketCommentsProps) {
   const supabase = createClient();
   const [comments, setComments] = useState(initial);
   const [content, setContent] = useState("");
@@ -124,6 +126,11 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
               }`}>
                 {comment.content}
               </div>
+              <TranslateButton
+                text={comment.content}
+                targetLocale={targetLocale}
+                className="mt-1.5"
+              />
             </div>
           </div>
         ))}
