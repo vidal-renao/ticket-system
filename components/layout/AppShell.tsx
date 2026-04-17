@@ -18,9 +18,14 @@ export function AppShell({ children, role, userName, userAvatar, locale }: AppSh
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    // Preserve locale on sign-out — de has no prefix, others get /<locale>/login
     const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
     window.location.href = loginPath;
+  }
+
+  async function handleGoHome() {
+    await supabase.auth.signOut();
+    const homePath = locale === "de" ? "/home" : `/${locale}/home`;
+    window.location.href = homePath;
   }
 
   return (
@@ -30,6 +35,7 @@ export function AppShell({ children, role, userName, userAvatar, locale }: AppSh
         userName={userName}
         userAvatar={userAvatar}
         onSignOut={handleSignOut}
+        onGoHome={handleGoHome}
       />
       <main className="flex-1 overflow-y-auto">
         <PageTransition>{children}</PageTransition>

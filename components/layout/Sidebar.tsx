@@ -90,9 +90,10 @@ interface SidebarProps {
   userName: string;
   userAvatar?: string | null;
   onSignOut: () => void;
+  onGoHome: () => void;
 }
 
-export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps) {
+export function Sidebar({ role, userName, userAvatar, onSignOut, onGoHome }: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
 
@@ -138,20 +139,16 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
         })}
       </nav>
 
-      {/* Home button */}
+      {/* Home button — signs out and returns to landing */}
       <div className="px-3 pb-2 border-t border-[var(--color-surface-600)] pt-2">
-        <Link
-          href="/home"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
-            pathname === "/home"
-              ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20"
-              : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
-          )}
+        <button
+          type="button"
+          onClick={onGoHome}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-[var(--color-text-muted)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
         >
           <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
           {t("home")}
-        </Link>
+        </button>
       </div>
 
       {/* Locale switcher */}
