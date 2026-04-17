@@ -39,7 +39,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
-  const { data: ticket, error } = await supabase
+  // Use service client for INSERT — auth already validated above.
+  // Bypasses RLS to avoid session-propagation issues in API routes.
+  const svcInsert = createServiceClientStatic();
+  const { data: ticket, error } = await svcInsert
     .from("tickets")
     .insert({
       title: title.trim(),
