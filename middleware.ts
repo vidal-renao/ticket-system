@@ -6,7 +6,7 @@ import { routing } from "@/i18n/routing";
 const handleI18nRouting = createIntlMiddleware(routing);
 
 /** Paths that don't require authentication (locale-suffix matched) */
-const AUTH_PATHS = ["/login", "/signup"];
+const AUTH_PATHS = ["/login", "/signup", "/home"];
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;

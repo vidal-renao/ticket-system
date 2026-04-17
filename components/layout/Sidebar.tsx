@@ -12,6 +12,7 @@ import {
   Zap,
   BarChart3,
   LogOut,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
@@ -136,6 +137,22 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
           );
         })}
       </nav>
+
+      {/* Home button */}
+      <div className="px-3 pb-2 border-t border-[var(--color-surface-600)] pt-2">
+        <Link
+          href="/home"
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+            pathname === "/home"
+              ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20"
+              : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
+          )}
+        >
+          <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
+          {t("home")}
+        </Link>
+      </div>
 
       {/* Locale switcher */}
       <div className="border-t border-[var(--color-surface-600)]">

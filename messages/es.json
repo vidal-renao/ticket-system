@@ -33,7 +33,8 @@
     "analytics": "Analítica",
     "team": "Equipo",
     "settings": "Configuración",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "home": "Inicio"
   },
   "tickets": {
     "myTickets": "Mis Tickets",

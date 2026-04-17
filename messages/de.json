@@ -33,7 +33,8 @@
     "analytics": "Auswertungen",
     "team": "Team",
     "settings": "Einstellungen",
-    "signOut": "Abmelden"
+    "signOut": "Abmelden",
+    "home": "Startseite"
   },
   "tickets": {
     "myTickets": "Meine Anfragen",
