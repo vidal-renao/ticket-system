@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
 
@@ -9,6 +10,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ error }: LoginFormProps) {
+  const t = useTranslations("auth");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export function LoginForm({ error }: LoginFormProps) {
       try {
         json = await res.json();
       } catch {
-        toast.error("Server error — please try again");
+        toast.error(t("errorServer"));
         setPending(false);
         return;
       }
@@ -57,7 +59,7 @@ export function LoginForm({ error }: LoginFormProps) {
       // Hard navigate so the browser sends the freshly-set session cookies
       window.location.href = redirectTo ?? "/dashboard";
     } catch {
-      toast.error("Network error — please try again");
+      toast.error(t("errorNetwork"));
       setPending(false);
     }
   }
@@ -72,7 +74,7 @@ export function LoginForm({ error }: LoginFormProps) {
       <div className="p-5 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] space-y-4">
         <div>
           <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Email
+            {t("email")}
           </label>
           <input
             name="email"
@@ -84,7 +86,7 @@ export function LoginForm({ error }: LoginFormProps) {
         </div>
         <div>
           <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Password
+            {t("password")}
           </label>
           <input
             name="password"
@@ -97,7 +99,7 @@ export function LoginForm({ error }: LoginFormProps) {
       </div>
 
       <Button type="submit" loading={pending} className="w-full">
-        Sign in
+        {t("signIn")}
       </Button>
     </form>
   );

@@ -19,7 +19,9 @@
     "passwordPlaceholder": "••••••••",
     "privacyNote": "Protected by DSG/LPD · Swiss data privacy standards",
     "errorInvalid": "Invalid credentials. Please check your email and password.",
-    "errorGeneric": "Sign-in failed. Please try again."
+    "errorGeneric": "Sign-in failed. Please try again.",
+    "errorNetwork": "Network error — please try again.",
+    "errorServer": "Server error — please try again."
   },
   "nav": {
     "tickets": "Tickets",
@@ -43,9 +45,13 @@
     "totalCount": "{count} tickets total",
     "submitRequest": "Submit a Request",
     "aiDescription": "Describe your issue — our AI will prioritize and route it automatically.",
+    "summary": "Summary",
     "description": "Description",
     "errorRequired": "Title and description are required.",
-    "errorGeneric": "Could not create ticket. Please try again."
+    "errorGeneric": "Could not create ticket. Please try again.",
+    "submitSuccess": "Ticket submitted — AI triage in progress",
+    "aiNotice": "Our AI will automatically classify your request, assign a priority, and prepare a response for your technician.",
+    "submitButtonLabel": "Submit Request"
   },
   "queue": {
     "title": "Queue",

@@ -19,7 +19,9 @@
     "passwordPlaceholder": "••••••••",
     "privacyNote": "Geschützt durch DSG/nDSG · Schweizer Datenschutzstandards",
     "errorInvalid": "Ungültige Anmeldedaten. Bitte überprüfen Sie E-Mail und Passwort.",
-    "errorGeneric": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
+    "errorGeneric": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "errorNetwork": "Netzwerkfehler — bitte versuchen Sie es erneut.",
+    "errorServer": "Serverfehler — bitte versuchen Sie es erneut."
   },
   "nav": {
     "tickets": "Anfragen",
@@ -43,9 +45,13 @@
     "totalCount": "{count} Anfragen insgesamt",
     "submitRequest": "Anfrage einreichen",
     "aiDescription": "Beschreiben Sie Ihr Problem — unsere KI priorisiert und leitet es automatisch weiter.",
+    "summary": "Zusammenfassung",
     "description": "Beschreibung",
     "errorRequired": "Titel und Beschreibung sind erforderlich.",
-    "errorGeneric": "Anfrage konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
+    "errorGeneric": "Anfrage konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "submitSuccess": "Anfrage eingereicht — KI-Triage läuft",
+    "aiNotice": "Unsere KI klassifiziert Ihre Anfrage automatisch, weist eine Priorität zu und bereitet eine Antwort für Ihren Techniker vor.",
+    "submitButtonLabel": "Anfrage absenden"
   },
   "queue": {
     "title": "Warteschlange",

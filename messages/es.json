@@ -12,14 +12,16 @@
   },
   "auth": {
     "signIn": "Iniciar sesión",
-    "signInTitle": "Accede a tu cuenta",
+    "signInTitle": "Acceda a su cuenta",
     "email": "Correo electrónico",
     "password": "Contraseña",
-    "emailPlaceholder": "tu@empresa.ch",
+    "emailPlaceholder": "usted@empresa.ch",
     "passwordPlaceholder": "••••••••",
     "privacyNote": "Protegido por DSG/LPD · Estándares suizos de privacidad",
-    "errorInvalid": "Credenciales incorrectas. Verifica tu correo y contraseña.",
-    "errorGeneric": "Inicio de sesión fallido. Por favor, inténtalo de nuevo."
+    "errorInvalid": "Credenciales incorrectas. Por favor, verifique su correo y contraseña.",
+    "errorGeneric": "Inicio de sesión fallido. Por favor, inténtelo de nuevo.",
+    "errorNetwork": "Error de red — por favor, inténtelo de nuevo.",
+    "errorServer": "Error del servidor — por favor, inténtelo de nuevo."
   },
   "nav": {
     "tickets": "Tickets",
@@ -38,14 +40,18 @@
     "allTickets": "Todos los Tickets",
     "newTicket": "Nuevo Ticket",
     "noTickets": "Aún no hay tickets",
-    "noTicketsCustomer": "Envía tu primera solicitud de soporte.",
-    "noTicketsStaff": "No hay tickets en tu organización.",
+    "noTicketsCustomer": "Envíe su primera solicitud de soporte.",
+    "noTicketsStaff": "No hay tickets en su organización.",
     "totalCount": "{count} tickets en total",
     "submitRequest": "Enviar Solicitud",
-    "aiDescription": "Describe tu problema — nuestra IA lo priorizará y enrutará automáticamente.",
+    "aiDescription": "Describa su problema — nuestra IA lo priorizará y enrutará automáticamente.",
+    "summary": "Resumen",
     "description": "Descripción",
     "errorRequired": "El título y la descripción son obligatorios.",
-    "errorGeneric": "No se pudo crear el ticket. Por favor, inténtalo de nuevo."
+    "errorGeneric": "No se pudo crear el ticket. Por favor, inténtelo de nuevo.",
+    "submitSuccess": "Ticket enviado — triage de IA en progreso",
+    "aiNotice": "Nuestra IA clasificará automáticamente su solicitud, asignará una prioridad y preparará una respuesta para su técnico.",
+    "submitButtonLabel": "Enviar solicitud"
   },
   "queue": {
     "title": "Cola",
@@ -130,7 +136,7 @@
   },
   "team": {
     "title": "Equipo",
-    "subtitle": "Miembros de tu organización y sus roles de acceso",
+    "subtitle": "Miembros de su organización y sus roles de acceso",
     "memberList": "Lista de miembros",
     "memberCount": "{count} miembros",
     "totalMembers": "Miembros totales",

@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
 
 export function NewTicketForm() {
+  const t = useTranslations("tickets");
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -39,7 +41,7 @@ export function NewTicketForm() {
       }
 
       const { ticket } = await res.json();
-      toast.success("Ticket submitted — AI triage in progress");
+      toast.success(t("submitSuccess"));
       router.push(`/tickets/${ticket.id}`);
     } catch (err: any) {
       toast.error(err.message);
@@ -53,7 +55,7 @@ export function NewTicketForm() {
       <Card className="p-5 space-y-4">
         <div>
           <label htmlFor="ticket-title" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Summary <span className="text-red-400" aria-label="required">*</span>
+            {t("summary")} <span className="text-red-400" aria-label="required">*</span>
           </label>
           <input
             id="ticket-title"
@@ -71,7 +73,7 @@ export function NewTicketForm() {
 
         <div>
           <label htmlFor="ticket-description" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Description <span className="text-red-400" aria-label="required">*</span>
+            {t("description")} <span className="text-red-400" aria-label="required">*</span>
           </label>
           <textarea
             id="ticket-description"
@@ -89,7 +91,7 @@ export function NewTicketForm() {
       <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
         <Zap className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
         <p className="text-xs text-indigo-300">
-          Our AI will automatically classify your request, assign a priority, and prepare a response for your technician.
+          {t("aiNotice")}
         </p>
       </div>
 
@@ -99,7 +101,7 @@ export function NewTicketForm() {
         disabled={!title.trim() || !description.trim()}
         className="w-full"
       >
-        Submit Request
+        {t("submitButtonLabel")}
       </Button>
     </form>
   );
