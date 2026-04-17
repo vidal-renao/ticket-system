@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 interface OrgSettings {
@@ -57,13 +57,39 @@ export async function setPiiScrubbing(
     .single();
 
   if (profile?.role !== "admin") return { error: "Forbidden: admin only" };
-  if (!profile.organization_id) return { error: "No organization" };
+
+  // Auto-provision an organization for this admin if none exists yet.
+  // Uses service role to bypass RLS (profile.organization_id is NULL so
+  // the anon client cannot read/write organizations).
+  let orgId = profile.organization_id;
+  if (!orgId) {
+    const svc = await createServiceClient();
+    const domain = user.email?.split("@")[1] ?? "organization";
+    const orgName = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
+
+    const { data: newOrg, error: orgError } = await svc
+      .from("organizations")
+      .insert({ name: orgName })
+      .select("id")
+      .single();
+
+    if (orgError || !newOrg) return { error: `Cannot create organization: ${orgError?.message}` };
+
+    const { error: profileError } = await svc
+      .from("profiles")
+      .update({ organization_id: newOrg.id })
+      .eq("id", user.id);
+
+    if (profileError) return { error: `Cannot link organization: ${profileError.message}` };
+
+    orgId = newOrg.id;
+  }
 
   // Read current settings to merge (preserve other keys)
   const { data: org } = await supabase
     .from("organizations")
     .select("settings")
-    .eq("id", profile.organization_id)
+    .eq("id", orgId)
     .single();
 
   const current =
@@ -71,10 +97,12 @@ export async function setPiiScrubbing(
       ? (org.settings as Record<string, unknown>)
       : {};
 
-  const { error } = await supabase
+  // Use service client to bypass RLS when updating (RLS requires organization_id match)
+  const svc = await createServiceClient();
+  const { error } = await svc
     .from("organizations")
     .update({ settings: { ...current, pii_scrubbing_enabled: enabled } })
-    .eq("id", profile.organization_id);
+    .eq("id", orgId);
 
   if (error) return { error: error.message };
 
