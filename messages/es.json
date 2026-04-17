@@ -17,13 +17,20 @@
     "password": "Contraseña",
     "emailPlaceholder": "tu@empresa.ch",
     "passwordPlaceholder": "••••••••",
-    "privacyNote": "Protegido por DSG/LPD · Estándares suizos de privacidad"
+    "privacyNote": "Protegido por DSG/LPD · Estándares suizos de privacidad",
+    "errorInvalid": "Credenciales incorrectas. Verifica tu correo y contraseña.",
+    "errorGeneric": "Inicio de sesión fallido. Por favor, inténtalo de nuevo."
   },
   "nav": {
     "tickets": "Tickets",
+    "myTickets": "Mis Tickets",
+    "allTickets": "Todos los Tickets",
     "queue": "Cola",
     "dashboard": "Panel",
     "newTicket": "Nuevo Ticket",
+    "analytics": "Analítica",
+    "team": "Equipo",
+    "settings": "Configuración",
     "signOut": "Cerrar sesión"
   },
   "tickets": {
@@ -36,7 +43,9 @@
     "totalCount": "{count} tickets en total",
     "submitRequest": "Enviar Solicitud",
     "aiDescription": "Describe tu problema — nuestra IA lo priorizará y enrutará automáticamente.",
-    "description": "Descripción"
+    "description": "Descripción",
+    "errorRequired": "El título y la descripción son obligatorios.",
+    "errorGeneric": "No se pudo crear el ticket. Por favor, inténtalo de nuevo."
   },
   "queue": {
     "title": "Cola",
@@ -118,5 +127,20 @@
       "urgent": "Urgente",
       "angry": "Enfadado"
     }
+  },
+  "team": {
+    "title": "Equipo",
+    "subtitle": "Miembros de tu organización y sus roles de acceso",
+    "memberList": "Lista de miembros",
+    "memberCount": "{count} miembros",
+    "totalMembers": "Miembros totales",
+    "activeMembers": "Miembros activos",
+    "noMembers": "Aún no hay miembros en esta organización.",
+    "statusActive": "Activo",
+    "statusInactive": "Inactivo",
+    "role_admin": "Administrador",
+    "role_manager": "Manager",
+    "role_agent": "Agente",
+    "role_customer": "Cliente"
   }
 }

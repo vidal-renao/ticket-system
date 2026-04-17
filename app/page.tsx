@@ -1,24 +1,7 @@
-export const dynamic = "force-dynamic";
-
+// Root redirect — next-intl middleware handles locale detection.
+// This page is only hit if middleware doesn't intercept (edge case).
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 
-export default async function RootPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    const role = profile?.role ?? "customer";
-    if (role === "customer") redirect("/tickets");
-    if (role === "agent")    redirect("/queue");
-    redirect("/dashboard");
-  }
-
+export default function RootPage() {
   redirect("/login");
 }

@@ -17,46 +17,55 @@
     "password": "Passwort",
     "emailPlaceholder": "sie@unternehmen.ch",
     "passwordPlaceholder": "••••••••",
-    "privacyNote": "Geschützt durch DSG/nDSG · Schweizer Datenschutzstandards"
+    "privacyNote": "Geschützt durch DSG/nDSG · Schweizer Datenschutzstandards",
+    "errorInvalid": "Ungültige Anmeldedaten. Bitte überprüfen Sie E-Mail und Passwort.",
+    "errorGeneric": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut."
   },
   "nav": {
-    "tickets": "Tickets",
+    "tickets": "Anfragen",
+    "myTickets": "Meine Anfragen",
+    "allTickets": "Alle Anfragen",
     "queue": "Warteschlange",
-    "dashboard": "Dashboard",
-    "newTicket": "Neues Ticket",
+    "dashboard": "Übersicht",
+    "newTicket": "Neue Anfrage",
+    "analytics": "Auswertungen",
+    "team": "Team",
+    "settings": "Einstellungen",
     "signOut": "Abmelden"
   },
   "tickets": {
-    "myTickets": "Meine Tickets",
-    "allTickets": "Alle Tickets",
-    "newTicket": "Neues Ticket",
-    "noTickets": "Noch keine Tickets",
+    "myTickets": "Meine Anfragen",
+    "allTickets": "Alle Anfragen",
+    "newTicket": "Neue Anfrage",
+    "noTickets": "Noch keine Anfragen",
     "noTicketsCustomer": "Reichen Sie Ihre erste Support-Anfrage ein.",
-    "noTicketsStaff": "Keine Tickets in Ihrer Organisation.",
-    "totalCount": "{count} Tickets insgesamt",
+    "noTicketsStaff": "Keine Anfragen in Ihrer Organisation.",
+    "totalCount": "{count} Anfragen insgesamt",
     "submitRequest": "Anfrage einreichen",
     "aiDescription": "Beschreiben Sie Ihr Problem — unsere KI priorisiert und leitet es automatisch weiter.",
-    "description": "Beschreibung"
+    "description": "Beschreibung",
+    "errorRequired": "Titel und Beschreibung sind erforderlich.",
+    "errorGeneric": "Anfrage konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
   },
   "queue": {
     "title": "Warteschlange",
     "summary": "{total} offen · {urgent} dringend",
     "urgentSla": "Dringend / SLA verletzt",
     "empty": "Warteschlange ist leer",
-    "emptyDesc": "Momentan keine offenen Tickets."
+    "emptyDesc": "Momentan keine offenen Anfragen."
   },
   "dashboard": {
-    "title": "Executive Dashboard",
+    "title": "Betriebsübersicht",
     "subtitle": "Echtzeit-Betriebsübersicht",
-    "openTickets": "Offene Tickets",
+    "openTickets": "Offene Anfragen",
     "critical": "Kritisch",
     "resolved": "Gelöst",
     "slaBreached": "SLA verletzt",
-    "recentTickets": "Letzte Tickets",
+    "recentTickets": "Letzte Anfragen",
     "aiPerformance": "KI-Leistung",
     "acceptanceRate": "Akzeptanzrate",
     "avgConfidence": "Ø Konfidenz",
-    "aiBasedOn": "Basierend auf {count} analysierten Tickets",
+    "aiBasedOn": "Basierend auf {count} analysierten Anfragen",
     "byCategory": "Nach Kategorie",
     "noData": "Noch keine Daten"
   },
@@ -64,7 +73,7 @@
     "slaDeadline": "SLA-Frist",
     "slaBreached": "SLA verletzt",
     "piiWarning": "PII",
-    "aiTriage": "KI-Triage",
+    "aiTriage": "KI-Zuweisung",
     "aiProcessing": "Wird verarbeitet...",
     "uncategorized": "Unkategorisiert",
     "internal": "Intern"
@@ -88,7 +97,7 @@
     "subtitle": "Organisationskonfiguration und Compliance",
     "compliance": "Compliance & Datenschutz (DSG/nDSG)",
     "piiScrubbing": "PII-Bereinigung",
-    "piiScrubbingDesc": "E-Mails, Telefonnummern und IP-Adressen in Ticket-Inhalten automatisch vor der KI-Analyse entfernen. Empfohlen für Organisationen, die personenbezogene Daten verarbeiten.",
+    "piiScrubbingDesc": "E-Mails, Telefonnummern und IP-Adressen in Anfragen automatisch vor der KI-Analyse entfernen. Empfohlen für Organisationen, die personenbezogene Daten verarbeiten.",
     "piiActive": "Aktiv",
     "piiInactive": "Inaktiv",
     "saved": "Einstellungen gespeichert",
@@ -96,7 +105,7 @@
     "dsgNote": "Erforderlich gemäss Schweizer DSG/nDSG Art. 6 für Organisationen, die personenbezogene Daten in Support-Kontexten verarbeiten."
   },
   "analytics": {
-    "title": "Analytik",
+    "title": "Auswertungen",
     "subtitle": "KI-Leistung, Stimmungsanalyse und SLA-Prognose",
     "aiAnalyzed": "KI-analysiert",
     "avgConfidence": "Ø Konfidenz",
@@ -107,7 +116,7 @@
     "slaBreachPrediction": "SLA-Verletzungsvorhersage",
     "aiAccuracy": "KI-Genauigkeit",
     "categoryAcceptance": "Kategorie-Akzeptanz",
-    "basedOn": "Basierend auf {count} analysierten Tickets",
+    "basedOn": "Basierend auf {count} analysierten Anfragen",
     "remaining": "verbleibend",
     "noSlaRisk": "Kein SLA-Risiko in den nächsten 4 Stunden",
     "noData": "Noch keine Daten",
@@ -118,5 +127,20 @@
       "urgent": "Dringend",
       "angry": "Verärgert"
     }
+  },
+  "team": {
+    "title": "Team",
+    "subtitle": "Mitglieder Ihrer Organisation und deren Zugriffsrollen",
+    "memberList": "Mitgliederliste",
+    "memberCount": "{count} Mitglieder",
+    "totalMembers": "Mitglieder gesamt",
+    "activeMembers": "Aktive Mitglieder",
+    "noMembers": "Noch keine Mitglieder in dieser Organisation.",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "role_admin": "Administrator",
+    "role_manager": "Manager",
+    "role_agent": "Agent",
+    "role_customer": "Kunde"
   }
 }

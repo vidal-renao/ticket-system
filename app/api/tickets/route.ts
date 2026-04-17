@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { triageTicket } from "@/lib/ai/triage";
 import { scrubPII } from "@/lib/ai/pii-scrubber";
+import { retrieveRelevantKnowledge, buildRAGContext } from "@/lib/ai/rag";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -20,7 +23,10 @@ export async function POST(request: Request) {
 
   const { title, description } = body;
   if (!title?.trim() || !description?.trim()) {
-    return NextResponse.json({ error: "title and description are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "title and description are required" },
+      { status: 400 }
+    );
   }
 
   const { data: profile } = await supabase
@@ -52,25 +58,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Fire AI triage — uses service client, fully decoupled from request lifecycle
-  runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
-    .catch((err) => console.error("[AI Triage] Unhandled failure for ticket", ticket.id, err));
+  // Schedule AI triage — keepalive on Vercel, fire-and-forget in local dev
+  scheduleBackground(
+    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
+  );
 
   return NextResponse.json({ ticket }, { status: 201 });
 }
 
+/**
+ * Keeps the Vercel function alive until the background promise settles.
+ * Falls back to fire-and-forget in local dev (no @vercel/functions required).
+ */
+function scheduleBackground(promise: Promise<void>): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { waitUntil } = require("@vercel/functions") as {
+      waitUntil: (p: Promise<unknown>) => void;
+    };
+    waitUntil(promise);
+  } catch {
+    // @vercel/functions not available (local dev) — standard fire-and-forget
+    promise.catch((err) => console.error("[Background task error]", err));
+  }
+}
+
 const AI_TRIAGE_TIMEOUT_MS = 30_000;
+const MAX_INPUT_CHARS = 3_000;
 
 async function runAITriage(
   ticketId: string,
   title: string,
   description: string,
-  orgId: string,
-) {
-  // Service client: independent of request cookies — safe for post-response async ops
-  const svc = await createServiceClient();
+  orgId: string
+): Promise<void> {
+  const svc = createServiceClientStatic();
 
-  // Check org-level PII scrubbing setting
   const { data: org } = await svc
     .from("organizations")
     .select("settings")
@@ -83,20 +106,27 @@ async function runAITriage(
     !Array.isArray(org.settings) &&
     (org.settings as Record<string, unknown>).pii_scrubbing_enabled === true;
 
-  const triageTitle = piiEnabled ? scrubPII(title) : title;
-  const triageDescription = piiEnabled ? scrubPII(description) : description;
+  // Truncate before PII scrub — protects against abnormally large inputs
+  const safeTitle = title.slice(0, MAX_INPUT_CHARS);
+  const safeDescription = description.slice(0, MAX_INPUT_CHARS);
+
+  const triageTitle = piiEnabled ? scrubPII(safeTitle) : safeTitle;
+  const triageDescription = piiEnabled ? scrubPII(safeDescription) : safeDescription;
+
+  // RAG: retrieve relevant KB articles (degrades gracefully if not configured)
+  const ragChunks  = await retrieveRelevantKnowledge(svc, orgId, triageDescription);
+  const ragContext = buildRAGContext(ragChunks);
 
   let result;
   try {
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), AI_TRIAGE_TIMEOUT_MS);
     try {
-      result = await triageTicket(triageTitle, triageDescription);
+      result = await triageTicket(triageTitle, triageDescription, ac.signal, ragContext);
     } finally {
       clearTimeout(timeout);
     }
   } catch (err) {
-    // Anthropic failed — persist a failed analysis row so the UI can reflect "pending"
     await svc.from("ai_analysis").insert({
       ticket_id: ticketId,
       suggested_category: "Other",

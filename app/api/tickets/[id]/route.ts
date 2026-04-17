@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+const VALID_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+  open:        ["in_progress", "resolved"],
+  in_progress: ["open", "resolved"],
+  resolved:    ["closed", "open"],
+  closed:      [],
+};
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +22,7 @@ export async function PATCH(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, organization_id")
     .eq("id", user.id)
     .single();
 
@@ -21,7 +30,31 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Verify ticket belongs to the agent's org — prevents cross-org writes
+  const { data: existing } = await supabase
+    .from("tickets")
+    .select("status, organization_id")
+    .eq("id", id)
+    .eq("organization_id", profile.organization_id)
+    .single();
+
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await request.json();
+
+  // Validate status transition
+  if (body.status && body.status !== existing.status) {
+    const allowed = VALID_TRANSITIONS[existing.status as TicketStatus] ?? [];
+    if (!allowed.includes(body.status as TicketStatus)) {
+      return NextResponse.json(
+        { error: `Invalid transition: ${existing.status} → ${body.status}` },
+        { status: 422 }
+      );
+    }
+  }
+
   const allowed = ["status", "priority", "category_id", "assigned_to", "tags"];
   const patch: Record<string, unknown> = {};
 
@@ -29,14 +62,14 @@ export async function PATCH(
     if (body[key] !== undefined) patch[key] = body[key];
   }
 
-  // Set resolved/closed timestamps
   if (patch.status === "resolved") patch.resolved_at = new Date().toISOString();
-  if (patch.status === "closed") patch.closed_at = new Date().toISOString();
+  if (patch.status === "closed")   patch.closed_at   = new Date().toISOString();
 
   const { data, error } = await supabase
     .from("tickets")
     .update(patch)
     .eq("id", id)
+    .eq("organization_id", profile.organization_id)
     .select()
     .single();
 

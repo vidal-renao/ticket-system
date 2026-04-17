@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import {
   TicketIcon,
@@ -16,9 +17,19 @@ import {
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
 
+type NavKey =
+  | "dashboard"
+  | "myTickets"
+  | "allTickets"
+  | "newTicket"
+  | "queue"
+  | "analytics"
+  | "team"
+  | "settings";
+
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: NavKey;
   icon: React.ElementType;
   roles: UserRole[];
 }
@@ -26,49 +37,49 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Dashboard",
+    labelKey: "dashboard",
     icon: LayoutDashboard,
     roles: ["manager", "admin"],
   },
   {
     href: "/tickets",
-    label: "My Tickets",
+    labelKey: "myTickets",
     icon: TicketIcon,
     roles: ["customer"],
   },
   {
     href: "/tickets/new",
-    label: "New Ticket",
+    labelKey: "newTicket",
     icon: PlusCircle,
     roles: ["customer"],
   },
   {
     href: "/queue",
-    label: "Queue",
+    labelKey: "queue",
     icon: Zap,
     roles: ["agent", "manager", "admin"],
   },
   {
     href: "/tickets",
-    label: "All Tickets",
+    labelKey: "allTickets",
     icon: TicketIcon,
     roles: ["agent", "manager", "admin"],
   },
   {
     href: "/analytics",
-    label: "Analytics",
+    labelKey: "analytics",
     icon: BarChart3,
     roles: ["manager", "admin"],
   },
   {
     href: "/team",
-    label: "Team",
+    labelKey: "team",
     icon: Users,
     roles: ["manager", "admin"],
   },
   {
     href: "/settings",
-    label: "Settings",
+    labelKey: "settings",
     icon: Settings,
     roles: ["admin"],
   },
@@ -83,6 +94,8 @@ interface SidebarProps {
 
 export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
+
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   return (
@@ -105,7 +118,7 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
-              key={`${item.href}-${item.label}`}
+              key={`${item.href}-${item.labelKey}`}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
@@ -116,7 +129,7 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
               )}
             >
               <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-              {item.label}
+              {t(item.labelKey)}
               {isActive && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
               )}
@@ -144,8 +157,9 @@ export function Sidebar({ role, userName, userAvatar, onSignOut }: SidebarProps)
             <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">{userName}</p>
           </div>
           <button
+            type="button"
             onClick={onSignOut}
-            aria-label="Sign out"
+            aria-label={t("signOut")}
             className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
           >
             <LogOut className="w-4 h-4" aria-hidden="true" />

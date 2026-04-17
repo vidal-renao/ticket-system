@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "app/api/tickets/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/ai/feedback/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

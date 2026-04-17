@@ -49,3 +49,17 @@ export async function createServiceClient() {
     }
   );
 }
+
+/**
+ * Static service-role client for background jobs (fire-and-forget, post-response).
+ * Does NOT use cookies() — safe to call outside the request lifecycle.
+ */
+export function createServiceClientStatic() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: { getAll: () => [], setAll: () => {} },
+    }
+  );
+}

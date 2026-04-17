@@ -87,21 +87,30 @@ SMART RESPONSE GUIDELINES:
 
 export async function triageTicket(
   title: string,
-  description: string
+  description: string,
+  signal?: AbortSignal,
+  ragContext?: string
 ): Promise<TriageResultWithMeta> {
   const startTime = Date.now();
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `TICKET TITLE: ${title}\n\nTICKET DESCRIPTION:\n${description}`,
-      },
-    ],
-  });
+  const systemPrompt = ragContext
+    ? `${SYSTEM_PROMPT}\n\n${ragContext}`
+    : SYSTEM_PROMPT;
+
+  const response = await client.messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: `TICKET TITLE: ${title}\n\nTICKET DESCRIPTION:\n${description}`,
+        },
+      ],
+    },
+    { signal }
+  );
 
   const processingTime = Date.now() - startTime;
   const rawText = response.content[0].type === "text" ? response.content[0].text : "";

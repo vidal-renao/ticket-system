@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
 import { PageTransition } from "./PageTransition";
@@ -11,15 +10,17 @@ interface AppShellProps {
   role: UserRole;
   userName: string;
   userAvatar?: string | null;
+  locale: string;
 }
 
-export function AppShell({ children, role, userName, userAvatar }: AppShellProps) {
-  const router = useRouter();
+export function AppShell({ children, role, userName, userAvatar, locale }: AppShellProps) {
   const supabase = createClient();
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.push("/login");
+    // Preserve locale on sign-out — de has no prefix, others get /<locale>/login
+    const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
+    window.location.href = loginPath;
   }
 
   return (

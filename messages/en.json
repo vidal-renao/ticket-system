@@ -17,13 +17,20 @@
     "password": "Password",
     "emailPlaceholder": "you@company.ch",
     "passwordPlaceholder": "••••••••",
-    "privacyNote": "Protected by DSG/LPD · Swiss data privacy standards"
+    "privacyNote": "Protected by DSG/LPD · Swiss data privacy standards",
+    "errorInvalid": "Invalid credentials. Please check your email and password.",
+    "errorGeneric": "Sign-in failed. Please try again."
   },
   "nav": {
     "tickets": "Tickets",
+    "myTickets": "My Tickets",
+    "allTickets": "All Tickets",
     "queue": "Queue",
     "dashboard": "Dashboard",
     "newTicket": "New Ticket",
+    "analytics": "Analytics",
+    "team": "Team",
+    "settings": "Settings",
     "signOut": "Sign out"
   },
   "tickets": {
@@ -36,7 +43,9 @@
     "totalCount": "{count} tickets total",
     "submitRequest": "Submit a Request",
     "aiDescription": "Describe your issue — our AI will prioritize and route it automatically.",
-    "description": "Description"
+    "description": "Description",
+    "errorRequired": "Title and description are required.",
+    "errorGeneric": "Could not create ticket. Please try again."
   },
   "queue": {
     "title": "Queue",
@@ -118,5 +127,20 @@
       "urgent": "Urgent",
       "angry": "Angry"
     }
+  },
+  "team": {
+    "title": "Team",
+    "subtitle": "Members of your organization and their access roles",
+    "memberList": "Member list",
+    "memberCount": "{count} members",
+    "totalMembers": "Total members",
+    "activeMembers": "Active members",
+    "noMembers": "No members in this organization yet.",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "role_admin": "Admin",
+    "role_manager": "Manager",
+    "role_agent": "Agent",
+    "role_customer": "Customer"
   }
 }

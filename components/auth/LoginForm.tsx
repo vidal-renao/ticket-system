@@ -1,26 +1,19 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { useFormStatus } from "react-dom";
-import { loginAction } from "@/app/(auth)/login/actions";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" loading={pending} className="w-full">
-      Sign in
-    </Button>
-  );
+interface LoginFormProps {
+  error?: string;
 }
 
-export function LoginForm() {
-  const [state, formAction] = useActionState(loginAction, null);
+export function LoginForm({ error }: LoginFormProps) {
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    if (state?.error) toast.error(state.error);
-  }, [state]);
+    if (error) toast.error(decodeURIComponent(error));
+  }, [error]);
 
   const inputClass = [
     "w-full px-3 py-2.5 rounded-lg text-sm",
@@ -30,8 +23,52 @@ export function LoginForm() {
     "transition-colors",
   ].join(" ");
 
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        body: new FormData(e.currentTarget),
+      });
+
+      let json: { redirectTo?: string; error?: string };
+      try {
+        json = await res.json();
+      } catch {
+        toast.error("Server error — please try again");
+        setPending(false);
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error(json.error || "Login failed");
+        setPending(false);
+        return;
+      }
+
+      const { redirectTo, error: apiError } = json;
+      if (apiError) {
+        toast.error(apiError);
+        setPending(false);
+        return;
+      }
+
+      // Hard navigate so the browser sends the freshly-set session cookies
+      window.location.href = redirectTo ?? "/dashboard";
+    } catch {
+      toast.error("Network error — please try again");
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form
+      method="post"
+      action="/api/auth/login"
+      onSubmit={handleSubmit}
+      className="space-y-4"
+    >
       <div className="p-5 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] space-y-4">
         <div>
           <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
@@ -59,7 +96,9 @@ export function LoginForm() {
         </div>
       </div>
 
-      <SubmitButton />
+      <Button type="submit" loading={pending} className="w-full">
+        Sign in
+      </Button>
     </form>
   );
 }

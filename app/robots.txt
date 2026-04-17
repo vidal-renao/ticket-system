@@ -1,0 +1,14 @@
+User-agent: *
+Disallow: /api/
+Disallow: /de/dashboard
+Disallow: /en/dashboard
+Disallow: /es/dashboard
+Disallow: /de/queue
+Disallow: /en/queue
+Disallow: /es/queue
+Disallow: /de/tickets/
+Disallow: /en/tickets/
+Disallow: /es/tickets/
+Allow: /
+
+Sitemap: https://helpdesk.vidallab.ch/sitemap.xml
