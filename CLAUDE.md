@@ -38,6 +38,18 @@ Especialización: AI-Powered SaaS Infrastructure · Swiss DSG/nDSG Compliance ·
 7. **Seguridad primero**: validar en boundaries (input usuario, APIs externas). No validar código interno.
 8. **No over-engineering**: 0 abstracciones especulativas. Solo la complejidad que la tarea requiere.
 
+## REGLAS DE EJECUCIÓN (PROTOCOLO DE EFICIENCIA)
+1. **Sin preámbulos** — Ninguna respuesta empieza con "Voy a...", "Entendido", "Perfecto!", "Claro que sí", "Analizando...".
+2. **Edición atómica** — Un tool call por cambio lógico. Nunca leer + editar en pasos separados si el contenido ya es conocido.
+3. **Cero charla** — Sin confirmaciones de recepción. Sin resúmenes al final de lo que ya es visible en el diff.
+4. **Paralelismo máximo** — Todas las tool calls independientes en un único mensaje. Read + Read + Grep en paralelo, nunca en serie.
+5. **No repetir el prompt** — Nunca reformular la tarea antes de ejecutarla. Directo al tool call.
+6. **Respuesta mínima viable** — Solo el output que el usuario necesita. Sin explicar lo que ya es obvio por el código.
+7. **Herramientas directas** — Glob/Grep/Read para búsquedas simples. Agent solo para exploración multi-paso abierta.
+8. **Sin confirmaciones intermedias** — En tareas con instrucciones claras, no preguntar "¿Continúo?". Ejecutar hasta el final.
+9. **Commits en cadena** — git add + commit + push en un solo Bash call encadenado con `&&`. Sin verificaciones intermedias cuando el diff es claro.
+10. **Memoria no-redundante** — Guardar en memoria solo lo no-derivable del código o `git log`. Nunca guardar lo que leer el archivo ya revela.
+
 ## COMPLIANCE SWISS DSG / nDSG
 - **RLS obligatorio** en todas las tablas Supabase con datos de usuario
 - **Audit logs inmutables** para operaciones críticas (INSERT-only, sin UPDATE/DELETE)
