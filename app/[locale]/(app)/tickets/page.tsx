@@ -39,21 +39,23 @@ export default async function TicketsPage({
 
   const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
 
-  // Service client — RLS policies on tickets are inconsistent (missing staff
-  // policies after manual DB edits). Access scoped manually via eq() filters.
-  const ticketsQuery = svc
-    .from("tickets")
-    .select("id, ticket_number, title, status, priority, created_at, updated_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  // Supabase query builder is immutable — eq() returns a new object.
+  // Must branch into two separate query chains, not mutate a shared variable.
+  const orgId = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
-  if (!isStaff) {
-    ticketsQuery.eq("created_by", user.id);
-  } else {
-    ticketsQuery.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
-  }
-
-  const { data: tickets } = await ticketsQuery;
+  const { data: tickets } = isStaff
+    ? await svc
+        .from("tickets")
+        .select("id, ticket_number, title, status, priority, created_at, updated_at")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(100)
+    : await svc
+        .from("tickets")
+        .select("id, ticket_number, title, status, priority, created_at, updated_at")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
   return (
