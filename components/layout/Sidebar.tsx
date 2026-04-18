@@ -11,6 +11,7 @@ import {
   Settings,
   Zap,
   BarChart3,
+  TrendingUp,
   LogOut,
   Home,
 } from "lucide-react";
@@ -24,6 +25,7 @@ type NavKey =
   | "newTicket"
   | "queue"
   | "analytics"
+  | "predictive"
   | "team"
   | "settings";
 
@@ -69,6 +71,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/analytics",
     labelKey: "analytics",
     icon: BarChart3,
+    roles: ["manager", "admin"],
+  },
+  {
+    href: "/analytics/predictive",
+    labelKey: "predictive",
+    icon: TrendingUp,
     roles: ["manager", "admin"],
   },
   {
