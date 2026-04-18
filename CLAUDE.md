@@ -81,8 +81,12 @@ middleware.ts           ← next-intl + Supabase session refresh
 ## ESTÁNDARES UI/UX
 - **Dark mode nativo**: background `#060606`, glassmorphism con `rgba(255,255,255,0.04)`
 - **Grid system**: max-w-6xl, px-6, gap-5/gap-6
-- **Animaciones**: Framer Motion `initial/animate/transition` — `once: true` en scroll triggers
-- **Tipografía**: Geist Sans variable, tracking-tight en headings, text-white/50 para muted
+- **Anti-generic**: prohibido colores por defecto de Tailwind sin paleta personalizada
+- **Sombras por capas**: nunca `shadow-md` plano — sombras tintadas con baja opacidad
+- **Animaciones**: solo `transform` y `opacity`. Easing tipo `spring`. Prohibido `transition-all`
+- **Tipografía**: Geist Sans variable, `tracking-tight` en headings, `line-height` generoso (1.7) en cuerpo
+- **Interactividad**: todo elemento clicable DEBE tener estados hover, focus-visible y active
+- **Jerarquía visual**: sistema de capas (base → elevado → flotante) con elevación real
 - **Badges Shields.io**: stack, compliance, deployment status en READMEs
 - **Diagramas Mermaid**: arquitectura, flujos de datos, ERD en docs/
 
