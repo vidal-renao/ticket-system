@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { TicketIcon, PlusCircle, Clock, AlertCircle, Zap } from "lucide-react";
+import { TicketIcon, PlusCircle, Clock, AlertCircle } from "lucide-react";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -36,24 +36,23 @@ export default async function TicketsPage({
     .eq("id", user.id)
     .single();
 
-  const query = supabase
+  // Flat query — no embedded joins (RLS on categories/profiles/ai_analysis
+  // causes PostgREST to reject the whole query for non-privileged roles)
+  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+
+  const baseQuery = supabase
     .from("tickets")
-    .select(`
-      id, ticket_number, title, status, priority, created_at, updated_at,
-      categories(name, slug, color, icon),
-      profiles!tickets_created_by_fkey(full_name),
-      ai_analysis(suggested_priority, confidence_score, sentiment)
-    `)
+    .select("id, ticket_number, title, status, priority, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (profile?.role === "customer") {
-    query.eq("created_by", user.id);
+  if (!isStaff) {
+    baseQuery.eq("created_by", user.id);
   } else {
-    query.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
+    baseQuery.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
   }
 
-  const { data: tickets } = await query;
+  const { data: tickets } = await baseQuery;
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
   return (
@@ -112,32 +111,14 @@ export default async function TicketsPage({
                       }`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono text-[var(--color-text-muted)]">
-                          {formatTicketRef(ticket.ticket_number)}
-                        </span>
-                        {ticket.categories && (
-                          <span className="text-xs text-[var(--color-text-muted)]">
-                            · {ticket.categories.name}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-xs font-mono text-[var(--color-text-muted)] mb-1">
+                        {formatTicketRef(ticket.ticket_number)}
+                      </p>
                       <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                         {ticket.title}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {ticket.ai_analysis &&
-                        (ticket.ai_analysis.confidence_score ?? 0) >= 60 &&
-                        ticket.ai_analysis.suggested_priority !== ticket.priority && (
-                        <span
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium text-indigo-400 border-indigo-500/30 bg-indigo-500/10"
-                          title={`AI suggests: ${ticket.ai_analysis.suggested_priority} (${ticket.ai_analysis.confidence_score?.toFixed(0)}% conf.)`}
-                        >
-                          <Zap className="w-2.5 h-2.5" />
-                          {tp(ticket.ai_analysis.suggested_priority as any)}
-                        </span>
-                      )}
                       <Badge className={priorityColor(ticket.priority)}>
                         {tp(ticket.priority)}
                       </Badge>

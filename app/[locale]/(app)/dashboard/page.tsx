@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -59,7 +60,7 @@ export default async function DashboardPage({
     supabase.from("tickets").select("*", { count: "exact", head: true })
       .eq("organization_id", orgId).eq("sla_breached", true),
     supabase.from("tickets")
-      .select("id, ticket_number, title, priority, status, created_at, categories(name)")
+      .select("id, ticket_number, title, priority, status, created_at")
       .eq("organization_id", orgId).order("created_at", { ascending: false }).limit(5),
     supabase.from("tickets")
       .select("categories(name, slug)").eq("organization_id", orgId).not("category_id", "is", null),
@@ -104,27 +105,32 @@ export default async function DashboardPage({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {recentTickets?.map((ticket: any, i: number) => (
-                <div key={ticket.id} className={`flex items-center gap-3 px-5 py-3 ${i < (recentTickets.length - 1) ? "border-b border-[var(--color-surface-600)]" : ""}`}>
-                  <AlertCircle className={`w-3.5 h-3.5 shrink-0 ${
-                    ticket.priority === "critical" ? "text-red-400" :
-                    ticket.priority === "high"     ? "text-orange-400" :
-                    ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-[var(--color-text-primary)] truncate">{ticket.title}</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      TK-{String(ticket.ticket_number).padStart(4, "0")} · {ticket.categories?.name ?? "—"}
-                    </p>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded border capitalize ${
-                    ticket.status === "open" ? "text-indigo-400 border-indigo-400/20" :
-                    ticket.status === "in_progress" ? "text-blue-400 border-blue-400/20" : "text-slate-400 border-slate-400/20"
-                  }`}>
-                    {ticket.status.replace(/_/g, " ")}
-                  </span>
-                </div>
-              ))}
+              {recentTickets?.map((ticket: any, i: number) => {
+                const ticketPath = locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
+                return (
+                  <Link href={ticketPath} key={ticket.id}>
+                    <div className={`flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-800)] transition-colors ${i < (recentTickets.length - 1) ? "border-b border-[var(--color-surface-600)]" : ""}`}>
+                      <AlertCircle className={`w-3.5 h-3.5 shrink-0 ${
+                        ticket.priority === "critical" ? "text-red-400" :
+                        ticket.priority === "high"     ? "text-orange-400" :
+                        ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[var(--color-text-primary)] truncate">{ticket.title}</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          TK-{String(ticket.ticket_number).padStart(4, "0")}
+                        </p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded border capitalize ${
+                        ticket.status === "open" ? "text-indigo-400 border-indigo-400/20" :
+                        ticket.status === "in_progress" ? "text-blue-400 border-blue-400/20" : "text-slate-400 border-slate-400/20"
+                      }`}>
+                        {ticket.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
               {!recentTickets?.length && (
                 <div className="px-5 py-8 text-center text-sm text-[var(--color-text-muted)]">{t("noData")}</div>
               )}

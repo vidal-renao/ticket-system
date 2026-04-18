@@ -44,8 +44,6 @@ export default async function QueuePage({
     .select(`
       id, ticket_number, title, status, priority, created_at, sla_breached,
       sla_resolution_due, contains_pii,
-      categories(name, slug),
-      profiles!tickets_created_by_fkey(full_name),
       ai_analysis(suggested_priority, sentiment, confidence_score, summary)
     `)
     .eq("organization_id", profile.organization_id ?? "00000000-0000-0000-0000-000000000000")
@@ -80,9 +78,6 @@ export default async function QueuePage({
                 <span className="text-xs font-mono text-[var(--color-text-muted)]">
                   {formatTicketRef(ticket.ticket_number)}
                 </span>
-                {ticket.categories && (
-                  <span className="text-xs text-[var(--color-text-muted)]">· {ticket.categories.name}</span>
-                )}
                 {ticket.contains_pii && (
                   <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
                     <Shield className="w-2.5 h-2.5" /> {ti("piiWarning")}

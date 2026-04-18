@@ -187,7 +187,8 @@ const COPY: Record<string, {
 
 export function LandingPage({ locale }: LandingPageProps) {
   const c = COPY[locale] ?? COPY.en;
-  const loginHref = locale === "de" ? "/login" : `/${locale}/login`;
+  const loginHref  = locale === "de" ? "/login"  : `/${locale}/login`;
+  const signupHref = locale === "de" ? "/signup" : `/${locale}/signup`;
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-950)] text-[var(--color-text-primary)]">
@@ -228,13 +229,13 @@ export function LandingPage({ locale }: LandingPageProps) {
           </p>
 
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            <a
-              href="#pricing"
+            <Link
+              href={signupHref}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5"
             >
               {c.cta_primary}
               <ArrowRight className="w-4 h-4" />
-            </a>
+            </Link>
             <Link
               href={loginHref}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-surface-500)] transition-all"
@@ -336,13 +337,13 @@ export function LandingPage({ locale }: LandingPageProps) {
             {c.footer_cta_title}
           </h2>
           <p className="text-[var(--color-text-secondary)] mb-8">{c.footer_cta_sub}</p>
-          <a
-            href="#pricing"
+          <Link
+            href={signupHref}
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:-translate-y-0.5"
           >
             {c.footer_cta_btn}
             <ArrowRight className="w-4 h-4" />
-          </a>
+          </Link>
         </div>
 
         {/* Footer links */}
@@ -351,7 +352,7 @@ export function LandingPage({ locale }: LandingPageProps) {
             <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
               <Zap className="w-2.5 h-2.5 text-white" />
             </div>
-            <span>HelpDesk AI © 2026</span>
+            <span>© 2026 Vidal Ecosystem. All rights reserved.</span>
           </div>
           <div className="flex items-center gap-4">
             <span>Basel, Switzerland 🇨🇭</span>
