@@ -41,7 +41,6 @@ export default async function TicketDetailPage({
     .eq("id", id)
     .single();
 
-  if (ticketError) console.error("[TicketDetail] query error", ticketError);
   if (!ticket) notFound();
 
   // ai_analysis is staff-only — fetch separately so customer queries still work
