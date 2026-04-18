@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AlertCircle, Clock, Zap, Shield } from "lucide-react";
@@ -31,7 +31,8 @@ export default async function QueuePage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles").select("role, organization_id").eq("id", user.id).single();
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
@@ -39,18 +40,25 @@ export default async function QueuePage({
     redirect(ticketsPath);
   }
 
-  const { data: tickets } = await supabase
+  const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+
+  const { data: ticketsRaw } = await svc
     .from("tickets")
-    .select(`
-      id, ticket_number, title, status, priority, created_at, sla_breached,
-      sla_resolution_due, contains_pii,
-      ai_analysis(suggested_priority, sentiment, confidence_score, summary)
-    `)
-    .eq("organization_id", profile.organization_id ?? "00000000-0000-0000-0000-000000000000")
+    .select("id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii")
+    .eq("organization_id", orgId)
     .in("status", ["open", "in_progress"])
     .order("created_at", { ascending: false });
 
-  const sorted = [...(tickets ?? [])].sort((a: any, b: any) => {
+  // Fetch ai_analysis separately — embedded join fails silently on FK hint mismatch
+  const ticketIds = (ticketsRaw ?? []).map((t: any) => t.id);
+  const { data: aiRows } = ticketIds.length
+    ? await svc.from("ai_analysis").select("ticket_id, suggested_priority, sentiment, confidence_score, summary").in("ticket_id", ticketIds)
+    : { data: [] };
+
+  const aiByTicket = Object.fromEntries((aiRows ?? []).map((a: any) => [a.ticket_id, a]));
+  const tickets = (ticketsRaw ?? []).map((t: any) => ({ ...t, ai_analysis: aiByTicket[t.id] ?? null }));
+
+  const sorted = [...tickets].sort((a: any, b: any) => {
     if (a.sla_breached && !b.sla_breached) return -1;
     if (!a.sla_breached && b.sla_breached) return 1;
     return (PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] ?? 3) -
