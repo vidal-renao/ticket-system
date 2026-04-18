@@ -27,26 +27,33 @@ export default async function TicketDetailPage({
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
 
-  const { data: ticket } = await supabase
+  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+
+  // Fetch ticket WITHOUT ai_analysis join — that table has staff-only RLS and
+  // PostgREST would error (returning null) if a customer requests it via join.
+  const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
     .select(`
       *,
       categories(name, slug, color, icon),
-      profiles!tickets_created_by_fkey(full_name, avatar_url),
-      ai_analysis(*)
+      profiles!tickets_created_by_fkey(full_name, avatar_url)
     `)
     .eq("id", id)
     .single();
 
+  if (ticketError) console.error("[TicketDetail] query error", ticketError);
   if (!ticket) notFound();
+
+  // ai_analysis is staff-only — fetch separately so customer queries still work
+  const { data: aiAnalysis } = isStaff
+    ? await supabase.from("ai_analysis").select("*").eq("ticket_id", id).single()
+    : { data: null };
 
   const { data: comments } = await supabase
     .from("ticket_comments")
     .select(`*, profiles(full_name, avatar_url)`)
     .eq("ticket_id", id)
     .order("created_at", { ascending: true });
-
-  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -126,11 +133,11 @@ export default async function TicketDetailPage({
             </Card>
           )}
 
-          {isStaff && ticket.ai_analysis && (
-            <AITriagePanel analysis={ticket.ai_analysis} ticketId={ticket.id} />
+          {isStaff && aiAnalysis && (
+            <AITriagePanel analysis={aiAnalysis} ticketId={ticket.id} />
           )}
 
-          {isStaff && !ticket.ai_analysis && (
+          {isStaff && !aiAnalysis && (
             <Card>
               <CardContent className="py-3">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] mb-1">{t("aiTriage")}</p>
