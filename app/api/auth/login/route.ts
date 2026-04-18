@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -41,7 +42,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
+  // Use service client to bypass RLS — auth already verified above via signInWithPassword.
+  // The anon client blocks profile reads when organization_id is NULL (RLS NULL = NULL issue).
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
     .select("role")
     .eq("id", user.id)

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -30,7 +30,8 @@ export default async function TicketsPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
     .select("role, organization_id")
     .eq("id", user.id)

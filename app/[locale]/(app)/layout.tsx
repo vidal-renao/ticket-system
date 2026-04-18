@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/AppShell";
 
 export default async function AppLayout({
@@ -16,7 +16,10 @@ export default async function AppLayout({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  // Use service client to bypass RLS on profiles — auth is already verified above.
+  // This prevents redirect loops when profiles RLS policies are misconfigured.
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
     .select("full_name, role")
     .eq("id", user.id)

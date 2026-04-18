@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { TicketIcon, AlertCircle, CheckCircle2, Clock, Zap, TrendingUp, ShieldAlert } from "lucide-react";
 
@@ -25,7 +25,8 @@ export default async function DashboardPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles").select("role, organization_id").eq("id", user.id).single();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
