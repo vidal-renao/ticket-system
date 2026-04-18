@@ -48,7 +48,7 @@ export default async function QueuePage({
       profiles!tickets_created_by_fkey(full_name),
       ai_analysis(suggested_priority, sentiment, confidence_score, summary)
     `)
-    .eq("organization_id", profile.organization_id ?? "")
+    .eq("organization_id", profile.organization_id ?? "00000000-0000-0000-0000-000000000000")
     .in("status", ["open", "in_progress"])
     .order("created_at", { ascending: false });
 

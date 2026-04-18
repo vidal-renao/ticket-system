@@ -34,18 +34,29 @@ export default async function AnalyticsPage({
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
   if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);
 
-  const orgId = profile.organization_id ?? "";
+  // Guard: no org → nothing to show yet
+  if (!profile.organization_id) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
+        <p className="text-sm text-[var(--color-text-muted)]">{t("noData")}</p>
+      </div>
+    );
+  }
 
-  // SLA breach risk threshold: 4 hours from now
+  const orgId = profile.organization_id;
   const slaRiskThreshold = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
+  // Fetch tickets and ai_analysis separately — ai_analysis has staff-only RLS;
+  // embedding it via PostgREST join can cause HTTP 400 in edge cases.
   const [
-    { data: ticketsWithAI },
+    { data: allTickets },
     { data: slaAtRisk },
     { data: openByPriority },
+    { data: aiRows },
   ] = await Promise.all([
     supabase.from("tickets")
-      .select("priority, status, ai_analysis(sentiment, confidence_score, category_accepted, contains_pii_detected)")
+      .select("id, priority, status")
       .eq("organization_id", orgId),
     supabase.from("tickets")
       .select("id, ticket_number, title, priority, sla_resolution_due, categories(name)")
@@ -60,6 +71,13 @@ export default async function AnalyticsPage({
       .select("priority")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"]),
+    supabase.from("ai_analysis")
+      .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
+      .in(
+        "ticket_id",
+        // Pass ticket IDs scoped to this org (ai_analysis has no org column)
+        (allTickets ?? []).map((t: { id: string }) => t.id)
+      ),
   ]);
 
   // Compute sentiment distribution
@@ -70,9 +88,7 @@ export default async function AnalyticsPage({
   let totalConfidence = 0, confidenceCount = 0;
   let categoryAccepted = 0, feedbackTotal = 0;
 
-  for (const row of ticketsWithAI ?? []) {
-    const ai = (row as any).ai_analysis;
-    if (!ai) continue;
+  for (const ai of aiRows ?? []) {
     totalAI++;
     if (ai.sentiment && ai.sentiment in sentimentCounts) {
       sentimentCounts[ai.sentiment as SentimentType]++;

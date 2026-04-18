@@ -30,7 +30,16 @@ export default async function DashboardPage({
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
   if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);
 
-  const orgId = profile.organization_id ?? "";
+  if (!profile.organization_id) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
+        <p className="text-sm text-[var(--color-text-muted)]">{t("noData")}</p>
+      </div>
+    );
+  }
+
+  const orgId = profile.organization_id;
 
   const [
     { count: totalOpen },

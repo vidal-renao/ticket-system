@@ -54,7 +54,16 @@ export default async function TeamPage({
     redirect(queuePath);
   }
 
-  const orgId = profile.organization_id ?? "";
+  if (!profile.organization_id) {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
+        <p className="text-sm text-[var(--color-text-muted)]">{t("noMembers")}</p>
+      </div>
+    );
+  }
+
+  const orgId = profile.organization_id;
 
   const { data: members } = await supabase
     .from("profiles")

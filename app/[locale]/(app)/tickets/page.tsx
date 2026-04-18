@@ -50,7 +50,7 @@ export default async function TicketsPage({
   if (profile?.role === "customer") {
     query.eq("created_by", user.id);
   } else {
-    query.eq("organization_id", profile?.organization_id ?? "");
+    query.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
   }
 
   const { data: tickets } = await query;
