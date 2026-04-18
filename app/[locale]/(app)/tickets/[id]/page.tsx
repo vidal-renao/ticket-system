@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
@@ -24,7 +24,8 @@ export default async function TicketDetailPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles").select("role").eq("id", user.id).single();
 
   const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
