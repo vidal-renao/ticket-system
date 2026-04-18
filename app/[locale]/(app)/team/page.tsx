@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Users, UserCheck, Building2 } from "lucide-react";
 import type { UserRole } from "@/lib/supabase/types";
@@ -42,7 +42,8 @@ export default async function TeamPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
     .select("role, organization_id")
     .eq("id", user.id)
@@ -65,7 +66,7 @@ export default async function TeamPage({
 
   const orgId = profile.organization_id;
 
-  const { data: members } = await supabase
+  const { data: members } = await svc
     .from("profiles")
     .select("id, full_name, role, department, is_active, created_at")
     .eq("organization_id", orgId)

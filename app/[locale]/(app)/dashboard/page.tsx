@@ -53,18 +53,18 @@ export default async function DashboardPage({
     { data: recentTickets },
     { data: priorityStats },
   ] = await Promise.all([
-    supabase.from("tickets").select("*", { count: "exact", head: true })
+    svc.from("tickets").select("*", { count: "exact", head: true })
       .eq("organization_id", orgId).in("status", ["open", "in_progress"]),
-    supabase.from("tickets").select("*", { count: "exact", head: true })
+    svc.from("tickets").select("*", { count: "exact", head: true })
       .eq("organization_id", orgId).eq("priority", "critical").in("status", ["open", "in_progress"]),
-    supabase.from("tickets").select("*", { count: "exact", head: true })
+    svc.from("tickets").select("*", { count: "exact", head: true })
       .eq("organization_id", orgId).eq("status", "resolved"),
-    supabase.from("tickets").select("*", { count: "exact", head: true })
+    svc.from("tickets").select("*", { count: "exact", head: true })
       .eq("organization_id", orgId).eq("sla_breached", true),
-    supabase.from("tickets")
+    svc.from("tickets")
       .select("id, ticket_number, title, priority, status, created_at")
       .eq("organization_id", orgId).order("created_at", { ascending: false }).limit(5),
-    supabase.from("tickets")
+    svc.from("tickets")
       .select("priority").eq("organization_id", orgId).in("status", ["open", "in_progress"]),
   ]);
 

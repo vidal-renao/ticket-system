@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { BarChart3, Zap, AlertCircle, ShieldAlert, Clock } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon } from "@/lib/utils";
@@ -28,7 +28,8 @@ export default async function AnalyticsPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles").select("role, organization_id").eq("id", user.id).single();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
@@ -48,13 +49,12 @@ export default async function AnalyticsPage({
   const slaRiskThreshold = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
   // Step 1: fetch org tickets (IDs needed to scope ai_analysis query)
-  const { data: allTickets } = await supabase
+  const { data: allTickets } = await svc
     .from("tickets")
     .select("id, priority, status")
-    .eq("organization_id", orgId)
-    .returns<{ id: string; priority: string; status: string }[]>();
+    .eq("organization_id", orgId);
 
-  const ticketIds: string[] = (allTickets ?? []).map((t) => t.id);
+  const ticketIds: string[] = (allTickets ?? []).map((t: any) => t.id);
 
   // Step 2: parallel queries — ai_analysis scoped by ticket IDs (no org column)
   const [
@@ -62,8 +62,8 @@ export default async function AnalyticsPage({
     { data: openByPriority },
     { data: aiRows },
   ] = await Promise.all([
-    supabase.from("tickets")
-      .select("id, ticket_number, title, priority, sla_resolution_due, categories(name)")
+    svc.from("tickets")
+      .select("id, ticket_number, title, priority, sla_resolution_due")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"])
       .not("sla_resolution_due", "is", null)
@@ -71,12 +71,12 @@ export default async function AnalyticsPage({
       .eq("sla_breached", false)
       .order("sla_resolution_due", { ascending: true })
       .limit(10),
-    supabase.from("tickets")
+    svc.from("tickets")
       .select("priority")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"]),
     ticketIds.length > 0
-      ? supabase.from("ai_analysis")
+      ? svc.from("ai_analysis")
           .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
           .in("ticket_id", ticketIds)
       : Promise.resolve({ data: [] as { ticket_id: string; sentiment: string | null; confidence_score: number | null; category_accepted: boolean | null; contains_pii_detected: boolean }[] }),
@@ -286,7 +286,7 @@ export default async function AnalyticsPage({
                           {ticket.title}
                         </p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          {formatTicketRef(ticket.ticket_number)} · {(ticket as any).categories?.name ?? "—"}
+                          {formatTicketRef(ticket.ticket_number)}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
