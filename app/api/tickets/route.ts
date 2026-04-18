@@ -29,7 +29,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: profile } = await supabase
+  // Service client bypasses RLS — auth already verified via getUser() above.
+  // Anon client blocks profile reads when organization_id is NULL (NULL = NULL issue).
+  const svcProfile = createServiceClientStatic();
+  const { data: profile } = await svcProfile
     .from("profiles")
     .select("organization_id")
     .eq("id", user.id)
