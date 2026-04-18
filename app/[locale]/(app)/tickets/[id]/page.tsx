@@ -30,9 +30,10 @@ export default async function TicketDetailPage({
 
   const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
 
-  // Fetch ticket WITHOUT ai_analysis join — that table has staff-only RLS and
-  // PostgREST would error (returning null) if a customer requests it via join.
-  const { data: ticket } = await supabase
+  // Service client bypasses RLS — access control enforced manually below.
+  // Anon client fails when RLS policies on tickets/categories/profiles are
+  // inconsistent (missing staff policies, embedded join RLS cascade).
+  const { data: ticket } = await svc
     .from("tickets")
     .select(`
       *,
@@ -44,12 +45,15 @@ export default async function TicketDetailPage({
 
   if (!ticket) notFound();
 
-  // ai_analysis is staff-only — fetch separately so customer queries still work
+  // Manual access check: customers can only see their own tickets
+  if (!isStaff && ticket.created_by !== user.id) notFound();
+
+  // ai_analysis is staff-only
   const { data: aiAnalysis } = isStaff
-    ? await supabase.from("ai_analysis").select("*").eq("ticket_id", id).single()
+    ? await svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
     : { data: null };
 
-  const { data: comments } = await supabase
+  const { data: comments } = await svc
     .from("ticket_comments")
     .select(`*, profiles(full_name, avatar_url)`)
     .eq("ticket_id", id)

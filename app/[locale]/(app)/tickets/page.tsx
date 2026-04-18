@@ -37,23 +37,23 @@ export default async function TicketsPage({
     .eq("id", user.id)
     .single();
 
-  // Flat query — no embedded joins (RLS on categories/profiles/ai_analysis
-  // causes PostgREST to reject the whole query for non-privileged roles)
   const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
 
-  const baseQuery = supabase
+  // Service client — RLS policies on tickets are inconsistent (missing staff
+  // policies after manual DB edits). Access scoped manually via eq() filters.
+  const ticketsQuery = svc
     .from("tickets")
     .select("id, ticket_number, title, status, priority, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(50);
 
   if (!isStaff) {
-    baseQuery.eq("created_by", user.id);
+    ticketsQuery.eq("created_by", user.id);
   } else {
-    baseQuery.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
+    ticketsQuery.eq("organization_id", profile?.organization_id ?? "00000000-0000-0000-0000-000000000000");
   }
 
-  const { data: tickets } = await baseQuery;
+  const { data: tickets } = await ticketsQuery;
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
   return (
