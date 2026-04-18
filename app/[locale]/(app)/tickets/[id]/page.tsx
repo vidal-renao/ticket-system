@@ -31,7 +31,7 @@ export default async function TicketDetailPage({
 
   // Fetch ticket WITHOUT ai_analysis join — that table has staff-only RLS and
   // PostgREST would error (returning null) if a customer requests it via join.
-  const { data: ticket, error: ticketError } = await supabase
+  const { data: ticket } = await supabase
     .from("tickets")
     .select(`
       *,
