@@ -47,17 +47,21 @@ export default async function AnalyticsPage({
   const orgId = profile.organization_id;
   const slaRiskThreshold = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
-  // Fetch tickets and ai_analysis separately — ai_analysis has staff-only RLS;
-  // embedding it via PostgREST join can cause HTTP 400 in edge cases.
+  // Step 1: fetch org tickets (IDs needed to scope ai_analysis query)
+  const { data: allTickets } = await supabase
+    .from("tickets")
+    .select("id, priority, status")
+    .eq("organization_id", orgId)
+    .returns<{ id: string; priority: string; status: string }[]>();
+
+  const ticketIds: string[] = (allTickets ?? []).map((t) => t.id);
+
+  // Step 2: parallel queries — ai_analysis scoped by ticket IDs (no org column)
   const [
-    { data: allTickets },
     { data: slaAtRisk },
     { data: openByPriority },
     { data: aiRows },
   ] = await Promise.all([
-    supabase.from("tickets")
-      .select("id, priority, status")
-      .eq("organization_id", orgId),
     supabase.from("tickets")
       .select("id, ticket_number, title, priority, sla_resolution_due, categories(name)")
       .eq("organization_id", orgId)
@@ -71,13 +75,11 @@ export default async function AnalyticsPage({
       .select("priority")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"]),
-    supabase.from("ai_analysis")
-      .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
-      .in(
-        "ticket_id",
-        // Pass ticket IDs scoped to this org (ai_analysis has no org column)
-        (allTickets ?? []).map((t: { id: string }) => t.id)
-      ),
+    ticketIds.length > 0
+      ? supabase.from("ai_analysis")
+          .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
+          .in("ticket_id", ticketIds)
+      : Promise.resolve({ data: [] as { ticket_id: string; sentiment: string | null; confidence_score: number | null; category_accepted: boolean | null; contains_pii_detected: boolean }[] }),
   ]);
 
   // Compute sentiment distribution
