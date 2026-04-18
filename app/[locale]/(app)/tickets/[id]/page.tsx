@@ -30,34 +30,39 @@ export default async function TicketDetailPage({
 
   const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
 
-  // Service client bypasses RLS — access control enforced manually below.
-  // Anon client fails when RLS policies on tickets/categories/profiles are
-  // inconsistent (missing staff policies, embedded join RLS cascade).
-  const { data: ticket } = await svc
+  // Flat ticket query — no embedded joins to avoid FK name mismatch errors.
+  // PostgREST returns data=null (silently) when a join hint like
+  // profiles!tickets_created_by_fkey doesn't match the actual constraint name.
+  const { data: ticket, error: ticketError } = await svc
     .from("tickets")
-    .select(`
-      *,
-      categories(name, slug, color, icon),
-      profiles!tickets_created_by_fkey(full_name, avatar_url)
-    `)
+    .select("*")
     .eq("id", id)
     .single();
 
-  if (!ticket) notFound();
+  if (ticketError || !ticket) notFound();
 
   // Manual access check: customers can only see their own tickets
   if (!isStaff && ticket.created_by !== user.id) notFound();
 
-  // ai_analysis is staff-only
-  const { data: aiAnalysis } = isStaff
-    ? await svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
-    : { data: null };
-
-  const { data: comments } = await svc
-    .from("ticket_comments")
-    .select(`*, profiles(full_name, avatar_url)`)
-    .eq("ticket_id", id)
-    .order("created_at", { ascending: true });
+  // Fetch related data as separate flat queries
+  const [
+    { data: category },
+    { data: creator },
+    { data: aiAnalysis },
+    { data: comments },
+  ] = await Promise.all([
+    ticket.category_id
+      ? svc.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
+      : Promise.resolve({ data: null }),
+    svc.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
+    isStaff
+      ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
+      : Promise.resolve({ data: null }),
+    svc.from("ticket_comments")
+      .select("*, profiles(full_name, avatar_url)")
+      .eq("ticket_id", id)
+      .order("created_at", { ascending: true }),
+  ]);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -78,9 +83,9 @@ export default async function TicketDetailPage({
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={priorityColor(ticket.priority)}>{tp(ticket.priority)}</Badge>
           <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
-          {ticket.categories && (
+          {category && (
             <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
-              {ticket.categories.name}
+              {category.name}
             </Badge>
           )}
           <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
