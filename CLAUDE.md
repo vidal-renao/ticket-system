@@ -78,17 +78,43 @@ lib/
 middleware.ts           ← next-intl + Supabase session refresh
 ```
 
-## ESTÁNDARES UI/UX
+## ESTÁNDARES UI/UX (SWISS QUALITY)
 - **Dark mode nativo**: background `#060606`, glassmorphism con `rgba(255,255,255,0.04)`
 - **Grid system**: max-w-6xl, px-6, gap-5/gap-6
-- **Anti-generic**: prohibido colores por defecto de Tailwind sin paleta personalizada
-- **Sombras por capas**: nunca `shadow-md` plano — sombras tintadas con baja opacidad
-- **Animaciones**: solo `transform` y `opacity`. Easing tipo `spring`. Prohibido `transition-all`
-- **Tipografía**: Geist Sans variable, `tracking-tight` en headings, `line-height` generoso (1.7) en cuerpo
-- **Interactividad**: todo elemento clicable DEBE tener estados hover, focus-visible y active
-- **Jerarquía visual**: sistema de capas (base → elevado → flotante) con elevación real
+- **Paleta personalizada**: prohibido colores por defecto de Tailwind sin customización — siempre paletas semánticas propias
+- **Tipografía**: Geist Sans variable, `tracking-tight` en headings, `line-height: 1.7` en cuerpo, `font-mono tabular-nums` en datos numéricos
+- **Sombras por capas**: nunca `shadow-md` plano — usar sombras tintadas multi-capa con baja opacidad (ej. `shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_8px_32px_rgba(0,0,0,0.4)]`)
+- **Jerarquía visual**: sistema de 3 capas (base → elevado → flotante) con elevación real mediante border + shadow
 - **Badges Shields.io**: stack, compliance, deployment status en READMEs
 - **Diagramas Mermaid**: arquitectura, flujos de datos, ERD en docs/
+
+## PROTOCOLO DE QA VISUAL & PIXEL PERFECT
+
+### Ojo Crítico — Accesibilidad y Jerarquía
+- **WCAG AA mínimo**: contraste de texto ≥ 4.5:1 sobre fondos oscuros; verificar con DevTools > Accessibility
+- **Espaciados consistentes**: usar exclusivamente valores del sistema de espaciado de Tailwind (múltiplos de 4px); prohibido `margin: 3px` o valores ad-hoc
+- **Jerarquía tipográfica clara**: máximo 3 niveles de tamaño por vista — H1 (`text-xl`+), label (`text-sm`), dato auxiliar (`text-xs`)
+- **Color no es el único indicador**: todo estado de error/éxito/warning debe tener texto o icono además del color
+
+### Responsive & Touch
+- **Botones y targets táctiles**: mínimo `44×44px` en mobile — usar `min-h-[44px] min-w-[44px]` en elementos interactivos
+- **Breakpoints obligatorios**: diseñar primero para `lg` (desktop app), verificar que no rompa en `md` y `sm`
+- **Overflow controlado**: todo contenedor con texto variable debe tener `truncate` o `overflow-hidden` — prohibido desbordamiento horizontal en producción
+- **Grid fluido**: `grid-cols-1 lg:grid-cols-N` — nunca columnas fijas sin fallback
+
+### Interactividad — Estados Obligatorios
+- **Hover**: todo elemento clicable debe cambiar visualmente en hover (`hover:bg-*` o `hover:opacity-*`)
+- **Focus-visible**: `focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none` en todos los elementos interactivos — nunca eliminar outline sin reemplazarlo
+- **Active**: feedback táctil en botones — `active:scale-[0.97]` o `active:opacity-80`
+- **Disabled**: estado visual claramente diferenciado — `opacity-40 cursor-not-allowed pointer-events-none`
+- **Loading**: nunca dejar un botón sin feedback tras click — usar spinner o estado de texto
+
+### Rendimiento de Animaciones
+- **Solo `transform` y `opacity`**: prohibido animar `width`, `height`, `top`, `left`, `background-color` directamente — causan layout thrashing
+- **Prohibido `transition-all`**: declarar propiedades explícitas — `transition-[transform,opacity]`
+- **Duración estándar**: micro-interacciones `150ms`, transiciones de estado `200-250ms`, animaciones de entrada `300ms`
+- **Easing**: preferir `ease-out` para entradas, `ease-in` para salidas, `spring` (Framer Motion) para elementos físicos
+- **`will-change` con moderación**: solo en elementos con animación continua — no aplicar globalmente
 
 ## GESTIÓN DEL ECOSISTEMA
 - Al entrar en un subproyecto: leer su `README.md` y estructura antes de actuar
