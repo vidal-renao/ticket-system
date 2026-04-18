@@ -101,16 +101,29 @@ interface SidebarProps {
   onGoHome: () => void;
 }
 
+const ROLE_HOME: Record<UserRole, string> = {
+  customer: "/tickets",
+  agent:    "/queue",
+  manager:  "/dashboard",
+  admin:    "/dashboard",
+};
+
 export function Sidebar({ role, userName, userAvatar, onSignOut, onGoHome }: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
 
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
+  // Fix: if another visible item has an exact pathname match, don't activate parent via startsWith
+  const hasExactMatch = visibleItems.some((item) => pathname === item.href);
+
   return (
     <aside className="flex flex-col w-60 min-h-screen border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[var(--color-surface-600)]">
+      {/* Logo — links back to role home without signing out */}
+      <Link
+        href={ROLE_HOME[role]}
+        className="flex items-center gap-2.5 px-5 py-5 border-b border-[var(--color-surface-600)] hover:bg-[var(--color-surface-800)] transition-colors"
+      >
         <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
           <Zap className="w-4 h-4 text-white" />
         </div>
@@ -118,13 +131,16 @@ export function Sidebar({ role, userName, userAvatar, onSignOut, onGoHome }: Sid
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">HelpDesk AI</p>
           <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{role}</p>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-0.5">
         {visibleItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          // If another visible item has an exact pathname match (e.g. /analytics/predictive),
+        // do NOT activate the parent (/analytics) via startsWith — avoids dual-highlight.
+        const isActive = pathname === item.href ||
+          (!hasExactMatch && pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={`${item.href}-${item.labelKey}`}

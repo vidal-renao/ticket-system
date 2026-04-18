@@ -42,6 +42,7 @@ export default async function DashboardPage({
   }
 
   const orgId = profile.organization_id;
+  const prefix = locale === "de" ? "" : `/${locale}`;
 
   // All queries are flat — no embedded joins (categories/ai_analysis RLS
   // can reject the whole PostgREST request if the policy blocks reads)
@@ -90,10 +91,10 @@ export default async function DashboardPage({
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard icon={<TicketIcon className="w-5 h-5 text-indigo-400" />} label={t("openTickets")} value={totalOpen ?? 0} />
-        <KPICard icon={<AlertCircle className="w-5 h-5 text-red-400" />}   label={t("critical")}    value={totalCritical ?? 0} alert={(totalCritical ?? 0) > 0} />
-        <KPICard icon={<CheckCircle2 className="w-5 h-5 text-green-400" />} label={t("resolved")}   value={totalResolved ?? 0} />
-        <KPICard icon={<ShieldAlert className="w-5 h-5 text-amber-400" />}  label={t("slaBreached")} value={slaBreached ?? 0} alert={(slaBreached ?? 0) > 0} />
+        <KPICard icon={<TicketIcon className="w-5 h-5 text-indigo-400" />} label={t("openTickets")} value={totalOpen ?? 0}     href={`${prefix}/queue`} />
+        <KPICard icon={<AlertCircle className="w-5 h-5 text-red-400" />}   label={t("critical")}    value={totalCritical ?? 0} href={`${prefix}/queue`} alert={(totalCritical ?? 0) > 0} />
+        <KPICard icon={<CheckCircle2 className="w-5 h-5 text-green-400" />} label={t("resolved")}   value={totalResolved ?? 0} href={`${prefix}/tickets`} />
+        <KPICard icon={<ShieldAlert className="w-5 h-5 text-amber-400" />}  label={t("slaBreached")} value={slaBreached ?? 0}  href={`${prefix}/tickets`} alert={(slaBreached ?? 0) > 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -194,9 +195,9 @@ export default async function DashboardPage({
   );
 }
 
-function KPICard({ icon, label, value, alert }: { icon: React.ReactNode; label: string; value: number; alert?: boolean }) {
-  return (
-    <Card className={alert ? "border-red-500/30" : ""}>
+function KPICard({ icon, label, value, alert, href }: { icon: React.ReactNode; label: string; value: number; alert?: boolean; href?: string }) {
+  const inner = (
+    <Card className={`${alert ? "border-red-500/30" : ""}${href ? " hover:border-[var(--color-surface-500)] transition-colors cursor-pointer" : ""}`}>
       <CardContent className="py-4">
         <div className="flex items-start justify-between mb-3">
           {icon}
@@ -207,6 +208,8 @@ function KPICard({ icon, label, value, alert }: { icon: React.ReactNode; label: 
       </CardContent>
     </Card>
   );
+  if (href) return <Link href={href}>{inner}</Link>;
+  return inner;
 }
 
 function ProgressBar({ value, className }: { value: number; className?: string }) {

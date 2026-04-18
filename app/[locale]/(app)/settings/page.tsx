@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
-import { Shield, ShieldAlert } from "lucide-react";
+import { Shield, ShieldAlert, Key, Copy } from "lucide-react";
 import { getOrgSettings } from "@/app/actions/org-settings";
 import { PIIScrubbingToggle } from "@/components/settings/PIIScrubbingToggle";
+import { OrgCodeDisplay } from "@/components/settings/OrgCodeDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +29,11 @@ export default async function SettingsPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const { data: profile } = await supabase
+  // Service client bypasses RLS — auth already verified above.
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
-    .select("role")
+    .select("role, organization_id")
     .eq("id", user.id)
     .single();
 
@@ -38,6 +41,14 @@ export default async function SettingsPage({
   if (profile?.role !== "admin") redirect(queuePath);
 
   const { pii_scrubbing_enabled } = await getOrgSettings();
+
+  // Fetch org name if it exists
+  const orgId = profile?.organization_id ?? null;
+  let orgName: string | null = null;
+  if (orgId) {
+    const { data: org } = await svc.from("organizations").select("name").eq("id", orgId).single();
+    orgName = org?.name ?? null;
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -47,6 +58,24 @@ export default async function SettingsPage({
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{t("subtitle")}</p>
       </div>
+
+      {/* Organization Code Card */}
+      <Card className="mb-5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Key className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+            <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+              {t("orgCode")}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <OrgCodeDisplay orgId={orgId} orgName={orgName} />
+          <p className="text-[11px] text-[var(--color-text-muted)] mt-3 leading-relaxed">
+            {t("orgCodeDesc")}
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

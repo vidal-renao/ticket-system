@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { TicketIcon, PlusCircle, Clock, AlertCircle } from "lucide-react";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
+import { TicketRowActions } from "@/components/tickets/TicketRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function TicketsPage({
         .limit(100)
     : await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, updated_at")
+        .select("id, ticket_number, title, status, priority, created_at, updated_at, metadata")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -121,7 +122,7 @@ export default async function TicketsPage({
                         {ticket.title}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       <Badge className={priorityColor(ticket.priority)}>
                         {tp(ticket.priority)}
                       </Badge>
@@ -132,6 +133,20 @@ export default async function TicketsPage({
                         <Clock className="w-3 h-3" />
                         {formatRelativeTime(ticket.updated_at)}
                       </span>
+                      {profile?.role === "customer" && (
+                        <TicketRowActions
+                          ticketId={ticket.id}
+                          currentPriority={ticket.priority}
+                          currentRating={
+                            ticket.metadata &&
+                            typeof ticket.metadata === "object" &&
+                            !Array.isArray(ticket.metadata) &&
+                            typeof (ticket.metadata as Record<string, unknown>).customer_rating === "number"
+                              ? (ticket.metadata as Record<string, unknown>).customer_rating as number
+                              : null
+                          }
+                        />
+                      )}
                     </div>
                   </div>
                 </Card>

@@ -23,7 +23,7 @@ export function AppShell({ children, role, userName, userAvatar, locale }: AppSh
   }
 
   async function handleGoHome() {
-    await supabase.auth.signOut();
+    // Navigate to public landing — keep session active so user can return to app
     const homePath = locale === "de" ? "/home" : `/${locale}/home`;
     window.location.href = homePath;
   }
