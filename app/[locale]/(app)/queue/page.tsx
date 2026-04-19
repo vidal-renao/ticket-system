@@ -4,10 +4,12 @@ import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { AlertCircle, Clock, Zap, Shield } from "lucide-react";
+import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon, formatRelativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+const OTHERS_PAGE_SIZE = 15;
 
 export async function generateMetadata() {
   const t = await getTranslations("queue");
@@ -18,10 +20,13 @@ const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 export default async function QueuePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
-  const { locale } = await params;
+  const { locale }       = await params;
+  const { page: pageStr } = await searchParams;
   const t  = await getTranslations("queue");
   const tp = await getTranslations("priority");
   const ti = await getTranslations("ticket");
@@ -33,8 +38,7 @@ export default async function QueuePage({
 
   const svc = createServiceClientStatic();
 
-  // Two separate queries: auth columns first (always safe), then optional columns
-  // that may not exist if the DB migration hasn't run yet.
+  // Auth-safe query (columns that always exist)
   const { data: profile } = await svc
     .from("profiles")
     .select("role, organization_id")
@@ -48,15 +52,15 @@ export default async function QueuePage({
 
   const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
-  // Safely fetch specialty — column may not exist yet if migration is pending
+  // Safely fetch specialty — column may not exist until migration runs
   const { data: agentExtras } = await svc
     .from("profiles")
     .select("specialty")
     .eq("id", user.id)
     .single();
-  const agentSpecialty: string | null = (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
+  const agentSpecialty: string | null =
+    (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
 
-  // Only columns that exist on the tickets table (no category / assigned_team_id)
   const { data: ticketsRaw, error: ticketsError } = await svc
     .from("tickets")
     .select(
@@ -89,10 +93,9 @@ export default async function QueuePage({
     summary?: string;
   };
 
-  const rawList = (ticketsRaw ?? []) as RawTicket[];
+  const rawList   = (ticketsRaw ?? []) as RawTicket[];
   const ticketIds = rawList.map((t) => t.id);
 
-  // Fetch AI analysis separately — avoids PostgREST join failures
   const { data: aiRows, error: aiError } = ticketIds.length
     ? await svc
         .from("ai_analysis")
@@ -103,7 +106,6 @@ export default async function QueuePage({
 
   if (aiError) console.error("[QueuePage] ai_analysis query error:", aiError.message);
 
-  // Keep most-recent ai_analysis per ticket
   const aiByTicket: Record<string, AiRow> = {};
   for (const row of (aiRows ?? []) as AiRow[]) {
     if (!(row.ticket_id in aiByTicket)) aiByTicket[row.ticket_id] = row;
@@ -134,7 +136,6 @@ export default async function QueuePage({
   const myTickets = sorted.filter(
     (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === user.id
   );
-  // "My Specialty" — unassigned tickets whose AI category matches agent specialty
   const mySpecialty = agentSpecialty
     ? sorted.filter(
         (t) =>
@@ -152,6 +153,17 @@ export default async function QueuePage({
       t.assigned_to !== user.id &&
       !mySpecialtyIds.has(t.id)
   );
+
+  // Pagination applies only to "Others" section
+  const currentPage  = Math.max(1, parseInt(pageStr ?? "1", 10));
+  const totalOthersPages = Math.max(1, Math.ceil(others.length / OTHERS_PAGE_SIZE));
+  const safePage     = Math.min(currentPage, totalOthersPages);
+  const pagedOthers  = others.slice((safePage - 1) * OTHERS_PAGE_SIZE, safePage * OTHERS_PAGE_SIZE);
+
+  function othersPageHref(p: number) {
+    const base = locale === "de" ? "/queue" : `/${locale}/queue`;
+    return p > 1 ? `${base}?page=${p}` : base;
+  }
 
   function TicketCard({ ticket }: { ticket: TicketWithAI }) {
     const ticketPath =
@@ -221,13 +233,22 @@ export default async function QueuePage({
     );
   }
 
-  function SectionHeader({ label, icon }: { label: string; icon: React.ReactNode }) {
+  function SectionHeader({
+    label,
+    count,
+    icon,
+  }: {
+    label: string;
+    count: number;
+    icon: React.ReactNode;
+  }) {
     return (
       <div className="flex items-center gap-2 mb-3">
         {icon}
         <h2 className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
           {label}
         </h2>
+        <span className="ml-auto text-xs text-[var(--color-text-muted)]">{count}</span>
       </div>
     );
   }
@@ -243,11 +264,12 @@ export default async function QueuePage({
         </div>
       </div>
 
-      {/* Critical / SLA breached */}
+      {/* Critical / SLA */}
       {critical.length > 0 && (
         <div className="mb-6">
           <SectionHeader
             label={t("urgentSla")}
+            count={critical.length}
             icon={<AlertCircle className="w-4 h-4 text-red-400" />}
           />
           <div className="space-y-2">
@@ -261,6 +283,7 @@ export default async function QueuePage({
         <div className="mb-6">
           <SectionHeader
             label={t("myTickets")}
+            count={myTickets.length}
             icon={<Zap className="w-4 h-4 text-indigo-400" />}
           />
           <div className="space-y-2">
@@ -269,11 +292,12 @@ export default async function QueuePage({
         </div>
       )}
 
-      {/* Matching my specialty (AI-routed) */}
+      {/* My specialty */}
       {mySpecialty.length > 0 && (
         <div className="mb-6">
           <SectionHeader
             label={t("mySpecialty")}
+            count={mySpecialty.length}
             icon={<Zap className="w-4 h-4 text-violet-400" />}
           />
           <div className="space-y-2">
@@ -282,18 +306,61 @@ export default async function QueuePage({
         </div>
       )}
 
-      {/* Everything else */}
+      {/* Others — paginated */}
       {others.length > 0 && (
         <div>
-          {(myTickets.length > 0 || mySpecialty.length > 0) && (
-            <SectionHeader
-              label={t("otherTickets")}
-              icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
-            />
-          )}
-          <div className="space-y-2">
-            {others.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
+          <SectionHeader
+            label={t("otherTickets")}
+            count={others.length}
+            icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
+          />
+          <div className="space-y-2 mb-4">
+            {pagedOthers.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
           </div>
+
+          {/* Pagination */}
+          {totalOthersPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {(safePage - 1) * OTHERS_PAGE_SIZE + 1}–
+                {Math.min(safePage * OTHERS_PAGE_SIZE, others.length)} of {others.length}
+              </p>
+              <div className="flex items-center gap-1">
+                {safePage > 1 && (
+                  <Link
+                    href={othersPageHref(safePage - 1)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)] transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                  </Link>
+                )}
+                {Array.from({ length: Math.min(totalOthersPages, 7) }, (_, i) => {
+                  const p = Math.max(1, Math.min(safePage - 3, totalOthersPages - 6)) + i;
+                  return (
+                    <Link
+                      key={p}
+                      href={othersPageHref(p)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${
+                        p === safePage
+                          ? "bg-indigo-600 text-white font-semibold"
+                          : "text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+                      }`}
+                    >
+                      {p}
+                    </Link>
+                  );
+                })}
+                {safePage < totalOthersPages && (
+                  <Link
+                    href={othersPageHref(safePage + 1)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)] transition-colors"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,0 +1,110 @@
+import { NextResponse } from "next/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const svc = createServiceClientStatic();
+  const { data: adminProfile } = await svc
+    .from("profiles")
+    .select("role, organization_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!adminProfile || adminProfile.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  let body: {
+    name?: string;
+    email?: string;
+    password?: string;
+    type?: "agent" | "customer";
+    team_id?: string;
+    specialty?: string;
+    company_name?: string;
+    industry?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { name, email, password, type } = body;
+  if (!name?.trim() || !email?.trim() || !password || !type) {
+    return NextResponse.json(
+      { error: "name, email, password and type are required" },
+      { status: 400 }
+    );
+  }
+
+  // admin.createUser() does NOT affect the current admin session
+  const { data: newUserData, error: createError } = await svc.auth.admin.createUser({
+    email: email.trim(),
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: name.trim() },
+  });
+
+  if (createError || !newUserData?.user) {
+    return NextResponse.json(
+      { error: createError?.message ?? "Failed to create user" },
+      { status: 400 }
+    );
+  }
+
+  const userId = newUserData.user.id;
+  const role = type === "customer" ? "customer" : "agent";
+
+  const profileData: Record<string, unknown> = {
+    id: userId,
+    full_name: name.trim(),
+    organization_id: adminProfile.organization_id,
+    role,
+    is_active: true,
+  };
+
+  if (role === "agent" && body.team_id?.trim()) {
+    profileData.team_id = body.team_id.trim();
+    if (body.specialty?.trim()) {
+      profileData.specialty = body.specialty.trim();
+    } else {
+      const { data: team } = await svc
+        .from("teams")
+        .select("name")
+        .eq("id", body.team_id.trim())
+        .single();
+      if (team?.name) profileData.specialty = team.name;
+    }
+  }
+
+  const { error: profileError } = await svc
+    .from("profiles")
+    .upsert(profileData, { onConflict: "id" });
+
+  if (profileError) console.error("[admin/users] profile error:", profileError.message);
+
+  if (role === "customer" && body.company_name?.trim()) {
+    const { error: custError } = await svc.from("customers_info").upsert(
+      {
+        id: userId,
+        company_name: body.company_name.trim(),
+        industry: body.industry?.trim() ?? "",
+        business_details: "",
+        tax_id: "",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (custError) console.error("[admin/users] customers_info error:", custError.message);
+  }
+
+  return NextResponse.json({
+    user: { id: userId, email: email.trim(), name: name.trim(), role },
+  });
+}

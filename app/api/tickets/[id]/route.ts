@@ -44,8 +44,9 @@ export async function PATCH(
 
   const body = await request.json();
 
-  // Validate status transition
-  if (body.status && body.status !== existing.status) {
+  // Validate status transition — admins can force any status
+  const isAdmin = profile.role === "admin";
+  if (body.status && body.status !== existing.status && !isAdmin) {
     const allowed = VALID_TRANSITIONS[existing.status as TicketStatus] ?? [];
     if (!allowed.includes(body.status as TicketStatus)) {
       return NextResponse.json(
