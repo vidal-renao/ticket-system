@@ -1,7 +1,7 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 
 const LANG_NAMES: Record<string, string> = {
   de: "German",
@@ -19,7 +19,10 @@ export async function suggestReply(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  const { data: profile } = await supabase
+  // Service client bypasses RLS — identity already verified via getUser()
+  const svc = createServiceClientStatic();
+
+  const { data: profile } = await svc
     .from("profiles")
     .select("role")
     .eq("id", user.id)
@@ -29,7 +32,7 @@ export async function suggestReply(
     return { error: "Forbidden" };
   }
 
-  const { data: ticket } = await supabase
+  const { data: ticket } = await svc
     .from("tickets")
     .select(
       "title, description, categories(name), ai_analysis(sentiment, detected_language)"

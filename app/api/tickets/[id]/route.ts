@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 
 type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 
@@ -16,11 +16,13 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+  // Service client bypasses RLS for trusted server-side operations
+  const svc = createServiceClientStatic();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile } = await supabase
+  const { data: profile } = await svc
     .from("profiles")
     .select("role, organization_id")
     .eq("id", user.id)
@@ -31,7 +33,7 @@ export async function PATCH(
   }
 
   // Verify ticket belongs to the agent's org — prevents cross-org writes
-  const { data: existing } = await supabase
+  const { data: existing } = await svc
     .from("tickets")
     .select("status, organization_id")
     .eq("id", id)
@@ -66,7 +68,7 @@ export async function PATCH(
   if (patch.status === "resolved") patch.resolved_at = new Date().toISOString();
   if (patch.status === "closed")   patch.closed_at   = new Date().toISOString();
 
-  const { data, error } = await supabase
+  const { data, error } = await svc
     .from("tickets")
     .update(patch)
     .eq("id", id)

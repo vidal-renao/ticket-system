@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MessageSquare, Lock, Sparkles } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { suggestReply } from "@/app/actions/suggest-reply";
@@ -28,7 +27,6 @@ interface TicketCommentsProps {
 }
 
 export function TicketComments({ ticketId, comments: initial, currentUserId, isStaff, targetLocale }: TicketCommentsProps) {
-  const supabase = createClient();
   const [comments, setComments] = useState(initial);
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -52,21 +50,22 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
     if (!content.trim()) return;
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("ticket_comments")
-      .insert({
+    const res = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         ticket_id: ticketId,
-        author_id: currentUserId,
         content: content.trim(),
         is_internal: isInternal,
-      })
-      .select(`*, profiles(full_name, avatar_url)`)
-      .single();
+      }),
+    });
 
-    if (error) {
-      toast.error("Failed to post comment");
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      toast.error(d.error ?? "Failed to post comment");
     } else {
-      setComments((prev) => [...prev, data]);
+      const { comment } = await res.json();
+      setComments((prev) => [...prev, comment]);
       setContent("");
       toast.success(isInternal ? "Internal note added" : "Reply sent");
     }

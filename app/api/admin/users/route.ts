@@ -61,33 +61,49 @@ export async function POST(request: Request) {
   const userId = newUserData.user.id;
   const role = type === "customer" ? "customer" : "agent";
 
-  const profileData: Record<string, unknown> = {
-    id: userId,
-    full_name: name.trim(),
-    organization_id: adminProfile.organization_id,
-    role,
-    is_active: true,
-  };
-
-  if (role === "agent" && body.team_id?.trim()) {
-    profileData.team_id = body.team_id.trim();
-    if (body.specialty?.trim()) {
-      profileData.specialty = body.specialty.trim();
-    } else {
-      const { data: team } = await svc
-        .from("teams")
-        .select("name")
-        .eq("id", body.team_id.trim())
-        .single();
-      if (team?.name) profileData.specialty = team.name;
-    }
-  }
-
+  // Step 1: save base profile (columns that always exist)
   const { error: profileError } = await svc
     .from("profiles")
-    .upsert(profileData, { onConflict: "id" });
+    .upsert(
+      {
+        id: userId,
+        full_name: name.trim(),
+        organization_id: adminProfile.organization_id,
+        role,
+        is_active: true,
+      },
+      { onConflict: "id" }
+    );
 
-  if (profileError) console.error("[admin/users] profile error:", profileError.message);
+  if (profileError) {
+    console.error("[admin/users] profile error:", profileError.message);
+    return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
+  }
+
+  // Step 2: try to set team_id / specialty — may fail if migration hasn't run yet
+  if (role === "agent" && (body.team_id?.trim() || body.specialty?.trim())) {
+    const extended: Record<string, unknown> = {};
+    if (body.team_id?.trim()) {
+      extended.team_id = body.team_id.trim();
+      if (body.specialty?.trim()) {
+        extended.specialty = body.specialty.trim();
+      } else {
+        const { data: team } = await svc
+          .from("teams")
+          .select("name")
+          .eq("id", body.team_id.trim())
+          .single();
+        if (team?.name) extended.specialty = team.name;
+      }
+    } else if (body.specialty?.trim()) {
+      extended.specialty = body.specialty.trim();
+    }
+    const { error: extErr } = await svc
+      .from("profiles")
+      .update(extended)
+      .eq("id", userId);
+    if (extErr) console.warn("[admin/users] extended fields not saved (migration pending?):", extErr.message);
+  }
 
   if (role === "customer" && body.company_name?.trim()) {
     const { error: custError } = await svc.from("customers_info").upsert(
