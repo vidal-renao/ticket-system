@@ -48,22 +48,20 @@ export default async function TicketsPage({
     title: string;
     status: string;
     priority: string;
-    category: string | null;
     created_at: string;
     updated_at: string;
-    metadata?: Record<string, unknown> | null;
   };
 
   const { data: tickets } = isStaff
     ? await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, category, created_at, updated_at")
+        .select("id, ticket_number, title, status, priority, created_at, updated_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
         .limit(100)
     : await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, category, created_at, updated_at, metadata")
+        .select("id, ticket_number, title, status, priority, created_at, updated_at")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -115,9 +113,6 @@ export default async function TicketsPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider w-24">
                   Ref
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden sm:table-cell">
-                  {t("category")}
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                   {t("priority")}
                 </th>
@@ -149,15 +144,6 @@ export default async function TicketsPage({
                       >
                         {formatTicketRef(ticket.ticket_number)}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      {ticket.category ? (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                          {ticket.category}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
@@ -209,11 +195,6 @@ export default async function TicketsPage({
                           <p className="text-xs font-mono text-[var(--color-text-muted)]">
                             {formatTicketRef(ticket.ticket_number)}
                           </p>
-                          {ticket.category && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                              {ticket.category}
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                           {ticket.title}

@@ -33,7 +33,7 @@ export default async function SettingsPage({
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
-    .select("role, organization_id, team_id, specialty, full_name")
+    .select("role, organization_id, full_name")
     .eq("id", user.id)
     .single();
 
@@ -42,6 +42,17 @@ export default async function SettingsPage({
   const isAdmin    = profile.role === "admin";
   const isCustomer = profile.role === "customer";
   const isAgent    = profile.role === "agent" || profile.role === "manager";
+
+  // Agent-specific fields fetched separately to avoid schema-cache failures
+  let agentProfile: { team_id: string | null; specialty: string | null } | null = null;
+  if (isAgent) {
+    const { data } = await svc
+      .from("profiles")
+      .select("team_id, specialty")
+      .eq("id", user.id)
+      .single();
+    agentProfile = data ?? null;
+  }
 
   // Admin: fetch org settings + name
   let pii_scrubbing_enabled = false;
@@ -75,11 +86,11 @@ export default async function SettingsPage({
 
   // Agent/Manager: fetch team name
   let agentTeamName: string | null = null;
-  if (isAgent && profile.team_id) {
+  if (isAgent && agentProfile?.team_id) {
     const { data: team } = await svc
       .from("teams")
       .select("name")
-      .eq("id", profile.team_id)
+      .eq("id", agentProfile.team_id)
       .single();
     agentTeamName = team?.name ?? null;
   }
@@ -197,11 +208,11 @@ export default async function SettingsPage({
                 )}
               </span>
             </div>
-            {profile.specialty && (
+            {agentProfile?.specialty && (
               <div className="flex items-center justify-between py-2">
                 <span className="text-xs text-[var(--color-text-muted)]">{t("yourSpecialty")}</span>
                 <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {profile.specialty}
+                  {agentProfile.specialty}
                 </span>
               </div>
             )}

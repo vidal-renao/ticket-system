@@ -54,7 +54,6 @@ export default async function AdminPage({
     title: string;
     status: string;
     priority: string;
-    category: string | null;
     created_at: string;
     created_by: string;
     assigned_to: string | null;
@@ -63,7 +62,7 @@ export default async function AdminPage({
 
   const { data: ticketsRaw } = await svc
     .from("tickets")
-    .select("id, ticket_number, title, status, priority, category, created_at, created_by, assigned_to, sla_breached")
+    .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false })
     .limit(500);
@@ -165,9 +164,6 @@ export default async function AdminPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                   {tck("priority")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden sm:table-cell">
-                  Category
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden md:table-cell">
                   Summary
                 </th>
@@ -228,17 +224,6 @@ export default async function AdminPage({
                           </Badge>
                         )}
                       </div>
-                    </td>
-
-                    {/* Category */}
-                    <td className="px-4 py-3 hidden sm:table-cell">
-                      {ticket.category ? (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                          {ticket.category}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
-                      )}
                     </td>
 
                     {/* Title */}
