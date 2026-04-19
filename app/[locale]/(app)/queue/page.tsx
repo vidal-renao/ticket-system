@@ -32,9 +32,12 @@ export default async function QueuePage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
+
+  // Two separate queries: auth columns first (always safe), then optional columns
+  // that may not exist if the DB migration hasn't run yet.
   const { data: profile } = await svc
     .from("profiles")
-    .select("role, organization_id, team_id, specialty")
+    .select("role, organization_id")
     .eq("id", user.id)
     .single();
 
@@ -44,6 +47,14 @@ export default async function QueuePage({
   }
 
   const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+
+  // Safely fetch specialty — column may not exist yet if migration is pending
+  const { data: agentExtras } = await svc
+    .from("profiles")
+    .select("specialty")
+    .eq("id", user.id)
+    .single();
+  const agentSpecialty: string | null = (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
 
   // Only columns that exist on the tickets table (no category / assigned_team_id)
   const { data: ticketsRaw, error: ticketsError } = await svc
@@ -118,8 +129,6 @@ export default async function QueuePage({
       (PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER] ?? 3)
     );
   });
-
-  const agentSpecialty: string | null = (profile as { specialty?: string | null })?.specialty ?? null;
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
