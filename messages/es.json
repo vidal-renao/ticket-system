@@ -72,7 +72,8 @@
     "settings": "Configuración",
     "admin": "Administración",
     "signOut": "Cerrar sesión",
-    "home": "Inicio"
+    "home": "Inicio",
+    "inbox": "Bandeja"
   },
   "tickets": {
     "myTickets": "Mis Tickets",

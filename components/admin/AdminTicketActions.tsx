@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Play, CheckCircle2, RotateCcw, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Agent {
@@ -27,7 +27,7 @@ export function AdminTicketActions({
   const [isPending, startTransition] = useTransition();
   const [assignee, setAssignee] = useState(currentAssignee ?? "");
 
-  const isClosed = currentStatus === "closed" || currentStatus === "resolved";
+  const isClosed = currentStatus === "closed";
 
   async function patch(body: Record<string, string>) {
     const res = await fetch(`/api/tickets/${ticketId}`, {
@@ -55,26 +55,26 @@ export function AdminTicketActions({
     });
   }
 
-  function handleClose() {
+  function handleStatus(status: string, label: string) {
     startTransition(async () => {
       try {
-        await patch({ status: "closed" });
-        toast.success("Ticket closed");
+        await patch({ status });
+        toast.success(`Ticket ${label}`);
         router.refresh();
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to close");
+        toast.error(err instanceof Error ? err.message : `Failed to ${label}`);
       }
     });
   }
 
   const selectClass =
-    "text-xs px-2 py-1.5 rounded-lg bg-[var(--color-surface-800)] border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer max-w-[140px] truncate";
+    "text-xs px-2 py-1.5 rounded-lg bg-[var(--color-surface-800)] border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer max-w-[130px] truncate";
+
+  const btnBase =
+    "flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40";
 
   return (
-    <div
-      className="flex items-center gap-1.5"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       {/* Assign select */}
       <select
         value={assignee}
@@ -85,30 +85,56 @@ export function AdminTicketActions({
       >
         <option value="">Unassigned</option>
         {agents.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
+          <option key={a.id} value={a.id}>{a.name}</option>
         ))}
       </select>
 
-      {/* Close button */}
-      {!isClosed ? (
+      {isPending ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-text-muted)]" />
+      ) : currentStatus === "open" ? (
+        /* open → start working */
         <button
           type="button"
-          disabled={isPending}
-          onClick={handleClose}
-          title="Close ticket"
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium bg-[var(--color-surface-800)] border border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-green-400 hover:border-green-500/30 transition-colors disabled:opacity-40"
+          onClick={() => handleStatus("in_progress", "started")}
+          title="Start working"
+          className={`${btnBase} bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20`}
         >
-          {isPending
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <CheckCircle2 className="w-3 h-3" />
-          }
-          Close
+          <Play className="w-3 h-3" /> Start
         </button>
+      ) : currentStatus === "in_progress" ? (
+        /* in_progress → resolve */
+        <button
+          type="button"
+          onClick={() => handleStatus("resolved", "resolved")}
+          title="Mark as resolved"
+          className={`${btnBase} bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20`}
+        >
+          <CheckCircle2 className="w-3 h-3" /> Resolve
+        </button>
+      ) : currentStatus === "resolved" ? (
+        /* resolved → close or reopen */
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleStatus("closed", "closed")}
+            title="Close ticket"
+            className={`${btnBase} bg-[var(--color-surface-800)] border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-green-400 hover:border-green-500/30`}
+          >
+            <XCircle className="w-3 h-3" /> Close
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatus("open", "reopened")}
+            title="Reopen ticket"
+            className={`${btnBase} bg-[var(--color-surface-800)] border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-amber-400 hover:border-amber-500/30`}
+          >
+            <RotateCcw className="w-3 h-3" />
+          </button>
+        </div>
       ) : (
-        <span className="text-[10px] text-green-400 font-medium px-2 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg capitalize">
-          {currentStatus}
+        /* closed — no actions */
+        <span className="text-[10px] text-green-400 font-medium px-2 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
+          Closed
         </span>
       )}
     </div>

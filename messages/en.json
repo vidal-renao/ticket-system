@@ -72,7 +72,8 @@
     "settings": "Settings",
     "admin": "Admin",
     "signOut": "Sign out",
-    "home": "Home"
+    "home": "Home",
+    "inbox": "Inbox"
   },
   "tickets": {
     "myTickets": "My Tickets",

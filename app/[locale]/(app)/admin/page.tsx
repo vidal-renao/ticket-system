@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { AdminFilters } from "@/components/admin/AdminFilters";
+import { AdminStatusTabs } from "@/components/admin/AdminStatusTabs";
 import { AdminPageControls } from "@/components/admin/AdminPageControls";
 import { AdminTicketActions } from "@/components/admin/AdminTicketActions";
 import { Building2, TicketIcon, ChevronLeft, ChevronRight } from "lucide-react";
@@ -231,6 +232,9 @@ export default async function AdminPage({
         </div>
         <AdminPageControls teams={teams} />
       </div>
+
+      {/* Status tabs */}
+      <AdminStatusTabs />
 
       {/* Filters */}
       <div className="mb-5">
