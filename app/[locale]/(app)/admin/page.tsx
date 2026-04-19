@@ -83,12 +83,16 @@ export default async function AdminPage({
     { data: categoriesRaw },
     { data: teamsRaw },
   ] = await Promise.all([
-    svc
-      .from("tickets")
-      .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id")
-      .eq("organization_id", orgId)
-      .order("created_at", { ascending: false })
-      .limit(500),
+    // Exclude closed tickets by default; include them only when explicitly filtered
+    (() => {
+      const q = svc
+        .from("tickets")
+        .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id")
+        .eq("organization_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      return filters.status ? q : q.neq("status", "closed");
+    })(),
     svc
       .from("profiles")
       .select("id, full_name, role")

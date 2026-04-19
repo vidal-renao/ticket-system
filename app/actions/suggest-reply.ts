@@ -34,18 +34,29 @@ export async function suggestReply(
 
   const { data: ticket } = await svc
     .from("tickets")
-    .select(
-      "title, description, categories(name), ai_analysis(sentiment, detected_language)"
-    )
+    .select("id, title, description, category_id")
     .eq("id", ticketId)
     .single();
 
   if (!ticket) return { error: "Ticket not found" };
 
-  const ai = (ticket as any).ai_analysis;
-  const sentiment: string = ai?.sentiment ?? "neutral";
-  const language: string = ai?.detected_language ?? "en";
-  const category: string = (ticket as any).categories?.name ?? "General";
+  // Flat queries — avoid nested join direction issues with PostgREST
+  const [{ data: categoryRow }, { data: aiRow }] = await Promise.all([
+    ticket.category_id
+      ? svc.from("categories").select("name").eq("id", ticket.category_id).single()
+      : Promise.resolve({ data: null }),
+    svc
+      .from("ai_analysis")
+      .select("sentiment, detected_language")
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single(),
+  ]);
+
+  const sentiment: string = (aiRow as { sentiment?: string } | null)?.sentiment ?? "neutral";
+  const language: string  = (aiRow as { detected_language?: string } | null)?.detected_language ?? "en";
+  const category: string  = (categoryRow as { name?: string } | null)?.name ?? "General";
   const langName = LANG_NAMES[language] ?? "English";
 
   const isUpset = ["frustrated", "angry"].includes(sentiment);
