@@ -6,8 +6,8 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { Button } from "@/components/ui/Button";
-import { TicketIcon, PlusCircle, Clock, AlertCircle } from "lucide-react";
-import { formatTicketRef, statusColor, formatRelativeTime } from "@/lib/utils";
+import { TicketIcon, PlusCircle, Clock, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { formatTicketRef, statusColor, formatRelativeTime, formatDateTime, formatDuration } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,20 @@ export default async function TicketsPage({
   const isCustomer = profile?.role === "customer";
   const orgId      = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
-  type TicketRow = {
+  // ── Customer query: full columns + AI-suggested category ──────────────────
+  type CustomerTicket = {
+    id: string;
+    ticket_number: number;
+    title: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    resolved_at: string | null;
+    ai_analysis: { suggested_category: string | null }[];
+  };
+
+  // ── Staff query (simpler) ─────────────────────────────────────────────────
+  type StaffTicket = {
     id: string;
     ticket_number: number;
     title: string;
@@ -52,7 +65,7 @@ export default async function TicketsPage({
     updated_at: string;
   };
 
-  const { data: tickets } = isStaff
+  const { data: tickets, error } = isStaff
     ? await svc
         .from("tickets")
         .select("id, ticket_number, title, status, priority, created_at, updated_at")
@@ -61,15 +74,21 @@ export default async function TicketsPage({
         .limit(100)
     : await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, updated_at")
+        .select("id, ticket_number, title, status, priority, created_at, resolved_at, ai_analysis(suggested_category)")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(100);
 
+  // Surface query errors to aid debugging (server-side only)
+  if (error) console.error("[TicketsPage] query error:", error.message);
+
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
+  const isResolved = (status: string) => status === "resolved" || status === "closed";
+  const isActive   = (status: string) => status === "in_progress";
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
@@ -105,7 +124,7 @@ export default async function TicketsPage({
           )}
         </Card>
       ) : isCustomer ? (
-        /* ── Customer: clean table view ── */
+        /* ── Customer: detailed timeline table ─────────────────────────────── */
         <div className="rounded-xl border border-[var(--color-surface-600)] overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -113,30 +132,42 @@ export default async function TicketsPage({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider w-24">
                   Ref
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-                  {t("priority")}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden md:table-cell">
+                  {t("summary")}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden sm:table-cell">
+                  {t("category")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden md:table-cell">
-                  {t("summary")}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden lg:table-cell">
+                  {t("opened")}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden xl:table-cell">
+                  {t("resolved")}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden lg:table-cell">
-                  Date
+                  {t("duration")}
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-surface-700)]">
-              {(tickets as TicketRow[]).map((ticket) => {
+              {(tickets as CustomerTicket[]).map((ticket) => {
                 const ticketPath = locale === "de"
                   ? `/tickets/${ticket.id}`
                   : `/${locale}/tickets/${ticket.id}`;
+
+                const aiCategory = ticket.ai_analysis?.[ticket.ai_analysis.length - 1]?.suggested_category ?? null;
+                const resolved   = isResolved(ticket.status);
+                const active     = isActive(ticket.status);
+
                 return (
                   <tr
                     key={ticket.id}
-                    className="hover:bg-[var(--color-surface-800)] transition-colors group"
+                    className="hover:bg-[var(--color-surface-800)] transition-colors"
                   >
+                    {/* Ref */}
                     <td className="px-4 py-3">
                       <Link
                         href={ticketPath}
@@ -145,21 +176,75 @@ export default async function TicketsPage({
                         {formatTicketRef(ticket.ticket_number)}
                       </Link>
                     </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
-                    </td>
+
+                    {/* Summary */}
                     <td className="px-4 py-3 hidden md:table-cell max-w-xs">
-                      <Link href={ticketPath} className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors truncate block">
+                      <Link
+                        href={ticketPath}
+                        className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors truncate block"
+                      >
                         {ticket.title}
                       </Link>
                     </td>
+
+                    {/* Category */}
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      {aiCategory ? (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                          {aiCategory}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] italic">
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" aria-hidden="true" />
+                          Classifying…
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {active ? (
+                          <span className="flex items-center gap-1 text-xs font-medium text-blue-400">
+                            <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                            {ts(ticket.status)}
+                          </span>
+                        ) : resolved ? (
+                          <span className="flex items-center gap-1 text-xs font-medium text-green-400">
+                            <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                            {ts(ticket.status)}
+                          </span>
+                        ) : (
+                          <Badge className={statusColor(ticket.status)}>
+                            {ts(ticket.status)}
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Opened */}
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <span className="text-xs text-[var(--color-text-muted)] tabular-nums">
+                        {formatDateTime(ticket.created_at)}
+                      </span>
+                    </td>
+
+                    {/* Resolved */}
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      {ticket.resolved_at ? (
+                        <span className="text-xs text-green-400 tabular-nums">
+                          {formatDateTime(ticket.resolved_at)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
+                      )}
+                    </td>
+
+                    {/* Duration */}
                     <td className="px-4 py-3 hidden lg:table-cell text-right">
-                      <span className="flex items-center justify-end gap-1 text-xs text-[var(--color-text-muted)]">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(ticket.created_at)}
+                      <span className={`text-xs tabular-nums ${resolved ? "text-green-400" : "text-[var(--color-text-muted)]"}`}>
+                        {formatDuration(ticket.created_at, ticket.resolved_at)}
+                        {!resolved && <span className="text-[var(--color-text-muted)]"> ·</span>}
                       </span>
                     </td>
                   </tr>
@@ -171,7 +256,7 @@ export default async function TicketsPage({
       ) : (
         /* ── Staff: card list view ── */
         <ol role="list" aria-label="Tickets" className="space-y-2">
-          {(tickets as TicketRow[]).map((ticket) => {
+          {(tickets as StaffTicket[]).map((ticket) => {
             const ticketPath = locale === "de"
               ? `/tickets/${ticket.id}`
               : `/${locale}/tickets/${ticket.id}`;
@@ -191,11 +276,9 @@ export default async function TicketsPage({
                         }`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-xs font-mono text-[var(--color-text-muted)]">
-                            {formatTicketRef(ticket.ticket_number)}
-                          </p>
-                        </div>
+                        <p className="text-xs font-mono text-[var(--color-text-muted)] mb-1">
+                          {formatTicketRef(ticket.ticket_number)}
+                        </p>
                         <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                           {ticket.title}
                         </p>

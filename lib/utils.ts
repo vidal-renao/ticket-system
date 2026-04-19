@@ -68,3 +68,28 @@ export function formatRelativeTime(date: string | Date): string {
   if (diffDays < 7)    return `${diffDays}d ago`;
   return d.toLocaleDateString("en-CH", { day: "numeric", month: "short" });
 }
+
+export function formatDateTime(date: string | Date): string {
+  return new Date(date).toLocaleString("en-CH", {
+    day:    "2-digit",
+    month:  "short",
+    year:   "numeric",
+    hour:   "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+export function formatDuration(start: string | Date, end: string | Date | null): string {
+  const from = new Date(start).getTime();
+  const to   = end ? new Date(end).getTime() : Date.now();
+  const ms   = Math.max(0, to - from);
+  const mins  = Math.floor(ms / 60000);
+  const hours = Math.floor(mins / 60);
+  const days  = Math.floor(hours / 24);
+
+  if (mins  < 1)   return "< 1 min";
+  if (mins  < 60)  return `${mins} min`;
+  if (hours < 24)  return `${hours}h ${mins % 60}m`;
+  return `${days}d ${hours % 24}h`;
+}
