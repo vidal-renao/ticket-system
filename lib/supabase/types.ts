@@ -58,6 +58,8 @@ export interface Database {
           is_active: boolean;
           data_processing_consent: boolean;
           consent_given_at: string | null;
+          team_id: string | null;
+          specialty: string | null;
           created_at: string;
           updated_at: string;
         };

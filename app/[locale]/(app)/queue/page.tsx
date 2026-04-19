@@ -32,10 +32,9 @@ export default async function QueuePage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
-  // Only columns that exist in profiles schema (no team_id / specialty)
   const { data: profile } = await svc
     .from("profiles")
-    .select("role, organization_id")
+    .select("role, organization_id, team_id, specialty")
     .eq("id", user.id)
     .single();
 
@@ -120,12 +119,29 @@ export default async function QueuePage({
     );
   });
 
+  const agentSpecialty = (profile as any)?.specialty as string | null ?? null;
+
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
     (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === user.id
   );
+  // "My Specialty" — unassigned tickets whose AI category matches agent specialty
+  const mySpecialty = agentSpecialty
+    ? sorted.filter(
+        (t) =>
+          !t.sla_breached &&
+          t.priority !== "critical" &&
+          t.assigned_to !== user.id &&
+          t.ai?.suggested_category?.toLowerCase() === agentSpecialty.toLowerCase()
+      )
+    : [];
+  const mySpecialtyIds = new Set(mySpecialty.map((t) => t.id));
   const others = sorted.filter(
-    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to !== user.id
+    (t) =>
+      !t.sla_breached &&
+      t.priority !== "critical" &&
+      t.assigned_to !== user.id &&
+      !mySpecialtyIds.has(t.id)
   );
 
   function TicketCard({ ticket }: { ticket: TicketWithAI }) {
@@ -235,7 +251,7 @@ export default async function QueuePage({
       {myTickets.length > 0 && (
         <div className="mb-6">
           <SectionHeader
-            label={t("mySpecialty")}
+            label={t("myTickets")}
             icon={<Zap className="w-4 h-4 text-indigo-400" />}
           />
           <div className="space-y-2">
@@ -244,10 +260,23 @@ export default async function QueuePage({
         </div>
       )}
 
+      {/* Matching my specialty (AI-routed) */}
+      {mySpecialty.length > 0 && (
+        <div className="mb-6">
+          <SectionHeader
+            label={t("mySpecialty")}
+            icon={<Zap className="w-4 h-4 text-violet-400" />}
+          />
+          <div className="space-y-2">
+            {mySpecialty.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
+          </div>
+        </div>
+      )}
+
       {/* Everything else */}
       {others.length > 0 && (
         <div>
-          {myTickets.length > 0 && (
+          {(myTickets.length > 0 || mySpecialty.length > 0) && (
             <SectionHeader
               label={t("otherTickets")}
               icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
