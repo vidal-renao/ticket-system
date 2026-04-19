@@ -58,7 +58,6 @@ export async function POST(request: Request) {
       status: "open",
       priority,
       source: "portal",
-      ...(assignment.category   && { category: assignment.category }),
       ...(assignment.assigned_to && { assigned_to: assignment.assigned_to }),
     })
     .select()
@@ -80,7 +79,6 @@ export async function POST(request: Request) {
 
 interface AssignmentResult {
   assigned_to: string | null;
-  category: string | null;
 }
 
 async function autoAssign(
@@ -88,7 +86,7 @@ async function autoAssign(
   orgId: string,
   teamId: string | null
 ): Promise<AssignmentResult> {
-  if (!teamId) return { assigned_to: null, category: null };
+  if (!teamId) return { assigned_to: null };
 
   const { data: team } = await svc
     .from("teams")
@@ -96,7 +94,7 @@ async function autoAssign(
     .eq("id", teamId)
     .single();
 
-  if (!team) return { assigned_to: null, category: null };
+  if (!team) return { assigned_to: null };
 
   // Find agents assigned to this team
   const { data: teamAgents } = await svc
@@ -113,7 +111,7 @@ async function autoAssign(
   const specialist = await findLeastBusyAgent(svc, teamAgentIds, 5);
 
   if (specialist) {
-    return { assigned_to: specialist, category: team.name };
+    return { assigned_to: specialist };
   }
 
   // Overflow — all specialists are saturated; find freest agent org-wide
@@ -127,10 +125,7 @@ async function autoAssign(
   const allAgentIds = (allAgents ?? []).map((a: { id: string }) => a.id);
   const overflowAgent = await findLeastBusyAgent(svc, allAgentIds, Infinity);
 
-  return {
-    assigned_to: overflowAgent,
-    category: team.name,
-  };
+  return { assigned_to: overflowAgent };
 }
 
 /** Returns the agent ID with the fewest open tickets, below maxTickets cap. */
