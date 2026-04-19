@@ -42,7 +42,7 @@ export default async function TicketsPage({
   const isCustomer = profile?.role === "customer";
   const orgId      = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
-  // ── Customer query: full columns + AI-suggested category ──────────────────
+  // ── Customer query: full columns ─────────────────────────────────────────
   type CustomerTicket = {
     id: string;
     ticket_number: number;
@@ -51,7 +51,6 @@ export default async function TicketsPage({
     priority: string;
     created_at: string;
     resolved_at: string | null;
-    ai_analysis: { suggested_category: string | null }[];
   };
 
   // ── Staff query (simpler) ─────────────────────────────────────────────────
@@ -74,13 +73,32 @@ export default async function TicketsPage({
         .limit(100)
     : await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, resolved_at, ai_analysis(suggested_category)")
+        .select("id, ticket_number, title, status, priority, created_at, resolved_at")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(100);
 
-  // Surface query errors to aid debugging (server-side only)
   if (error) console.error("[TicketsPage] query error:", error.message);
+
+  // Fetch AI-suggested categories separately to avoid join issues
+  let aiCategoryMap: Record<string, string | null> = {};
+  if (!isStaff && tickets && tickets.length > 0) {
+    const ticketIds = (tickets as { id: string }[]).map((t) => t.id);
+    const { data: aiRows, error: aiError } = await svc
+      .from("ai_analysis")
+      .select("ticket_id, suggested_category")
+      .in("ticket_id", ticketIds)
+      .order("created_at", { ascending: false });
+    if (aiError) console.error("[TicketsPage] ai_analysis query error:", aiError.message);
+    // Keep only the most recent analysis per ticket
+    if (aiRows) {
+      for (const row of aiRows) {
+        if (!(row.ticket_id in aiCategoryMap)) {
+          aiCategoryMap[row.ticket_id] = row.suggested_category ?? null;
+        }
+      }
+    }
+  }
 
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
@@ -158,7 +176,7 @@ export default async function TicketsPage({
                   ? `/tickets/${ticket.id}`
                   : `/${locale}/tickets/${ticket.id}`;
 
-                const aiCategory = ticket.ai_analysis?.[ticket.ai_analysis.length - 1]?.suggested_category ?? null;
+                const aiCategory = aiCategoryMap[ticket.id] ?? null;
                 const resolved   = isResolved(ticket.status);
                 const active     = isActive(ticket.status);
 
