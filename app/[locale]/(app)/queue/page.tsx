@@ -33,7 +33,10 @@ export default async function QueuePage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles").select("role, organization_id").eq("id", user.id).single();
+    .from("profiles")
+    .select("role, organization_id, team_id")
+    .eq("id", user.id)
+    .single();
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
   if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
@@ -44,51 +47,100 @@ export default async function QueuePage({
 
   const { data: ticketsRaw } = await svc
     .from("tickets")
-    .select("id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii")
+    .select(
+      "id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii, category, assigned_team_id, assigned_to"
+    )
     .eq("organization_id", orgId)
     .in("status", ["open", "in_progress"])
     .order("created_at", { ascending: false });
 
-  // Fetch ai_analysis separately — embedded join fails silently on FK hint mismatch
-  const ticketIds = (ticketsRaw ?? []).map((t: any) => t.id);
+  type RawTicket = { id: string; ticket_number: number; title: string; status: string; priority: string; created_at: string; sla_breached?: boolean; contains_pii?: boolean; category?: string; assigned_team_id?: string; assigned_to?: string };
+  type AiRow = { ticket_id: string; suggested_priority?: string; sentiment?: string; confidence_score?: number; summary?: string };
+
+  const ticketIds = (ticketsRaw ?? []).map((t: RawTicket) => t.id);
   const { data: aiRows } = ticketIds.length
-    ? await svc.from("ai_analysis").select("ticket_id, suggested_priority, sentiment, confidence_score, summary").in("ticket_id", ticketIds)
-    : { data: [] };
+    ? await svc
+        .from("ai_analysis")
+        .select("ticket_id, suggested_priority, sentiment, confidence_score, summary")
+        .in("ticket_id", ticketIds)
+    : { data: [] as AiRow[] };
 
-  const aiByTicket = Object.fromEntries((aiRows ?? []).map((a: any) => [a.ticket_id, a]));
-  const tickets = (ticketsRaw ?? []).map((t: any) => ({ ...t, ai_analysis: aiByTicket[t.id] ?? null }));
+  const aiByTicket = Object.fromEntries(
+    (aiRows ?? []).map((a: AiRow) => [a.ticket_id, a])
+  );
+  const tickets = (ticketsRaw ?? []).map((t: RawTicket) => ({
+    ...t,
+    ai_analysis: aiByTicket[t.id] ?? null,
+  }));
 
-  const sorted = [...tickets].sort((a: any, b: any) => {
+  type TicketRow = {
+    id: string;
+    ticket_number: number;
+    title: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    sla_breached?: boolean;
+    contains_pii?: boolean;
+    category?: string;
+    assigned_team_id?: string;
+    assigned_to?: string;
+    ai_analysis: { sentiment?: string; summary?: string; ticket_id?: string } | null;
+  };
+
+  // Sort: SLA breached → agent's own team → priority
+  const agentTeamId = profile.team_id ?? null;
+  const sorted = (tickets as TicketRow[]).sort((a, b) => {
     if (a.sla_breached && !b.sla_breached) return -1;
     if (!a.sla_breached && b.sla_breached) return 1;
-    return (PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] ?? 3) -
-           (PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER] ?? 3);
+    if (agentTeamId) {
+      const aMyTeam = a.assigned_team_id === agentTeamId;
+      const bMyTeam = b.assigned_team_id === agentTeamId;
+      if (aMyTeam && !bMyTeam) return -1;
+      if (!aMyTeam && bMyTeam) return 1;
+    }
+    return (
+      (PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] ?? 3) -
+      (PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER] ?? 3)
+    );
   });
 
-  const critical = sorted.filter((t: any) => t.priority === "critical" || t.sla_breached);
-  const regular  = sorted.filter((t: any) => t.priority !== "critical" && !t.sla_breached);
+  const critical = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
+  const myTeam   = sorted.filter(
+    (t) => !t.sla_breached && t.priority !== "critical" && !!agentTeamId && t.assigned_team_id === agentTeamId
+  );
+  const others   = sorted.filter(
+    (t) => !t.sla_breached && t.priority !== "critical" && (!agentTeamId || t.assigned_team_id !== agentTeamId)
+  );
 
-  function TicketRow({ ticket }: { ticket: any }) {
+  function TicketRow({ ticket }: { ticket: TicketRow }) {
     const ticketPath = locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
     return (
       <Link href={ticketPath}>
         <Card hover className="p-4">
           <div className="flex items-start gap-4">
             <div className="mt-0.5 shrink-0">
-              <AlertCircle className={`w-4 h-4 ${
-                ticket.priority === "critical" ? "text-red-400" :
-                ticket.priority === "high"     ? "text-orange-400" :
-                ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
-              }`} />
+              <AlertCircle
+                className={`w-4 h-4 ${
+                  ticket.priority === "critical" ? "text-red-400" :
+                  ticket.priority === "high"     ? "text-orange-400" :
+                  ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
+                }`}
+              />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-mono text-[var(--color-text-muted)]">
                   {formatTicketRef(ticket.ticket_number)}
                 </span>
+                {ticket.category && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    {ticket.category}
+                  </span>
+                )}
                 {ticket.contains_pii && (
                   <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
-                    <Shield className="w-2.5 h-2.5" /> {ti("piiWarning")}
+                    <Shield className="w-2.5 h-2.5" aria-hidden="true" /> {ti("piiWarning")}
                   </span>
                 )}
               </div>
@@ -122,6 +174,15 @@ export default async function QueuePage({
     );
   }
 
+  const SectionHeader = ({ label, icon }: { label: string; icon: React.ReactNode }) => (
+    <div className="flex items-center gap-2 mb-3">
+      {icon}
+      <h2 className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+        {label}
+      </h2>
+    </div>
+  );
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -133,23 +194,52 @@ export default async function QueuePage({
         </div>
       </div>
 
+      {/* Critical / SLA section */}
       {critical.length > 0 && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-red-400" />
-            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider">
-              {t("urgentSla")}
-            </h2>
-          </div>
+          <SectionHeader
+            label={t("urgentSla")}
+            icon={<AlertCircle className="w-4 h-4 text-red-400" />}
+          />
           <div className="space-y-2">
-            {critical.map((ticket: any) => <TicketRow key={ticket.id} ticket={ticket} />)}
+            {critical.map((ticket) => (
+              <TicketRow key={ticket.id} ticket={ticket} />
+            ))}
           </div>
         </div>
       )}
 
-      <div className="space-y-2">
-        {regular.map((ticket: any) => <TicketRow key={ticket.id} ticket={ticket} />)}
-      </div>
+      {/* Agent's specialty queue */}
+      {agentTeamId && myTeam.length > 0 && (
+        <div className="mb-6">
+          <SectionHeader
+            label={t("mySpecialty")}
+            icon={<Zap className="w-4 h-4 text-indigo-400" />}
+          />
+          <div className="space-y-2">
+            {myTeam.map((ticket) => (
+              <TicketRow key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Other tickets */}
+      {others.length > 0 && (
+        <div>
+          {(agentTeamId && myTeam.length > 0) && (
+            <SectionHeader
+              label={t("otherTickets")}
+              icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
+            />
+          )}
+          <div className="space-y-2">
+            {others.map((ticket) => (
+              <TicketRow key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {sorted.length === 0 && (
         <Card className="flex flex-col items-center justify-center py-16 text-center">

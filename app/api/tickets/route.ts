@@ -14,14 +14,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { title?: string; description?: string };
+  let body: { title?: string; description?: string; team_id?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { title, description } = body;
+  const { title, description, team_id } = body;
   if (!title?.trim() || !description?.trim()) {
     return NextResponse.json(
       { error: "title and description are required" },
@@ -29,10 +29,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Service client bypasses RLS — auth already verified via getUser() above.
-  // Anon client blocks profile reads when organization_id is NULL (NULL = NULL issue).
-  const svcProfile = createServiceClientStatic();
-  const { data: profile } = await svcProfile
+  const svc = createServiceClientStatic();
+  const { data: profile } = await svc
     .from("profiles")
     .select("organization_id")
     .eq("id", user.id)
@@ -42,10 +40,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
-  // Use service client for INSERT — auth already validated above.
-  // Bypasses RLS to avoid session-propagation issues in API routes.
-  const svcInsert = createServiceClientStatic();
-  const { data: ticket, error } = await svcInsert
+  // Smart auto-assignment based on selected team
+  const assignment = await autoAssign(svc, profile.organization_id, team_id ?? null);
+
+  const { data: ticket, error } = await svc
     .from("tickets")
     .insert({
       title: title.trim(),
@@ -55,6 +53,9 @@ export async function POST(request: Request) {
       status: "open",
       priority: "medium",
       source: "portal",
+      ...(assignment.category        && { category: assignment.category }),
+      ...(assignment.assigned_team_id && { assigned_team_id: assignment.assigned_team_id }),
+      ...(assignment.assigned_to      && { assigned_to: assignment.assigned_to }),
     })
     .select()
     .single();
@@ -64,7 +65,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Schedule AI triage — keepalive on Vercel, fire-and-forget in local dev
   scheduleBackground(
     runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
   );
@@ -72,10 +72,101 @@ export async function POST(request: Request) {
   return NextResponse.json({ ticket }, { status: 201 });
 }
 
-/**
- * Keeps the Vercel function alive until the background promise settles.
- * Falls back to fire-and-forget in local dev (no @vercel/functions required).
- */
+// ─── Auto-assignment engine ─────────────────────────────────────────────────
+
+interface AssignmentResult {
+  assigned_team_id: string | null;
+  assigned_to: string | null;
+  category: string | null;
+}
+
+async function autoAssign(
+  svc: ReturnType<typeof createServiceClientStatic>,
+  orgId: string,
+  teamId: string | null
+): Promise<AssignmentResult> {
+  if (!teamId) return { assigned_team_id: null, assigned_to: null, category: null };
+
+  const { data: team } = await svc
+    .from("teams")
+    .select("id, name")
+    .eq("id", teamId)
+    .single();
+
+  if (!team) return { assigned_team_id: null, assigned_to: null, category: null };
+
+  // Find agents assigned to this team
+  const { data: teamAgents } = await svc
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("team_id", teamId)
+    .eq("role", "agent")
+    .eq("is_active", true);
+
+  const teamAgentIds = (teamAgents ?? []).map((a: { id: string }) => a.id);
+
+  // Try specialist first (overflow threshold: 5 open tickets)
+  const specialist = await findLeastBusyAgent(svc, teamAgentIds, 5);
+
+  if (specialist) {
+    return { assigned_team_id: teamId, assigned_to: specialist, category: team.name };
+  }
+
+  // Overflow — all specialists are saturated; find freest agent org-wide
+  const { data: allAgents } = await svc
+    .from("profiles")
+    .select("id")
+    .eq("organization_id", orgId)
+    .eq("role", "agent")
+    .eq("is_active", true);
+
+  const allAgentIds = (allAgents ?? []).map((a: { id: string }) => a.id);
+  const overflowAgent = await findLeastBusyAgent(svc, allAgentIds, Infinity);
+
+  return {
+    assigned_team_id: teamId,    // still routed to correct team for metrics
+    assigned_to: overflowAgent,
+    category: team.name,
+  };
+}
+
+/** Returns the agent ID with the fewest open tickets, below maxTickets cap. */
+async function findLeastBusyAgent(
+  svc: ReturnType<typeof createServiceClientStatic>,
+  agentIds: string[],
+  maxTickets: number
+): Promise<string | null> {
+  if (agentIds.length === 0) return null;
+
+  const { data: openTickets } = await svc
+    .from("tickets")
+    .select("assigned_to")
+    .in("assigned_to", agentIds)
+    .in("status", ["open", "in_progress"]);
+
+  // Build count map with 0 as default for every agent
+  const counts: Record<string, number> = {};
+  for (const id of agentIds) counts[id] = 0;
+  for (const t of openTickets ?? []) {
+    if (t.assigned_to) counts[t.assigned_to] = (counts[t.assigned_to] ?? 0) + 1;
+  }
+
+  let bestAgent: string | null = null;
+  let minCount = Infinity;
+
+  for (const [agentId, count] of Object.entries(counts)) {
+    if (count <= maxTickets && count < minCount) {
+      minCount = count;
+      bestAgent = agentId;
+    }
+  }
+
+  return bestAgent;
+}
+
+// ─── Background helpers ─────────────────────────────────────────────────────
+
 function scheduleBackground(promise: Promise<void>): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -84,7 +175,6 @@ function scheduleBackground(promise: Promise<void>): void {
     };
     waitUntil(promise);
   } catch {
-    // @vercel/functions not available (local dev) — standard fire-and-forget
     promise.catch((err) => console.error("[Background task error]", err));
   }
 }
@@ -112,14 +202,12 @@ async function runAITriage(
     !Array.isArray(org.settings) &&
     (org.settings as Record<string, unknown>).pii_scrubbing_enabled === true;
 
-  // Truncate before PII scrub — protects against abnormally large inputs
-  const safeTitle = title.slice(0, MAX_INPUT_CHARS);
+  const safeTitle       = title.slice(0, MAX_INPUT_CHARS);
   const safeDescription = description.slice(0, MAX_INPUT_CHARS);
 
-  const triageTitle = piiEnabled ? scrubPII(safeTitle) : safeTitle;
+  const triageTitle       = piiEnabled ? scrubPII(safeTitle)       : safeTitle;
   const triageDescription = piiEnabled ? scrubPII(safeDescription) : safeDescription;
 
-  // RAG: retrieve relevant KB articles (degrades gracefully if not configured)
   const ragChunks  = await retrieveRelevantKnowledge(svc, orgId, triageDescription);
   const ragContext = buildRAGContext(ragChunks);
 

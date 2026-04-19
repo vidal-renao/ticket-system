@@ -3,8 +3,24 @@ import type { CookieOptions } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 
+interface RegisterBody {
+  name?: string;
+  email?: string;
+  password?: string;
+  org_code?: string;
+  role?: string;
+  // Agent fields
+  team_id?: string;
+  specialty?: string;
+  // Customer fields
+  company_name?: string;
+  industry?: string;
+  business_details?: string;
+  tax_id?: string;
+}
+
 export async function POST(request: NextRequest) {
-  let body: { name?: string; email?: string; password?: string; org_code?: string; role?: string };
+  let body: RegisterBody;
   try {
     body = await request.json();
   } catch {
@@ -19,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const assignedRole = role === "customer" ? "customer" : "agent";
 
-  // Validate org exists via service client
+  // Validate org exists
   const svc = createServiceClientStatic();
   const { data: org, error: orgError } = await svc
     .from("organizations")
@@ -28,7 +44,23 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (orgError || !org) {
-    return NextResponse.json({ error: "Organization not found. Check your organization code." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Organization not found. Check your organization code." },
+      { status: 404 }
+    );
+  }
+
+  // Validate team_id belongs to this org if provided
+  if (assignedRole === "agent" && body.team_id) {
+    const { data: team } = await svc
+      .from("teams")
+      .select("id")
+      .eq("id", body.team_id)
+      .eq("organization_id", org.id)
+      .single();
+    if (!team) {
+      return NextResponse.json({ error: "Invalid specialty selection" }, { status: 400 });
+    }
   }
 
   // Create auth user — capture session cookies for immediate login
@@ -62,26 +94,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 
-  // Upsert profile — handles both trigger-created and missing profiles
+  // Upsert profile with team assignment if agent
+  const profileData: Record<string, unknown> = {
+    id: userId,
+    full_name: name.trim(),
+    organization_id: org.id,
+    role: assignedRole,
+    is_active: true,
+  };
+
+  if (assignedRole === "agent" && body.team_id) {
+    profileData.team_id = body.team_id;
+    if (body.specialty?.trim()) profileData.specialty = body.specialty.trim();
+  }
+
   const { error: profileError } = await svc
     .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        full_name: name.trim(),
-        organization_id: org.id,
-        role: assignedRole,
-        is_active: true,
-      },
-      { onConflict: "id" }
-    );
+    .upsert(profileData, { onConflict: "id" });
 
   if (profileError) {
     console.error("[register] profile upsert error:", profileError.message);
-    // Non-fatal: user is created, profile may need manual fix
   }
 
-  // If Supabase returned a session, user is logged in immediately
+  // Insert company info if customer
+  if (assignedRole === "customer" && body.company_name?.trim()) {
+    const { error: customerError } = await svc.from("customers_info").upsert(
+      {
+        id: userId,
+        company_name: body.company_name.trim(),
+        industry: body.industry?.trim() ?? "",
+        business_details: body.business_details?.trim() ?? "",
+        tax_id: body.tax_id?.trim() ?? "",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (customerError) {
+      console.error("[register] customers_info upsert error:", customerError.message);
+    }
+  }
+
   const hasSession = !!signUpData.session;
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";
   const prefix = locale === "de" ? "" : `/${locale}`;
@@ -95,6 +147,5 @@ export async function POST(request: NextRequest) {
     return response;
   }
 
-  // Email confirmation required — redirect to login with success message
   return NextResponse.json({ needsConfirmation: true });
 }

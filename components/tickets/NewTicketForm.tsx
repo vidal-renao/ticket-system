@@ -8,11 +8,21 @@ import { Card } from "@/components/ui/Card";
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
 
-export function NewTicketForm() {
+interface Team {
+  id: string;
+  name: string;
+}
+
+interface NewTicketFormProps {
+  teams: Team[];
+}
+
+export function NewTicketForm({ teams }: NewTicketFormProps) {
   const t = useTranslations("tickets");
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [teamId, setTeamId] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
   const inputClass = [
@@ -32,7 +42,11 @@ export function NewTicketForm() {
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), description: description.trim() }),
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          ...(teamId && { team_id: teamId }),
+        }),
       });
 
       if (!res.ok) {
@@ -43,8 +57,8 @@ export function NewTicketForm() {
       const { ticket } = await res.json();
       toast.success(t("submitSuccess"));
       router.push(`/tickets/${ticket.id}`);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : t("errorGeneric"));
     } finally {
       setLoading(false);
     }
@@ -53,8 +67,43 @@ export function NewTicketForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Card className="p-5 space-y-4">
+        {/* Category selector */}
+        {teams.length > 0 ? (
+          <div>
+            <label
+              htmlFor="ticket-category"
+              className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5"
+            >
+              {t("category")} <span className="text-red-400" aria-label="required">*</span>
+            </label>
+            <select
+              id="ticket-category"
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              required
+              aria-label={t("category")}
+              className={`${inputClass} cursor-pointer`}
+            >
+              <option value="">{t("selectCategory")}</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs text-amber-400">
+            {t("noCategoryAvailable")}
+          </div>
+        )}
+
+        {/* Summary */}
         <div>
-          <label htmlFor="ticket-title" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+          <label
+            htmlFor="ticket-title"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5"
+          >
             {t("summary")} <span className="text-red-400" aria-label="required">*</span>
           </label>
           <input
@@ -68,11 +117,17 @@ export function NewTicketForm() {
             aria-describedby="ticket-title-hint"
             className={inputClass}
           />
-          <p id="ticket-title-hint" className="text-xs text-[var(--color-text-muted)] mt-1">{title.length}/200</p>
+          <p id="ticket-title-hint" className="text-xs text-[var(--color-text-muted)] mt-1">
+            {title.length}/200
+          </p>
         </div>
 
+        {/* Description */}
         <div>
-          <label htmlFor="ticket-description" className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
+          <label
+            htmlFor="ticket-description"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5"
+          >
             {t("description")} <span className="text-red-400" aria-label="required">*</span>
           </label>
           <textarea
@@ -89,16 +144,14 @@ export function NewTicketForm() {
 
       {/* AI notice */}
       <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-indigo-500/5 border border-indigo-500/20">
-        <Zap className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
-        <p className="text-xs text-indigo-300">
-          {t("aiNotice")}
-        </p>
+        <Zap className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" aria-hidden="true" />
+        <p className="text-xs text-indigo-300">{t("aiNotice")}</p>
       </div>
 
       <Button
         type="submit"
         loading={loading}
-        disabled={!title.trim() || !description.trim()}
+        disabled={!title.trim() || !description.trim() || (teams.length > 0 && !teamId)}
         className="w-full"
       >
         {t("submitButtonLabel")}
