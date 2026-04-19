@@ -5,7 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatTicketRef(ticketNumber: number): string {
+export function formatTicketRef(ticketNumber: number | null | undefined): string {
+  if (ticketNumber == null) return "TK-????";
   return `TK-${String(ticketNumber).padStart(4, "0")}`;
 }
 

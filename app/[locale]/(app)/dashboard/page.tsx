@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { TicketIcon, AlertCircle, CheckCircle2, Clock, Zap, TrendingUp, ShieldAlert } from "lucide-react";
+import { formatTicketRef } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -120,7 +121,7 @@ export default async function DashboardPage({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[var(--color-text-primary)] truncate">{ticket.title}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          TK-{String(ticket.ticket_number).padStart(4, "0")}
+                          {formatTicketRef(ticket.ticket_number)}
                         </p>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded border capitalize ${

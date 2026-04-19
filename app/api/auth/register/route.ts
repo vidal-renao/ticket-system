@@ -103,10 +103,8 @@ export async function POST(request: NextRequest) {
     is_active: true,
   };
 
-  if (assignedRole === "agent" && body.team_id) {
-    profileData.team_id = body.team_id;
-    if (body.specialty?.trim()) profileData.specialty = body.specialty.trim();
-  }
+  // profiles has no team_id / specialty columns — those live in the teams table.
+  // The team_id from registration is validated above but not stored here.
 
   const { error: profileError } = await svc
     .from("profiles")
