@@ -18,11 +18,13 @@ interface NewTicketFormProps {
 }
 
 export function NewTicketForm({ teams }: NewTicketFormProps) {
-  const t = useTranslations("tickets");
+  const t  = useTranslations("tickets");
+  const tp = useTranslations("priority");
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [teamId, setTeamId] = useState<string>("");
+  const [priority, setPriority] = useState<string>("medium");
   const [loading, setLoading] = useState(false);
 
   const inputClass = [
@@ -45,6 +47,7 @@ export function NewTicketForm({ teams }: NewTicketFormProps) {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
+          priority,
           ...(teamId && { team_id: teamId }),
         }),
       });
@@ -97,6 +100,28 @@ export function NewTicketForm({ teams }: NewTicketFormProps) {
             {t("noCategoryAvailable")}
           </div>
         )}
+
+        {/* Priority */}
+        <div>
+          <label
+            htmlFor="ticket-priority"
+            className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5"
+          >
+            {t("priority")}
+          </label>
+          <select
+            id="ticket-priority"
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            aria-label={t("priority")}
+            className={`${inputClass} cursor-pointer`}
+          >
+            <option value="low">{tp("low")}</option>
+            <option value="medium">{tp("medium")}</option>
+            <option value="high">{tp("high")}</option>
+            <option value="critical">{tp("critical")} (SLA)</option>
+          </select>
+        </div>
 
         {/* Summary */}
         <div>

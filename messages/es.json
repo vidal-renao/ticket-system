@@ -70,6 +70,7 @@
     "predictive": "Predictivo",
     "team": "Equipo",
     "settings": "Configuración",
+    "admin": "Administración",
     "signOut": "Cerrar sesión",
     "home": "Inicio"
   },
@@ -98,7 +99,9 @@
     "rate": "Valorar",
     "rated": "Valorado",
     "urgentSet": "Marcado como urgente",
-    "notUrgentSet": "Marcado como no urgente"
+    "notUrgentSet": "Marcado como no urgente",
+    "priority": "Prioridad",
+    "selectPriority": "Seleccionar prioridad"
   },
   "queue": {
     "title": "Cola",
@@ -223,5 +226,19 @@
     "role_manager": "Manager",
     "role_agent": "Agente",
     "role_customer": "Cliente"
+  },
+  "admin": {
+    "title": "Panel de Administración",
+    "subtitle": "Todos los tickets de su organización",
+    "company": "Empresa",
+    "assignedTo": "Asignado a",
+    "unassigned": "Sin asignar",
+    "internal": "Interno",
+    "allCompanies": "Todas las Empresas",
+    "allPriorities": "Todas las Prioridades",
+    "allAgents": "Todos los Agentes",
+    "noTickets": "Ningún ticket coincide con los filtros",
+    "totalShowing": "{count} tickets",
+    "clearFilters": "Limpiar filtros"
   }
 }

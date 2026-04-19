@@ -14,14 +14,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { title?: string; description?: string; team_id?: string };
+  let body: { title?: string; description?: string; team_id?: string; priority?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { title, description, team_id } = body;
+  const { title, description, team_id, priority: rawPriority } = body;
+  const VALID_PRIORITIES = ["low", "medium", "high", "critical"] as const;
+  type Priority = (typeof VALID_PRIORITIES)[number];
+  const priority: Priority = VALID_PRIORITIES.includes(rawPriority as Priority)
+    ? (rawPriority as Priority)
+    : "medium";
   if (!title?.trim() || !description?.trim()) {
     return NextResponse.json(
       { error: "title and description are required" },
@@ -51,7 +56,7 @@ export async function POST(request: Request) {
       organization_id: profile.organization_id,
       created_by: user.id,
       status: "open",
-      priority: "medium",
+      priority,
       source: "portal",
       ...(assignment.category        && { category: assignment.category }),
       ...(assignment.assigned_team_id && { assigned_team_id: assignment.assigned_team_id }),

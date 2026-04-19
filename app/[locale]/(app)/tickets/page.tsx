@@ -4,10 +4,10 @@ import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { Button } from "@/components/ui/Button";
 import { TicketIcon, PlusCircle, Clock, AlertCircle } from "lucide-react";
-import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
-import { TicketRowActions } from "@/components/tickets/TicketRowActions";
+import { formatTicketRef, statusColor, formatRelativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function TicketsPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const t = await getTranslations("tickets");
+  const t  = await getTranslations("tickets");
   const tp = await getTranslations("priority");
   const ts = await getTranslations("status");
 
@@ -38,25 +38,36 @@ export default async function TicketsPage({
     .eq("id", user.id)
     .single();
 
-  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+  const isStaff    = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+  const isCustomer = profile?.role === "customer";
+  const orgId      = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
-  // Supabase query builder is immutable — eq() returns a new object.
-  // Must branch into two separate query chains, not mutate a shared variable.
-  const orgId = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  type TicketRow = {
+    id: string;
+    ticket_number: number;
+    title: string;
+    status: string;
+    priority: string;
+    category: string | null;
+    created_at: string;
+    updated_at: string;
+    metadata?: Record<string, unknown> | null;
+  };
 
   const { data: tickets } = isStaff
     ? await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, updated_at")
+        .select("id, ticket_number, title, status, priority, category, created_at, updated_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
         .limit(100)
     : await svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, updated_at, metadata")
+        .select("id, ticket_number, title, status, priority, category, created_at, updated_at, metadata")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false })
         .limit(100);
+
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
 
   return (
@@ -64,13 +75,13 @@ export default async function TicketsPage({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            {profile?.role === "customer" ? t("myTickets") : t("allTickets")}
+            {isCustomer ? t("myTickets") : t("allTickets")}
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
             {t("totalCount", { count: tickets?.length ?? 0 })}
           </p>
         </div>
-        {profile?.role === "customer" && (
+        {isCustomer && (
           <Link href={newTicketPath}>
             <Button size="sm">
               <PlusCircle className="w-4 h-4" />
@@ -85,9 +96,9 @@ export default async function TicketsPage({
           <TicketIcon className="w-10 h-10 text-[var(--color-text-muted)] mb-3" />
           <p className="text-[var(--color-text-secondary)] font-medium">{t("noTickets")}</p>
           <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            {profile?.role === "customer" ? t("noTicketsCustomer") : t("noTicketsStaff")}
+            {isCustomer ? t("noTicketsCustomer") : t("noTicketsStaff")}
           </p>
-          {profile?.role === "customer" && (
+          {isCustomer && (
             <Link href={newTicketPath} className="mt-4">
               <Button size="sm">
                 <PlusCircle className="w-4 h-4" /> {t("newTicket")}
@@ -95,62 +106,132 @@ export default async function TicketsPage({
             </Link>
           )}
         </Card>
+      ) : isCustomer ? (
+        /* ── Customer: clean table view ── */
+        <div className="rounded-xl border border-[var(--color-surface-600)] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-surface-600)] bg-[var(--color-surface-800)]">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider w-24">
+                  Ref
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden sm:table-cell">
+                  {t("category")}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                  {t("priority")}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden md:table-cell">
+                  {t("summary")}
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider hidden lg:table-cell">
+                  Date
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-surface-700)]">
+              {(tickets as TicketRow[]).map((ticket) => {
+                const ticketPath = locale === "de"
+                  ? `/tickets/${ticket.id}`
+                  : `/${locale}/tickets/${ticket.id}`;
+                return (
+                  <tr
+                    key={ticket.id}
+                    className="hover:bg-[var(--color-surface-800)] transition-colors group"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={ticketPath}
+                        className="font-mono text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        {formatTicketRef(ticket.ticket_number)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      {ticket.category ? (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                          {ticket.category}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell max-w-xs">
+                      <Link href={ticketPath} className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors truncate block">
+                        {ticket.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-right">
+                      <span className="flex items-center justify-end gap-1 text-xs text-[var(--color-text-muted)]">
+                        <Clock className="w-3 h-3" />
+                        {formatRelativeTime(ticket.created_at)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── Staff: card list view ── */
         <ol role="list" aria-label="Tickets" className="space-y-2">
-          {tickets.map((ticket: any) => {
-            const ticketPath = locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
+          {(tickets as TicketRow[]).map((ticket) => {
+            const ticketPath = locale === "de"
+              ? `/tickets/${ticket.id}`
+              : `/${locale}/tickets/${ticket.id}`;
             return (
               <li key={ticket.id} role="listitem">
-              <Link
-                href={ticketPath}
-                aria-label={`${formatTicketRef(ticket.ticket_number)}: ${ticket.title} — ${ticket.priority} priority, ${ticket.status}`}
-              >
-                <Card hover className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="mt-0.5">
-                      <AlertCircle className={`w-4 h-4 ${
-                        ticket.priority === "critical" ? "text-red-400" :
-                        ticket.priority === "high"     ? "text-orange-400" :
-                        ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
-                      }`} />
+                <Link
+                  href={ticketPath}
+                  aria-label={`${formatTicketRef(ticket.ticket_number)}: ${ticket.title} — ${ticket.priority} priority, ${ticket.status}`}
+                >
+                  <Card hover className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="mt-0.5">
+                        <AlertCircle className={`w-4 h-4 ${
+                          ticket.priority === "critical" ? "text-red-400" :
+                          ticket.priority === "high"     ? "text-orange-400" :
+                          ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs font-mono text-[var(--color-text-muted)]">
+                            {formatTicketRef(ticket.ticket_number)}
+                          </p>
+                          {ticket.category && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                              {ticket.category}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                          {ticket.title}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
+                        <Badge className={statusColor(ticket.status)}>
+                          {ts(ticket.status)}
+                        </Badge>
+                        <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
+                          <Clock className="w-3 h-3" />
+                          {formatRelativeTime(ticket.updated_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-mono text-[var(--color-text-muted)] mb-1">
-                        {formatTicketRef(ticket.ticket_number)}
-                      </p>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                        {ticket.title}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      <Badge className={priorityColor(ticket.priority)}>
-                        {tp(ticket.priority)}
-                      </Badge>
-                      <Badge className={statusColor(ticket.status)}>
-                        {ts(ticket.status)}
-                      </Badge>
-                      <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                        <Clock className="w-3 h-3" />
-                        {formatRelativeTime(ticket.updated_at)}
-                      </span>
-                      {profile?.role === "customer" && (
-                        <TicketRowActions
-                          ticketId={ticket.id}
-                          currentPriority={ticket.priority}
-                          currentRating={
-                            ticket.metadata &&
-                            typeof ticket.metadata === "object" &&
-                            !Array.isArray(ticket.metadata) &&
-                            typeof (ticket.metadata as Record<string, unknown>).customer_rating === "number"
-                              ? (ticket.metadata as Record<string, unknown>).customer_rating as number
-                              : null
-                          }
-                        />
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              </Link>
+                  </Card>
+                </Link>
               </li>
             );
           })}

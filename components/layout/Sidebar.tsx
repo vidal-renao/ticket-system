@@ -14,6 +14,7 @@ import {
   TrendingUp,
   LogOut,
   Home,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
@@ -27,7 +28,8 @@ type NavKey =
   | "analytics"
   | "predictive"
   | "team"
-  | "settings";
+  | "settings"
+  | "admin";
 
 interface NavItem {
   href: string;
@@ -86,10 +88,16 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["manager", "admin"],
   },
   {
+    href: "/admin",
+    labelKey: "admin",
+    icon: Building2,
+    roles: ["admin"],
+  },
+  {
     href: "/settings",
     labelKey: "settings",
     icon: Settings,
-    roles: ["admin"],
+    roles: ["admin", "manager", "agent", "customer"],
   },
 ];
 

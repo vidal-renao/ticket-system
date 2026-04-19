@@ -70,6 +70,7 @@
     "predictive": "Predictive",
     "team": "Team",
     "settings": "Settings",
+    "admin": "Admin",
     "signOut": "Sign out",
     "home": "Home"
   },
@@ -98,7 +99,9 @@
     "rate": "Rate",
     "rated": "Rated",
     "urgentSet": "Marked as urgent",
-    "notUrgentSet": "Marked as not urgent"
+    "notUrgentSet": "Marked as not urgent",
+    "priority": "Priority",
+    "selectPriority": "Select priority"
   },
   "queue": {
     "title": "Queue",
@@ -223,5 +226,19 @@
     "role_manager": "Manager",
     "role_agent": "Agent",
     "role_customer": "Customer"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "subtitle": "All tickets across your organization",
+    "company": "Company",
+    "assignedTo": "Assigned To",
+    "unassigned": "Unassigned",
+    "internal": "Internal",
+    "allCompanies": "All Companies",
+    "allPriorities": "All Priorities",
+    "allAgents": "All Agents",
+    "noTickets": "No tickets match your filters",
+    "totalShowing": "{count} tickets",
+    "clearFilters": "Clear filters"
   }
 }

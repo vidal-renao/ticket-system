@@ -70,6 +70,7 @@
     "predictive": "Prognose",
     "team": "Team",
     "settings": "Einstellungen",
+    "admin": "Administration",
     "signOut": "Abmelden",
     "home": "Startseite"
   },
@@ -98,7 +99,9 @@
     "rate": "Bewerten",
     "rated": "Bewertet",
     "urgentSet": "Als dringend markiert",
-    "notUrgentSet": "Als nicht dringend markiert"
+    "notUrgentSet": "Als nicht dringend markiert",
+    "priority": "Priorität",
+    "selectPriority": "Priorität wählen"
   },
   "queue": {
     "title": "Warteschlange",
@@ -223,5 +226,19 @@
     "role_manager": "Manager",
     "role_agent": "Agent",
     "role_customer": "Kunde"
+  },
+  "admin": {
+    "title": "Admin-Panel",
+    "subtitle": "Alle Anfragen Ihrer Organisation",
+    "company": "Unternehmen",
+    "assignedTo": "Zugewiesen an",
+    "unassigned": "Nicht zugewiesen",
+    "internal": "Intern",
+    "allCompanies": "Alle Unternehmen",
+    "allPriorities": "Alle Prioritäten",
+    "allAgents": "Alle Agenten",
+    "noTickets": "Keine Anfragen entsprechen Ihren Filtern",
+    "totalShowing": "{count} Anfragen",
+    "clearFilters": "Filter zurücksetzen"
   }
 }
