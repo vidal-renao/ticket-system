@@ -103,10 +103,21 @@ export async function POST(request: NextRequest) {
     is_active: true,
   };
 
-  // Persist team assignment + specialty when registering as agent
-  if (assignedRole === "agent") {
-    if (body.team_id) profileData.team_id = body.team_id;
-    if (body.specialty?.trim()) profileData.specialty = body.specialty.trim();
+  // Persist team assignment + derive specialty from team name
+  if (assignedRole === "agent" && body.team_id) {
+    profileData.team_id = body.team_id;
+    // Use explicit specialty if provided, otherwise fall back to team name
+    if (body.specialty?.trim()) {
+      profileData.specialty = body.specialty.trim();
+    } else {
+      // team was already validated above — org.name is available there but we re-fetch name
+      const { data: teamForSpecialty } = await svc
+        .from("teams")
+        .select("name")
+        .eq("id", body.team_id)
+        .single();
+      if (teamForSpecialty?.name) profileData.specialty = teamForSpecialty.name;
+    }
   }
 
   const { error: profileError } = await svc

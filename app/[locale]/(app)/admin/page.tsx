@@ -187,18 +187,20 @@ export default async function AdminPage({
                 return (
                   <tr
                     key={ticket.id}
-                    className={`hover:bg-[var(--color-surface-800)] transition-colors ${
+                    className={`relative hover:bg-[var(--color-surface-800)] transition-colors cursor-pointer ${
                       ticket.sla_breached ? "bg-red-950/20" : ""
                     }`}
                   >
-                    {/* Ref */}
+                    {/* Ref — contains the full-row overlay link */}
                     <td className="px-4 py-3">
                       <Link
                         href={ticketPath}
-                        className="font-mono text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                      >
+                        className="absolute inset-0"
+                        aria-label={`${formatTicketRef(ticket.ticket_number)}: ${ticket.title}`}
+                      />
+                      <span className="relative font-mono text-xs text-indigo-400 pointer-events-none">
                         {formatTicketRef(ticket.ticket_number)}
-                      </Link>
+                      </span>
                     </td>
 
                     {/* Company of origin */}
@@ -228,12 +230,9 @@ export default async function AdminPage({
 
                     {/* Title */}
                     <td className="px-4 py-3 hidden md:table-cell max-w-xs">
-                      <Link
-                        href={ticketPath}
-                        className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors truncate block"
-                      >
+                      <span className="relative text-sm text-[var(--color-text-primary)] truncate block pointer-events-none">
                         {ticket.title}
-                      </Link>
+                      </span>
                     </td>
 
                     {/* Assigned agent */}

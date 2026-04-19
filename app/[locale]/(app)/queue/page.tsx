@@ -119,7 +119,7 @@ export default async function QueuePage({
     );
   });
 
-  const agentSpecialty = (profile as any)?.specialty as string | null ?? null;
+  const agentSpecialty: string | null = (profile as { specialty?: string | null })?.specialty ?? null;
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
