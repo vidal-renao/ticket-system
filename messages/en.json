@@ -132,6 +132,7 @@
     "noData": "No data yet"
   },
   "ticket": {
+    "description": "Description",
     "slaDeadline": "SLA Deadline",
     "slaBreached": "SLA breached",
     "piiWarning": "PII",
