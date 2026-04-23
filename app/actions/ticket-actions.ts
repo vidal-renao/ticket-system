@@ -1,9 +1,10 @@
 "use server";
 
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
 
-/** Set ticket urgency — only the ticket owner (customer) can call this. */
+/** Set ticket urgency for a customer-visible organization ticket. */
 export async function setTicketUrgency(
   ticketId: string,
   urgent: boolean
@@ -13,16 +14,18 @@ export async function setTicketUrgency(
   if (!user) return { error: "Unauthorized" };
 
   const svc = createServiceClientStatic();
+  const profile = await getCurrentProfile(supabase, user.id);
+  if (!profile?.organization_id) return { error: "Forbidden" };
+  if (profile.role !== "customer") return { error: "Forbidden" };
 
-  // Verify ownership
   const { data: ticket } = await svc
     .from("tickets")
-    .select("id, created_by, priority")
+    .select("id, organization_id, priority")
     .eq("id", ticketId)
+    .eq("organization_id", profile.organization_id)
     .single();
 
   if (!ticket) return { error: "Ticket not found" };
-  if (ticket.created_by !== user.id) return { error: "Forbidden" };
 
   const newPriority = urgent ? "high" : "medium";
   // Only downgrade if currently medium or lower to avoid overriding agent-set critical
@@ -42,7 +45,7 @@ export async function setTicketUrgency(
   return { ok: true };
 }
 
-/** Set customer rating on a ticket (1–5 stars, stored in metadata.customer_rating). */
+/** Set customer rating on a customer-visible organization ticket. */
 export async function setTicketRating(
   ticketId: string,
   rating: number
@@ -54,15 +57,18 @@ export async function setTicketRating(
   if (!user) return { error: "Unauthorized" };
 
   const svc = createServiceClientStatic();
+  const profile = await getCurrentProfile(supabase, user.id);
+  if (!profile?.organization_id) return { error: "Forbidden" };
+  if (profile.role !== "customer") return { error: "Forbidden" };
 
   const { data: ticket } = await svc
     .from("tickets")
-    .select("id, created_by, metadata")
+    .select("id, organization_id, metadata")
     .eq("id", ticketId)
+    .eq("organization_id", profile.organization_id)
     .single();
 
   if (!ticket) return { error: "Ticket not found" };
-  if (ticket.created_by !== user.id) return { error: "Forbidden" };
 
   const existingMeta =
     ticket.metadata && typeof ticket.metadata === "object" && !Array.isArray(ticket.metadata)

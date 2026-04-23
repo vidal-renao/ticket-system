@@ -45,11 +45,11 @@ export function AssignToMeButton({
       type="button"
       onClick={handleAssign}
       disabled={isPending}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+      aria-live="polite"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white border border-indigo-400/40 bg-indigo-600 hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-80 shadow-sm shadow-indigo-950/20 transition-colors"
     >
       {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
-      Assign to me
+      {isPending ? "Assigning..." : "Assign to me"}
     </button>
   );
 }
-

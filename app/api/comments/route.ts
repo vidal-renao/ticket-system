@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
-  if (profile.role === "customer" && ticket.created_by !== user.id) {
+  if (profile.role === "agent" && ticket.assigned_to && ticket.assigned_to !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

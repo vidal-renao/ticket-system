@@ -42,8 +42,9 @@ export default async function TicketDetailPage({
 
   if (ticketError || !ticket) notFound();
 
-  // Manual access check: customers can only see their own tickets
-  if (!isStaff && ticket.created_by !== user.id) notFound();
+  if (profile.role === "agent" && ticket.assigned_to && ticket.assigned_to !== user.id) {
+    notFound();
+  }
 
   const slaStatus = getSlaStatus(ticket);
   const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;

@@ -40,6 +40,10 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if (profile.role === "agent" && existing.assigned_to && existing.assigned_to !== user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await request.json();
 
   const requestedStatus = body.status === undefined ? null : normalizeStatusInput(body.status);
@@ -56,6 +60,13 @@ export async function PATCH(
 
   if (requestedStatus) {
     patch.status = canonicalToLegacyStatus(requestedStatus);
+  }
+
+  if (profile.role === "agent" && patch.assigned_to !== undefined) {
+    const requestedAssignee = (patch.assigned_to as string | null) || null;
+    if (requestedAssignee !== user.id) {
+      return NextResponse.json({ error: "Agents can only assign tickets to themselves" }, { status: 403 });
+    }
   }
 
   if (patch.assigned_to) {

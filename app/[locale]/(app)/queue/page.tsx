@@ -22,10 +22,11 @@ export default async function QueuePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; priority?: string; sla?: string }>;
 }) {
   const { locale }       = await params;
-  const { page: pageStr } = await searchParams;
+  const filters = await searchParams;
+  const pageStr = filters.page;
   const t  = await getTranslations("queue");
   const tp = await getTranslations("priority");
   const ti = await getTranslations("ticket");
@@ -60,13 +61,27 @@ export default async function QueuePage({
   const agentSpecialty: string | null =
     (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
 
-  const { data: ticketsRaw, error: ticketsError } = await svc
+  let ticketsQuery = svc
     .from("tickets")
     .select(
-      "id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii, assigned_to"
+      "id, ticket_number, title, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
     )
     .eq("organization_id", orgId)
-    .in("status", ["open", "in_progress", "pending_customer"])
+    .in("status", ["open", "in_progress", "pending_customer"]);
+
+  if (filters.status && ["open", "in_progress", "pending_customer"].includes(filters.status)) {
+    ticketsQuery = ticketsQuery.eq("status", filters.status);
+  }
+
+  if (filters.priority && ["low", "medium", "high", "critical"].includes(filters.priority)) {
+    ticketsQuery = ticketsQuery.eq("priority", filters.priority);
+  }
+
+  if (profile.role === "agent") {
+    ticketsQuery = ticketsQuery.or(`assigned_to.eq.${user.id},assigned_to.is.null`);
+  }
+
+  const { data: ticketsRaw, error: ticketsError } = await ticketsQuery
     .order("sla_breached", { ascending: false })
     .order("priority", { ascending: false })
     .order("assigned_to", { ascending: true, nullsFirst: false })
@@ -82,6 +97,12 @@ export default async function QueuePage({
     priority: string;
     created_at: string;
     sla_breached?: boolean;
+    response_due_at?: string | null;
+    resolution_due_at?: string | null;
+    sla_first_response_due?: string | null;
+    sla_resolution_due?: string | null;
+    first_response_at?: string | null;
+    first_agent_response_at?: string | null;
     contains_pii?: boolean;
     assigned_to?: string | null;
   };
@@ -120,9 +141,15 @@ export default async function QueuePage({
     ai: aiByTicket[t.id] ?? null,
   }));
 
-  // Sort: SLA breached → assigned to me → priority
   // DB already orders by SLA breach, priority, assignment presence and recency.
-  const sorted = tickets;
+  const filteredTickets = filters.sla
+    ? tickets.filter((ticket) => getSlaState(ticket).key === filters.sla)
+    : tickets;
+  const sorted = filteredTickets;
+
+  const myTicketCount = tickets.filter((t) => t.assigned_to === user.id).length;
+  const queueCount = tickets.filter((t) => !t.assigned_to).length;
+  const breachedCount = tickets.filter((t) => getSlaState(t).key === "breached").length;
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
@@ -133,7 +160,7 @@ export default async function QueuePage({
         (t) =>
           !t.sla_breached &&
           t.priority !== "critical" &&
-          t.assigned_to !== user.id &&
+          !t.assigned_to &&
           t.ai?.suggested_category?.toLowerCase() === agentSpecialty.toLowerCase()
       )
     : [];
@@ -142,7 +169,7 @@ export default async function QueuePage({
     (t) =>
       !t.sla_breached &&
       t.priority !== "critical" &&
-      t.assigned_to !== user.id &&
+      !t.assigned_to &&
       !mySpecialtyIds.has(t.id)
   );
 
@@ -154,13 +181,37 @@ export default async function QueuePage({
 
   function othersPageHref(p: number) {
     const base = locale === "de" ? "/queue" : `/${locale}/queue`;
-    return p > 1 ? `${base}?page=${p}` : base;
+    const sp = new URLSearchParams();
+    if (filters.status) sp.set("status", filters.status);
+    if (filters.priority) sp.set("priority", filters.priority);
+    if (filters.sla) sp.set("sla", filters.sla);
+    if (p > 1) sp.set("page", String(p));
+    const q = sp.toString();
+    return q ? `${base}?${q}` : base;
+  }
+
+  function filterHref(next: { status?: string; priority?: string; sla?: string }) {
+    const sp = new URLSearchParams();
+    const status = next.status ?? filters.status;
+    const priority = next.priority ?? filters.priority;
+    const sla = next.sla ?? filters.sla;
+    if (status) sp.set("status", status);
+    if (priority) sp.set("priority", priority);
+    if (sla) sp.set("sla", sla);
+    const q = sp.toString();
+    const base = locale === "de" ? "/queue" : `/${locale}/queue`;
+    return q ? `${base}?${q}` : base;
+  }
+
+  function clearFilterHref(key: "status" | "priority" | "sla") {
+    return filterHref({ [key]: "" });
   }
 
   function TicketCard({ ticket }: { ticket: TicketWithAI }) {
     const ticketPath =
       locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
     const aiCategory = ticket.ai?.suggested_category ?? null;
+    const slaState = getSlaState(ticket);
 
     return (
       <Card hover className="p-4">
@@ -217,9 +268,7 @@ export default async function QueuePage({
                   {sentimentIcon(ticket.ai.sentiment)}
                 </span>
               )}
-              {ticket.sla_breached && (
-                <Badge className="text-red-400 bg-red-400/10 border-red-400/20">SLA!</Badge>
-              )}
+              <Badge className={slaState.className}>{slaState.label}</Badge>
               <Badge className={priorityColor(ticket.priority)}>{tp(ticket.priority)}</Badge>
               <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                 <Clock className="w-3 h-3" />
@@ -229,8 +278,70 @@ export default async function QueuePage({
           </div>
         </div>
       </Card>
-    );
+  );
+}
+
+function getSlaState(ticket: {
+  created_at: string;
+  status: string;
+  sla_breached?: boolean | null;
+  response_due_at?: string | null;
+  resolution_due_at?: string | null;
+  sla_first_response_due?: string | null;
+  sla_resolution_due?: string | null;
+  first_response_at?: string | null;
+  first_agent_response_at?: string | null;
+}) {
+  const now = Date.now();
+  const firstResponseAt = ticket.first_agent_response_at ?? ticket.first_response_at;
+  const responseDue = ticket.response_due_at ?? ticket.sla_first_response_due;
+  const resolutionDue = ticket.resolution_due_at ?? ticket.sla_resolution_due;
+
+  const breached = Boolean(
+    ticket.sla_breached ||
+      (responseDue && !firstResponseAt && now > new Date(responseDue).getTime()) ||
+      (resolutionDue && now > new Date(resolutionDue).getTime())
+  );
+
+  if (breached) {
+    return {
+      key: "breached",
+      label: "SLA breached",
+      className: "text-red-400 bg-red-400/10 border-red-400/20",
+    };
   }
+
+  const dueDates = [!firstResponseAt ? responseDue : null, resolutionDue]
+    .filter(Boolean)
+    .map((date) => new Date(date as string).getTime());
+
+  if (dueDates.length === 0) {
+    return {
+      key: "on_time",
+      label: "SLA on time",
+      className: "text-green-400 bg-green-400/10 border-green-400/20",
+    };
+  }
+
+  const nextDue = Math.min(...dueDates);
+  const totalWindow = nextDue - new Date(ticket.created_at).getTime();
+  const remaining = nextDue - now;
+  const oneHour = 60 * 60 * 1000;
+
+  if (remaining <= oneHour || (totalWindow > 0 && remaining / totalWindow <= 0.25)) {
+    return {
+      key: "at_risk",
+      label: "SLA at risk",
+      className: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+    };
+  }
+
+  return {
+    key: "on_time",
+    label: "SLA on time",
+    className: "text-green-400 bg-green-400/10 border-green-400/20",
+  };
+}
 
   function SectionHeader({
     label,
@@ -261,6 +372,53 @@ export default async function QueuePage({
             {t("summary", { total: sorted.length, urgent: critical.length })}
           </p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+        <Card className="p-3">
+          <p className="text-xs text-[var(--color-text-muted)]">My Tickets</p>
+          <p className="text-2xl font-semibold text-[var(--color-text-primary)]">{myTicketCount}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-[var(--color-text-muted)]">Queue</p>
+          <p className="text-2xl font-semibold text-[var(--color-text-primary)]">{queueCount}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-[var(--color-text-muted)]">Breached</p>
+          <p className="text-2xl font-semibold text-red-400">{breachedCount}</p>
+        </Card>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {[
+          { key: "status", label: "Status", value: "open", text: "Open" },
+          { key: "status", label: "Status", value: "in_progress", text: "In progress" },
+          { key: "status", label: "Status", value: "pending_customer", text: "Waiting customer" },
+          { key: "priority", label: "Priority", value: "critical", text: "Critical" },
+          { key: "priority", label: "Priority", value: "high", text: "High" },
+          { key: "sla", label: "SLA", value: "on_time", text: "On time" },
+          { key: "sla", label: "SLA", value: "at_risk", text: "At risk" },
+          { key: "sla", label: "SLA", value: "breached", text: "Breached" },
+        ].map((filter) => {
+          const key = filter.key as "status" | "priority" | "sla";
+          const active =
+            (key === "status" && filters.status === filter.value) ||
+            (key === "priority" && filters.priority === filter.value) ||
+            (key === "sla" && filters.sla === filter.value);
+          return (
+            <Link
+              key={`${filter.key}-${filter.value}`}
+              href={active ? clearFilterHref(key) : filterHref({ [key]: filter.value })}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                active
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+              }`}
+            >
+              {filter.label}: {filter.text}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Critical / SLA */}
@@ -309,7 +467,7 @@ export default async function QueuePage({
       {others.length > 0 && (
         <div>
           <SectionHeader
-            label={t("otherTickets")}
+            label="Unassigned Queue"
             count={others.length}
             icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
           />

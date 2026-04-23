@@ -32,6 +32,8 @@ export default async function AdminPage({
     status?: string;
     category?: string;
     agent?: string;
+    sla?: string;
+    sort?: string;
     page?: string;
   }>;
 }) {
@@ -84,15 +86,32 @@ export default async function AdminPage({
     { data: categoriesRaw },
     { data: teamsRaw },
   ] = await Promise.all([
-    // Exclude closed tickets by default; include them only when explicitly filtered
     (() => {
-      const q = svc
+      let q = svc
         .from("tickets")
         .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id")
         .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
         .limit(500);
-      return filters.status ? q : q.neq("status", "closed");
+
+      q = filters.status ? q.eq("status", filters.status) : q.neq("status", "closed");
+      if (filters.priority) q = q.eq("priority", filters.priority);
+      if (filters.agent === "unassigned") q = q.is("assigned_to", null);
+      else if (filters.agent) q = q.eq("assigned_to", filters.agent);
+      if (filters.sla === "breached") q = q.eq("sla_breached", true);
+      if (filters.sla === "on_track") q = q.eq("sla_breached", false);
+
+      switch (filters.sort) {
+        case "created_at_asc":
+          return q.order("created_at", { ascending: true });
+        case "priority":
+          return q.order("priority", { ascending: false }).order("created_at", { ascending: false });
+        case "sla":
+          return q.order("sla_breached", { ascending: false }).order("created_at", { ascending: false });
+        case "status":
+          return q.order("status", { ascending: true }).order("created_at", { ascending: false });
+        default:
+          return q.order("created_at", { ascending: false });
+      }
     })(),
     svc
       .from("profiles")
@@ -165,12 +184,6 @@ export default async function AdminPage({
     enriched.map((t) => t.company_name).filter((c): c is string => !!c)
   )].sort();
 
-  const agentMap = new Map<string, string>();
-  enriched.forEach((t) => {
-    if (t.assigned_to && t.agent_name) agentMap.set(t.assigned_to, t.agent_name);
-  });
-  const agents = Array.from(agentMap.entries()).map(([id, name]) => ({ id, name }));
-
   const allAgents = profiles
     .filter((p) => p.role === "agent")
     .map((p) => ({ id: p.id, name: p.full_name ?? p.id }));
@@ -182,13 +195,10 @@ export default async function AdminPage({
     ]),
   ].sort();
 
-  // Apply filters
+  // Company/category remain derived labels, while core ticket filters run in the DB query above.
   const filtered = enriched
     .filter((t) => !filters.company  || t.company_name === filters.company)
-    .filter((t) => !filters.priority || t.priority === filters.priority)
-    .filter((t) => !filters.status   || t.status === filters.status)
-    .filter((t) => !filters.category || t.category_name === filters.category)
-    .filter((t) => !filters.agent    || t.assigned_to === filters.agent);
+    .filter((t) => !filters.category || t.category_name === filters.category);
 
   // Pagination
   const currentPage = Math.max(1, parseInt(filters.page ?? "1", 10));
@@ -203,13 +213,22 @@ export default async function AdminPage({
     if (filters.status)   sp.set("status",   filters.status);
     if (filters.category) sp.set("category", filters.category);
     if (filters.agent)    sp.set("agent",    filters.agent);
+    if (filters.sla)      sp.set("sla",      filters.sla);
+    if (filters.sort)     sp.set("sort",     filters.sort);
     if (p > 1) sp.set("page", String(p));
     const q = sp.toString();
     const base = locale === "de" ? "/admin" : `/${locale}/admin`;
     return q ? `${base}?${q}` : base;
   }
 
-  const hasFilters = filters.company || filters.priority || filters.status || filters.category || filters.agent;
+  const hasFilters =
+    filters.company ||
+    filters.priority ||
+    filters.status ||
+    filters.category ||
+    filters.agent ||
+    filters.sla ||
+    filters.sort;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -240,7 +259,7 @@ export default async function AdminPage({
       <div className="mb-5">
         <AdminFilters
           companies={companies}
-          agents={agents}
+          agents={allAgents}
           categories={categoryNames}
         />
       </div>

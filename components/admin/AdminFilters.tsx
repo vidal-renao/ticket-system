@@ -25,6 +25,14 @@ const STATUS_OPTIONS = [
   { value: "closed",            label: "Closed" },
 ];
 
+const SORT_OPTIONS = [
+  { value: "created_at_desc", label: "Newest first" },
+  { value: "created_at_asc",  label: "Oldest first" },
+  { value: "priority",        label: "Priority" },
+  { value: "sla",             label: "SLA risk" },
+  { value: "status",          label: "Status" },
+];
+
 export function AdminFilters({ companies, agents, categories }: AdminFiltersProps) {
   const router       = useRouter();
   const pathname     = usePathname();
@@ -36,13 +44,15 @@ export function AdminFilters({ companies, agents, categories }: AdminFiltersProp
     status:   searchParams.get("status")   ?? "",
     category: searchParams.get("category") ?? "",
     agent:    searchParams.get("agent")    ?? "",
+    sla:      searchParams.get("sla")      ?? "",
+    sort:     searchParams.get("sort")     ?? "",
   };
 
   function update(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
     if (value) {
       params.set(key, value);
-      params.delete("page"); // reset to page 1 on filter change
     } else {
       params.delete(key);
     }
@@ -54,7 +64,13 @@ export function AdminFilters({ companies, agents, categories }: AdminFiltersProp
   }
 
   const hasFilters =
-    current.company || current.priority || current.status || current.category || current.agent;
+    current.company ||
+    current.priority ||
+    current.status ||
+    current.category ||
+    current.agent ||
+    current.sla ||
+    current.sort;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -121,8 +137,34 @@ export function AdminFilters({ companies, agents, categories }: AdminFiltersProp
         className={selectClass}
       >
         <option value="">All Agents</option>
+        <option value="unassigned">Unassigned</option>
         {agents.map((a) => (
           <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </select>
+
+      {/* SLA */}
+      <select
+        value={current.sla}
+        onChange={(e) => update("sla", e.target.value)}
+        aria-label="Filter by SLA"
+        className={selectClass}
+      >
+        <option value="">All SLA</option>
+        <option value="breached">Breached</option>
+        <option value="on_track">On track</option>
+      </select>
+
+      {/* Sort */}
+      <select
+        value={current.sort}
+        onChange={(e) => update("sort", e.target.value)}
+        aria-label="Sort tickets"
+        className={selectClass}
+      >
+        <option value="">Sort: Newest first</option>
+        {SORT_OPTIONS.map((s) => (
+          <option key={s.value} value={s.value}>{s.label}</option>
         ))}
       </select>
 
