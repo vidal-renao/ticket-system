@@ -24,7 +24,7 @@ export default async function QueuePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string; status?: string; priority?: string; sla?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; priority?: string; sla?: string; category?: string; specialty?: string }>;
 }) {
   const { locale }       = await params;
   const filters = await searchParams;
@@ -163,6 +163,7 @@ export default async function QueuePage({
 
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const currentAgentInitials = getInitials(profile.full_name);
+  const availableCategories = [...new Set(Object.values(aiByTicket).map((row) => row?.suggested_category).filter((value): value is string => Boolean(value)))].sort();
 
   type TicketWithAI = RawTicket & { ai: AiRow | null };
 
@@ -171,7 +172,16 @@ export default async function QueuePage({
     ai: aiByTicket[t.id] ?? null,
   }));
 
-  const sorted = tickets;
+  const sorted = tickets.filter((ticket) => {
+    const ticketCategory = ticket.ai?.suggested_category ?? "";
+    if (filters.category && ticketCategory !== filters.category) return false;
+    if (filters.specialty === "mine") {
+      const specialty = agentSpecialty?.trim().toLowerCase();
+      if (!specialty) return false;
+      return ticketCategory.toLowerCase() === specialty;
+    }
+    return true;
+  });
 
   const myTicketCount = tickets.filter((t) => t.assigned_to === currentUserId).length;
   const queueCount = tickets.filter((t) => !t.assigned_to).length;
@@ -216,20 +226,24 @@ export default async function QueuePage({
     return q ? `${base}?${q}` : base;
   }
 
-  function filterHref(next: { status?: string; priority?: string; sla?: string }) {
+  function filterHref(next: { status?: string; priority?: string; sla?: string; category?: string; specialty?: string }) {
     const sp = new URLSearchParams();
     const status = next.status ?? filters.status;
     const priority = next.priority ?? filters.priority;
     const sla = next.sla ?? filters.sla;
+    const category = next.category ?? filters.category;
+    const specialty = next.specialty ?? filters.specialty;
     if (status) sp.set("status", status);
     if (priority) sp.set("priority", priority);
     if (sla) sp.set("sla", sla);
+    if (category) sp.set("category", category);
+    if (specialty) sp.set("specialty", specialty);
     const q = sp.toString();
     const base = locale === "de" ? "/queue" : `/${locale}/queue`;
     return q ? `${base}?${q}` : base;
   }
 
-  function clearFilterHref(key: "status" | "priority" | "sla") {
+  function clearFilterHref(key: "status" | "priority" | "sla" | "category" | "specialty") {
     return filterHref({ [key]: "" });
   }
 
@@ -476,6 +490,34 @@ function getSlaState(ticket: {
             </Link>
           );
         })}
+        {availableCategories.map((category) => {
+          const active = filters.category === category;
+          return (
+            <Link
+              key={`category-${category}`}
+              href={active ? clearFilterHref("category") : filterHref({ category })}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                active
+                  ? "bg-indigo-600 text-white border-indigo-500"
+                  : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+              }`}
+            >
+              Category: {category}
+            </Link>
+          );
+        })}
+        {agentSpecialty?.trim() && (
+          <Link
+            href={filters.specialty === "mine" ? clearFilterHref("specialty") : filterHref({ specialty: "mine" })}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+              filters.specialty === "mine"
+                ? "bg-indigo-600 text-white border-indigo-500"
+                : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+            }`}
+          >
+            Specialty: {agentSpecialty.trim()}
+          </Link>
+        )}
       </div>
 
       {/* Critical / SLA */}

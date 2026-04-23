@@ -23,7 +23,7 @@ export default async function TicketsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ status?: string; priority?: string; sla?: string }>;
+  searchParams: Promise<{ status?: string; priority?: string; sla?: string; category?: string; specialty?: string }>;
 }) {
   const { locale } = await params;
   const filters = await searchParams;
@@ -150,7 +150,6 @@ export default async function TicketsPage({
   const openCustomerTickets = customerTickets.filter((ticket) => !isResolved(ticket.status));
   const resolvedCustomerTickets = customerTickets.filter((ticket) => isResolved(ticket.status));
   const staffTickets = (tickets ?? []) as StaffTicket[];
-  const visibleStaffTickets = staffTickets;
   const staffBreachedCount = staffTickets.filter((ticket) => getTicketListSlaState(ticket).key === "breached").length;
   const allVisibleTickets = (tickets ?? []) as Array<CustomerTicket | StaffTicket>;
 
@@ -187,21 +186,36 @@ export default async function TicketsPage({
 
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const currentAgentInitials = getInitials(profile.full_name);
+  const availableCategories = [...new Set(Object.values(aiCategoryMap).filter((value): value is string => Boolean(value)))].sort();
+  const visibleStaffTickets = staffTickets.filter((ticket) => {
+    const ticketCategory = aiCategoryMap[ticket.id] ?? "";
+    if (filters.category && ticketCategory !== filters.category) return false;
+    if (filters.specialty === "mine") {
+      const specialty = profile.specialty?.trim().toLowerCase();
+      if (!specialty) return false;
+      return ticketCategory.toLowerCase() === specialty;
+    }
+    return true;
+  });
 
-  function ticketsFilterHref(next: { status?: string; priority?: string; sla?: string }) {
+  function ticketsFilterHref(next: { status?: string; priority?: string; sla?: string; category?: string; specialty?: string }) {
     const sp = new URLSearchParams();
     const status = next.status ?? filters.status;
     const priority = next.priority ?? filters.priority;
     const sla = next.sla ?? filters.sla;
+    const category = next.category ?? filters.category;
+    const specialty = next.specialty ?? filters.specialty;
     if (status) sp.set("status", status);
     if (priority) sp.set("priority", priority);
     if (sla) sp.set("sla", sla);
+    if (category) sp.set("category", category);
+    if (specialty) sp.set("specialty", specialty);
     const q = sp.toString();
     const base = locale === "de" ? "/tickets" : `/${locale}/tickets`;
     return q ? `${base}?${q}` : base;
   }
 
-  function clearTicketsFilterHref(key: "status" | "priority" | "sla") {
+  function clearTicketsFilterHref(key: "status" | "priority" | "sla" | "category" | "specialty") {
     return ticketsFilterHref({ [key]: "" });
   }
 
@@ -233,7 +247,12 @@ export default async function TicketsPage({
               {currentAgentInitials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              {profile.role === "agent" && (
+                <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {profile.full_name?.trim() || "Agent"} · {companyCode}
+                </p>
+              )}
+              <p className={`text-sm font-medium text-[var(--color-text-primary)] ${profile.role === "agent" ? "hidden" : ""}`}>
                 {organization?.name ?? "Organization"} · {companyCode}
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
@@ -295,6 +314,34 @@ export default async function TicketsPage({
                 </Link>
               );
             })}
+            {availableCategories.map((category) => {
+              const active = filters.category === category;
+              return (
+                <Link
+                  key={`category-${category}`}
+                  href={active ? clearTicketsFilterHref("category") : ticketsFilterHref({ category })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    active
+                      ? "bg-indigo-600 text-white border-indigo-500"
+                      : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+                  }`}
+                >
+                  Category: {category}
+                </Link>
+              );
+            })}
+            {profile.role === "agent" && profile.specialty?.trim() && (
+              <Link
+                href={filters.specialty === "mine" ? clearTicketsFilterHref("specialty") : ticketsFilterHref({ specialty: "mine" })}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  filters.specialty === "mine"
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
+                }`}
+              >
+                Specialty: {profile.specialty.trim()}
+              </Link>
+            )}
           </div>
         </>
       )}

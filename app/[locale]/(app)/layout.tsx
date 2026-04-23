@@ -21,11 +21,22 @@ export default async function AppLayout({
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
-    .select("full_name, role")
+    .select("full_name, role, specialty, avatar_url")
     .eq("id", user.id)
     .single();
 
   if (!profile) redirect(loginPath);
+
+  const resolvedName =
+    profile.full_name?.trim() ||
+    (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "") ||
+    user.email?.split("@")[0] ||
+    "User";
+
+  const resolvedSubtitle =
+    profile.role === "agent"
+      ? profile.specialty?.trim() || "General support"
+      : profile.role;
 
   const [{ data: notifications }, { count: unreadNotifications }] = await Promise.all([
     svc
@@ -44,7 +55,9 @@ export default async function AppLayout({
   return (
     <AppShell
       role={profile.role}
-      userName={profile.full_name ?? user.email ?? "User"}
+      userName={resolvedName}
+      userSubtitle={resolvedSubtitle}
+      userAvatar={profile.avatar_url}
       locale={locale}
       notifications={notifications ?? []}
       unreadNotifications={unreadNotifications ?? 0}

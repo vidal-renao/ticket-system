@@ -113,11 +113,14 @@ const NAV_ITEMS: NavItem[] = [
 interface SidebarProps {
   role: UserRole;
   userName: string;
+  userSubtitle?: string | null;
   userAvatar?: string | null;
   notifications: ShellNotification[];
   unreadNotifications: number;
   onSignOut: () => void;
   onGoHome: () => void;
+  onNavigate?: () => void;
+  className?: string;
 }
 
 const ROLE_HOME: Record<UserRole, string> = {
@@ -130,11 +133,14 @@ const ROLE_HOME: Record<UserRole, string> = {
 export function Sidebar({
   role,
   userName,
+  userSubtitle,
   userAvatar,
   notifications,
   unreadNotifications,
   onSignOut,
   onGoHome,
+  onNavigate,
+  className,
 }: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
@@ -145,10 +151,11 @@ export function Sidebar({
   const hasExactMatch = visibleItems.some((item) => pathname === item.href);
 
   return (
-    <aside className="flex flex-col w-60 min-h-screen border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]">
+    <aside className={cn("flex flex-col w-60 min-h-screen border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]", className)}>
       {/* Logo — links back to role home without signing out */}
       <Link
         href={ROLE_HOME[role]}
+        onClick={onNavigate}
         className="flex items-center gap-2.5 px-5 py-5 border-b border-[var(--color-surface-600)] hover:bg-[var(--color-surface-800)] transition-colors"
       >
         <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
@@ -164,6 +171,10 @@ export function Sidebar({
       <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-0.5">
         {visibleItems.map((item) => {
           const Icon = item.icon;
+          const labelKey =
+            role === "agent" && item.labelKey === "allTickets"
+              ? "myTickets"
+              : item.labelKey;
           // If another visible item has an exact pathname match (e.g. /analytics/predictive),
         // do NOT activate the parent (/analytics) via startsWith — avoids dual-highlight.
         const isActive = pathname === item.href ||
@@ -172,6 +183,7 @@ export function Sidebar({
             <Link
               key={`${item.href}-${item.labelKey}`}
               href={item.href}
+              onClick={onNavigate}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
@@ -181,7 +193,7 @@ export function Sidebar({
               )}
             >
               <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-              {t(item.labelKey)}
+              {t(labelKey)}
               {isActive && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
               )}
@@ -224,6 +236,9 @@ export function Sidebar({
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">{userName}</p>
+            {userSubtitle && (
+              <p className="text-[11px] text-[var(--color-text-muted)] truncate">{userSubtitle}</p>
+            )}
           </div>
           <button
             type="button"
