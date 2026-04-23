@@ -27,18 +27,19 @@ export default async function TicketDetailPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
   const currentUserId = user?.id ?? "";
+  const svc = createServiceClientStatic();
 
-  const profile = await getCurrentProfile(supabase, currentUserId);
+  const profile = await getCurrentProfile(svc, currentUserId);
   if (!profile?.organization_id) {
     console.error("[TicketDetailPage] Missing profile organization", {
       ticketId: id,
       userId: currentUserId,
+      roleHint: "ticket-detail",
     });
     redirect(loginPath);
   }
 
   const isStaff = isStaffRole(profile?.role);
-  const svc = createServiceClientStatic();
 
   const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
     svc,

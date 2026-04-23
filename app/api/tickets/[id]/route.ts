@@ -20,19 +20,20 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+  const svc = createServiceClientStatic();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const profile = await getCurrentProfile(supabase, user.id);
+  const profile = await getCurrentProfile(svc, user.id);
   if (!profile || !isStaffRole(profile.role) || !profile.organization_id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
-    createServiceClientStatic(),
+    svc,
     profile,
     id,
     "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at"
@@ -74,7 +75,6 @@ export async function PATCH(
   }
 
   if (patch.assigned_to) {
-    const svc = createServiceClientStatic();
     const { data: assignee } = await svc
       .from("profiles")
       .select("id, role, organization_id")
