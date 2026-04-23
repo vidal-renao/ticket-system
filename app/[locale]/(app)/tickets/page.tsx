@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { getTicketsByRole } from "@/lib/ticket-visibility";
+import { applyTicketSlaFilter, formatAgentIdentity, getInitials, getTicketsByRole } from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -51,6 +51,7 @@ export default async function TicketsPage({
     id: string;
     ticket_number: number;
     title: string;
+    created_by: string;
     status: string;
     priority: string;
     created_at: string;
@@ -62,6 +63,7 @@ export default async function TicketsPage({
     id: string;
     ticket_number: number;
     title: string;
+    created_by: string;
     status: string;
     priority: string;
     created_at: string;
@@ -76,10 +78,15 @@ export default async function TicketsPage({
     first_agent_response_at: string | null;
   };
 
+  const staffQueryOptions = profile.role === "agent"
+    ? { includeUnassignedForAgents: false }
+    : undefined;
+
   let staffTicketsQuery = getTicketsByRole(
     svc,
     profile,
-    "id, ticket_number, title, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at"
+    "id, ticket_number, title, created_by, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at",
+    staffQueryOptions
   );
 
   if (isStaff && filters.status && ["open", "in_progress", "pending_customer", "resolved", "closed"].includes(filters.status)) {
@@ -90,6 +97,17 @@ export default async function TicketsPage({
     staffTicketsQuery = staffTicketsQuery.eq("priority", filters.priority);
   }
 
+  if (isStaff) {
+    staffTicketsQuery = applyTicketSlaFilter(staffTicketsQuery, filters.sla);
+    console.info("[TicketsPage] scoped staff filters", {
+      userId: user.id,
+      role: profile.role,
+      organizationId: profile.organization_id,
+      filters,
+      includeUnassignedForAgents: staffQueryOptions?.includeUnassignedForAgents ?? true,
+    });
+  }
+
   const { data: tickets, error } = isStaff
     ? await staffTicketsQuery
         .order("created_at", { ascending: false })
@@ -97,7 +115,7 @@ export default async function TicketsPage({
     : await getTicketsByRole(
         svc,
         profile,
-        "id, ticket_number, title, status, priority, created_at, resolved_at"
+        "id, ticket_number, title, created_by, status, priority, created_at, resolved_at"
       )
         .order("created_at", { ascending: false })
         .limit(100);
@@ -132,10 +150,43 @@ export default async function TicketsPage({
   const openCustomerTickets = customerTickets.filter((ticket) => !isResolved(ticket.status));
   const resolvedCustomerTickets = customerTickets.filter((ticket) => isResolved(ticket.status));
   const staffTickets = (tickets ?? []) as StaffTicket[];
-  const visibleStaffTickets = isStaff && filters.sla
-    ? staffTickets.filter((ticket) => getTicketListSlaState(ticket).key === filters.sla)
-    : staffTickets;
+  const visibleStaffTickets = staffTickets;
   const staffBreachedCount = staffTickets.filter((ticket) => getTicketListSlaState(ticket).key === "breached").length;
+  const allVisibleTickets = (tickets ?? []) as Array<CustomerTicket | StaffTicket>;
+
+  const creatorIds = [...new Set(allVisibleTickets.map((ticket) => ticket.created_by).filter(Boolean))];
+  const assigneeIds = [...new Set(staffTickets.map((ticket) => ticket.assigned_to).filter((value): value is string => Boolean(value)))];
+
+  const [
+    { data: organization },
+    { data: customerCompanyRows },
+    { data: staffProfileRows },
+  ] = await Promise.all([
+    svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
+    creatorIds.length
+      ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
+      : Promise.resolve({ data: [] as { id: string; company_name: string; industry: string }[] }),
+    assigneeIds.length
+      ? svc.from("profiles").select("id, full_name, specialty").in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; specialty: string | null }[] }),
+  ]);
+
+  const companyContextByCreator = Object.fromEntries(
+    ((customerCompanyRows ?? []) as { id: string; company_name: string; industry: string }[]).map((row) => [
+      row.id,
+      {
+        company_name: row.company_name?.trim() || organization?.name || "Organization",
+        sector: row.industry?.trim() || "General",
+      },
+    ])
+  );
+
+  const assigneeById = Object.fromEntries(
+    ((staffProfileRows ?? []) as { id: string; full_name: string | null; specialty: string | null }[]).map((row) => [row.id, row])
+  );
+
+  const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
+  const currentAgentInitials = getInitials(profile.full_name);
 
   function ticketsFilterHref(next: { status?: string; priority?: string; sla?: string }) {
     const sp = new URLSearchParams();
@@ -174,6 +225,26 @@ export default async function TicketsPage({
           </Link>
         )}
       </div>
+
+      {(isCustomer || profile.role === "agent") && (
+        <Card className="p-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm font-semibold">
+              {currentAgentInitials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                {organization?.name ?? "Organization"} · {companyCode}
+              </p>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {profile.role === "agent"
+                  ? profile.specialty?.trim() || "General support"
+                  : companyContextByCreator[user.id]?.sector || "General"}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {isStaff && (
         <>
@@ -289,6 +360,7 @@ export default async function TicketsPage({
                 const aiCategory = aiCategoryMap[ticket.id] ?? null;
                 const resolved   = isResolved(ticket.status);
                 const active     = isActive(ticket.status);
+                const companyContext = companyContextByCreator[ticket.created_by];
 
                 return (
                   <tr
@@ -309,9 +381,12 @@ export default async function TicketsPage({
                     <td className="px-4 py-3 hidden md:table-cell max-w-xs">
                       <Link
                         href={ticketPath}
-                        className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors truncate block"
+                        className="text-sm text-[var(--color-text-primary)] hover:text-indigo-300 transition-colors block"
                       >
-                        {ticket.title}
+                        <span className="truncate block">{ticket.title}</span>
+                        <span className="mt-1 block text-[11px] text-[var(--color-text-muted)]">
+                          {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                        </span>
                       </Link>
                     </td>
 
@@ -395,6 +470,7 @@ export default async function TicketsPage({
                 const ticketPath = locale === "de"
                   ? `/tickets/${ticket.id}`
                   : `/${locale}/tickets/${ticket.id}`;
+                const companyContext = companyContextByCreator[ticket.created_by];
 
                 return (
                   <Link key={ticket.id} href={ticketPath}>
@@ -406,6 +482,9 @@ export default async function TicketsPage({
                           </p>
                           <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                             {ticket.title}
+                          </p>
+                          <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -431,6 +510,10 @@ export default async function TicketsPage({
               ? `/tickets/${ticket.id}`
               : `/${locale}/tickets/${ticket.id}`;
             const slaState = getTicketListSlaState(ticket);
+            const companyContext = companyContextByCreator[ticket.created_by];
+            const assignedProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
+            const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assignedProfile) : "Unassigned";
+            const assigneeInitials = ticket.assigned_to ? getInitials(assignedProfile?.full_name) : "--";
             return (
               <li key={ticket.id} role="listitem">
                 <Link
@@ -453,6 +536,17 @@ export default async function TicketsPage({
                         <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                           {ticket.title}
                         </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] text-[var(--color-text-muted)]">
+                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                          </span>
+                          <span className="inline-flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                            <span className="w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] font-semibold">
+                              {assigneeInitials}
+                            </span>
+                            {assigneeLabel}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                         <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />

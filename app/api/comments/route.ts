@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { applyTicketVisibilityScope } from "@/lib/ticket-visibility";
+import { resolveTicketAccess } from "@/lib/ticket-visibility";
+import type { Database } from "@/lib/supabase/types";
 import {
   canonicalToLegacyStatus,
   legacyToCanonicalStatus,
@@ -47,15 +48,22 @@ export async function POST(request: Request) {
 
   const isStaff = isStaffRole(profile.role);
 
-  const { data: ticket } = await applyTicketVisibilityScope(
-    supabase
-      .from("tickets")
-      .select("id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
-      .eq("id", ticket_id),
-    profile
-  ).single();
+  const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
+    createServiceClientStatic(),
+    profile,
+    ticket_id,
+    "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at"
+  );
 
-  if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  if (access.kind === "not_found") {
+    return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  }
+
+  if (access.kind === "forbidden") {
+    return NextResponse.json({ error: "Access restricted" }, { status: 403 });
+  }
+
+  const ticket = access.ticket;
 
   const requestedStatus = body.status_after_comment
     ? normalizeStatusInput(body.status_after_comment)

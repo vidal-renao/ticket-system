@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
-import { getTicketsByRole } from "@/lib/ticket-visibility";
+import { applyTicketSlaFilter, formatAgentIdentity, getInitials, getTicketsByRole } from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
@@ -57,7 +57,7 @@ export default async function QueuePage({
   let ticketsQuery = getTicketsByRole(
     svc,
     profile,
-    "id, ticket_number, title, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
+    "id, ticket_number, title, created_by, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
   ).in("status", ["open", "in_progress", "pending_customer"]);
 
   if (filters.status && ["open", "in_progress", "pending_customer"].includes(filters.status)) {
@@ -67,6 +67,15 @@ export default async function QueuePage({
   if (filters.priority && ["low", "medium", "high", "critical"].includes(filters.priority)) {
     ticketsQuery = ticketsQuery.eq("priority", filters.priority);
   }
+
+  ticketsQuery = applyTicketSlaFilter(ticketsQuery, filters.sla);
+  console.info("[QueuePage] scoped queue filters", {
+    userId: currentUserId,
+    role: profile.role,
+    organizationId: profile.organization_id,
+    specialty: agentSpecialty,
+    filters,
+  });
 
   const { data: ticketsRaw, error: ticketsError } = await ticketsQuery
     .order("sla_breached", { ascending: false })
@@ -80,6 +89,7 @@ export default async function QueuePage({
     id: string;
     ticket_number: number;
     title: string;
+    created_by: string;
     status: string;
     priority: string;
     created_at: string;
@@ -105,6 +115,8 @@ export default async function QueuePage({
 
   const rawList   = (ticketsRaw ?? []) as RawTicket[];
   const ticketIds = rawList.map((t) => t.id);
+  const creatorIds = [...new Set(rawList.map((ticket) => ticket.created_by).filter(Boolean))];
+  const assigneeIds = [...new Set(rawList.map((ticket) => ticket.assigned_to).filter((value): value is string => Boolean(value)))];
 
   const { data: aiRows, error: aiError } = ticketIds.length
     ? await svc
@@ -121,6 +133,37 @@ export default async function QueuePage({
     if (!(row.ticket_id in aiByTicket)) aiByTicket[row.ticket_id] = row;
   }
 
+  const [
+    { data: organization },
+    { data: customerCompanyRows },
+    { data: assigneeRows },
+  ] = await Promise.all([
+    svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
+    creatorIds.length
+      ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
+      : Promise.resolve({ data: [] as { id: string; company_name: string; industry: string }[] }),
+    assigneeIds.length
+      ? svc.from("profiles").select("id, full_name, specialty").in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; specialty: string | null }[] }),
+  ]);
+
+  const companyContextByCreator = Object.fromEntries(
+    ((customerCompanyRows ?? []) as { id: string; company_name: string; industry: string }[]).map((row) => [
+      row.id,
+      {
+        company_name: row.company_name?.trim() || organization?.name || "Organization",
+        sector: row.industry?.trim() || "General",
+      },
+    ])
+  );
+
+  const assigneeById = Object.fromEntries(
+    ((assigneeRows ?? []) as { id: string; full_name: string | null; specialty: string | null }[]).map((row) => [row.id, row])
+  );
+
+  const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
+  const currentAgentInitials = getInitials(profile.full_name);
+
   type TicketWithAI = RawTicket & { ai: AiRow | null };
 
   const tickets: TicketWithAI[] = rawList.map((t) => ({
@@ -128,11 +171,7 @@ export default async function QueuePage({
     ai: aiByTicket[t.id] ?? null,
   }));
 
-  // DB already orders by SLA breach, priority, assignment presence and recency.
-  const filteredTickets = filters.sla
-    ? tickets.filter((ticket) => getSlaState(ticket).key === filters.sla)
-    : tickets;
-  const sorted = filteredTickets;
+  const sorted = tickets;
 
   const myTicketCount = tickets.filter((t) => t.assigned_to === currentUserId).length;
   const queueCount = tickets.filter((t) => !t.assigned_to).length;
@@ -199,6 +238,10 @@ export default async function QueuePage({
       locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
     const aiCategory = ticket.ai?.suggested_category ?? null;
     const slaState = getSlaState(ticket);
+    const companyContext = companyContextByCreator[ticket.created_by];
+    const assigneeProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
+    const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assigneeProfile) : "Unassigned";
+    const assigneeInitials = ticket.assigned_to ? getInitials(assigneeProfile?.full_name) : "--";
 
     return (
       <Card hover className="p-4">
@@ -236,6 +279,17 @@ export default async function QueuePage({
               <p className="text-sm font-medium text-[var(--color-text-primary)] truncate mb-1">
                 {ticket.title}
               </p>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-[11px] text-[var(--color-text-muted)]">
+                  {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                </span>
+                <span className="inline-flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] font-semibold">
+                    {assigneeInitials}
+                  </span>
+                  {assigneeLabel}
+                </span>
+              </div>
               {ticket.ai?.summary && (
                 <p className="text-xs text-[var(--color-text-muted)] truncate">
                   {ticket.ai.summary}
@@ -360,6 +414,22 @@ function getSlaState(ticket: {
           </p>
         </div>
       </div>
+
+      <Card className="p-4 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm font-semibold">
+            {currentAgentInitials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              {profile.full_name?.trim() || "Agent"} · {organization?.name ?? "Organization"}
+            </p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {(agentSpecialty?.trim() || "General support")} · {companyCode}
+            </p>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <Card className="p-3">

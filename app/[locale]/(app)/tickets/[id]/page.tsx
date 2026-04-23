@@ -1,8 +1,9 @@
-import { notFound, redirect } from "next/navigation";
+import { forbidden, notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { applyTicketVisibilityScope } from "@/lib/ticket-visibility";
+import { getInitials, resolveTicketAccess } from "@/lib/ticket-visibility";
+import type { Database } from "@/lib/supabase/types";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
@@ -28,19 +29,28 @@ export default async function TicketDetailPage({
   const currentUserId = user?.id ?? "";
 
   const profile = await getCurrentProfile(supabase, currentUserId);
-  if (!profile?.organization_id) notFound();
+  if (!profile?.organization_id) {
+    console.error("[TicketDetailPage] Missing profile organization", {
+      ticketId: id,
+      userId: currentUserId,
+    });
+    redirect(loginPath);
+  }
 
   const isStaff = isStaffRole(profile?.role);
+  const svc = createServiceClientStatic();
 
-  // Flat ticket query — no embedded joins to avoid FK name mismatch errors.
-  // PostgREST returns data=null (silently) when a join hint like
-  // profiles!tickets_created_by_fkey doesn't match the actual constraint name.
-  const { data: ticket, error: ticketError } = await applyTicketVisibilityScope(
-    supabase.from("tickets").select("*").eq("id", id),
-    profile
-  ).single();
+  const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
+    svc,
+    profile,
+    id,
+    "*"
+  );
 
-  if (ticketError || !ticket) notFound();
+  if (access.kind === "not_found") notFound();
+  if (access.kind === "forbidden") forbidden();
+
+  const ticket = access.ticket;
 
   const slaStatus = getSlaStatus(ticket);
   const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;
@@ -52,6 +62,8 @@ export default async function TicketDetailPage({
     { data: creator },
     { data: aiAnalysis },
     { data: comments },
+    { data: organization },
+    { data: creatorCompanyInfo },
   ] = await Promise.all([
     ticket.category_id
       ? supabase.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
@@ -64,7 +76,26 @@ export default async function TicketDetailPage({
       .select("*, profiles(full_name, avatar_url)")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("organizations")
+      .select("name, slug")
+      .eq("id", ticket.organization_id)
+      .single(),
+    supabase
+      .from("customers_info")
+      .select("company_name, industry")
+      .eq("id", ticket.created_by)
+      .maybeSingle(),
   ]);
+
+  const companyName =
+    creatorCompanyInfo?.company_name?.trim() ||
+    organization?.name ||
+    "Organization";
+  const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
+  const sector = creatorCompanyInfo?.industry?.trim() || "General";
+  const creatorName = creator?.full_name?.trim() || "Requester";
+  const creatorInitials = getInitials(creatorName);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -82,6 +113,17 @@ export default async function TicketDetailPage({
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-3">
           {ticket.title}
         </h1>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
+            {companyName}
+          </Badge>
+          <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
+            {companyCode}
+          </Badge>
+          <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
+            {sector}
+          </Badge>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={priorityColor(ticket.priority)}>{tp(ticket.priority)}</Badge>
           <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
@@ -128,6 +170,23 @@ export default async function TicketDetailPage({
         </div>
 
         <div className="space-y-4">
+          <Card>
+            <CardContent className="py-3">
+              <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">Requester</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-xs font-semibold">
+                  {creatorInitials}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">{creatorName}</p>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    {companyName} · {sector}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {(responseDueAt || resolutionDueAt) && (
             <Card>
               <CardContent className="py-3">
