@@ -27,11 +27,27 @@ export default async function AppLayout({
 
   if (!profile) redirect(loginPath);
 
+  const [{ data: notifications }, { count: unreadNotifications }] = await Promise.all([
+    svc
+      .from("notifications")
+      .select("id, ticket_id, type, title, message, is_read, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    svc
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false),
+  ]);
+
   return (
     <AppShell
       role={profile.role}
       userName={profile.full_name ?? user.email ?? "User"}
       locale={locale}
+      notifications={notifications ?? []}
+      unreadNotifications={unreadNotifications ?? 0}
     >
       {children}
     </AppShell>

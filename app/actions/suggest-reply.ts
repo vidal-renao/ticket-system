@@ -1,7 +1,8 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile, isStaffRole } from "@/lib/authz";
 
 const LANG_NAMES: Record<string, string> = {
   de: "German",
@@ -19,33 +20,25 @@ export async function suggestReply(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Unauthorized" };
 
-  // Service client bypasses RLS — identity already verified via getUser()
-  const svc = createServiceClientStatic();
-
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!["agent", "manager", "admin"].includes(profile?.role ?? "")) {
+  const profile = await getCurrentProfile(supabase, user.id);
+  if (!profile?.organization_id || !isStaffRole(profile.role)) {
     return { error: "Forbidden" };
   }
 
-  const { data: ticket } = await svc
+  const { data: ticket } = await supabase
     .from("tickets")
     .select("id, title, description, category_id")
     .eq("id", ticketId)
+    .eq("organization_id", profile.organization_id)
     .single();
 
   if (!ticket) return { error: "Ticket not found" };
 
-  // Flat queries — avoid nested join direction issues with PostgREST
   const [{ data: categoryRow }, { data: aiRow }] = await Promise.all([
     ticket.category_id
-      ? svc.from("categories").select("name").eq("id", ticket.category_id).single()
+      ? supabase.from("categories").select("name").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
-    svc
+    supabase
       .from("ai_analysis")
       .select("sentiment, detected_language")
       .eq("ticket_id", ticketId)
@@ -55,8 +48,8 @@ export async function suggestReply(
   ]);
 
   const sentiment: string = (aiRow as { sentiment?: string } | null)?.sentiment ?? "neutral";
-  const language: string  = (aiRow as { detected_language?: string } | null)?.detected_language ?? "en";
-  const category: string  = (categoryRow as { name?: string } | null)?.name ?? "General";
+  const language: string = (aiRow as { detected_language?: string } | null)?.detected_language ?? "en";
+  const category: string = (categoryRow as { name?: string } | null)?.name ?? "General";
   const langName = LANG_NAMES[language] ?? "English";
 
   const isUpset = ["frustrated", "angry"].includes(sentiment);
@@ -80,9 +73,9 @@ CATEGORY: ${category}
 CUSTOMER SENTIMENT: ${sentiment}
 
 STRICT INSTRUCTIONS:
-- Write ONLY the reply body — no subject line, no salutation, no sign-off
-- Language: ${langName} — the ENTIRE reply must be in ${langName}
-- Length: 3–5 sentences maximum
+- Write ONLY the reply body - no subject line, no salutation, no sign-off
+- Language: ${langName} - the ENTIRE reply must be in ${langName}
+- Length: 3-5 sentences maximum
 - ${toneInstruction}
 - State clearly what action will be taken next and give a realistic timeframe
 - Do NOT repeat PII (names, emails, IPs) from the ticket description`,

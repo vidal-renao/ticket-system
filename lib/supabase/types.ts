@@ -66,6 +66,32 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
+      teams: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["teams"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["teams"]["Insert"]>;
+      };
+      customers_info: {
+        Row: {
+          id: string;
+          company_name: string;
+          industry: string;
+          business_details: string;
+          tax_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["customers_info"]["Row"], "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["customers_info"]["Insert"]>;
+      };
       categories: {
         Row: {
           id: string;
@@ -81,6 +107,21 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["categories"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["categories"]["Insert"]>;
+      };
+      sla_policies: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          name: string;
+          priority: TicketPriority;
+          first_response_hours: number;
+          resolution_hours: number;
+          business_hours_only: boolean;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["sla_policies"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["sla_policies"]["Insert"]>;
       };
       tickets: {
         Row: {
@@ -101,8 +142,13 @@ export interface Database {
           sla_first_response_due: string | null;
           sla_resolution_due: string | null;
           first_response_at: string | null;
+          response_due_at: string | null;
+          resolution_due_at: string | null;
+          first_agent_response_at: string | null;
           sla_first_response_met: boolean | null;
           sla_resolution_met: boolean | null;
+          sla_response_breached: boolean;
+          sla_resolution_breached: boolean;
           sla_breached: boolean;
           resolved_at: string | null;
           closed_at: string | null;
@@ -159,6 +205,24 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["ai_analysis"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["ai_analysis"]["Insert"]>;
       };
+      audit_logs: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          actor_id: string | null;
+          actor_role: UserRole | string | null;
+          action: string;
+          resource_type: string;
+          resource_id: string | null;
+          old_values: Json | null;
+          new_values: Json | null;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["audit_logs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
+      };
       notifications: {
         Row: {
           id: string;
@@ -191,7 +255,9 @@ export interface Database {
 export type Ticket = Database["public"]["Tables"]["tickets"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
+export type SlaPolicy = Database["public"]["Tables"]["sla_policies"]["Row"];
 export type AIAnalysis = Database["public"]["Tables"]["ai_analysis"]["Row"];
+export type AuditLog = Database["public"]["Tables"]["audit_logs"]["Row"];
 export type TicketComment = Database["public"]["Tables"]["ticket_comments"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 

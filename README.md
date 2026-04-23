@@ -177,6 +177,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ANTHROPIC_API_KEY=sk-ant-...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+CRON_SECRET=<shared-secret-for-vercel-cron>
+RESEND_API_KEY=re_...
+EMAIL_FROM="HelpDesk AI <support@your-domain.com>"
+EMAIL_INGEST_SECRET=<shared-secret-for-email-webhook>
 ```
 
 ### Database

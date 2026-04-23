@@ -1,5 +1,14 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/sla",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "functions": {
+    "app/api/cron/sla/route.ts": {
+      "maxDuration": 60
+    },
     "app/api/tickets/route.ts": {
       "maxDuration": 60
     },

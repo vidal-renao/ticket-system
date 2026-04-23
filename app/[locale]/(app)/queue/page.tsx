@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
 import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon, formatRelativeTime } from "@/lib/utils";
 
@@ -15,8 +16,6 @@ export async function generateMetadata() {
   const t = await getTranslations("queue");
   return { title: t("title") };
 }
-
-const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 export default async function QueuePage({
   params,
@@ -67,7 +66,10 @@ export default async function QueuePage({
       "id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii, assigned_to"
     )
     .eq("organization_id", orgId)
-    .in("status", ["open", "in_progress"])
+    .in("status", ["open", "in_progress", "pending_customer"])
+    .order("sla_breached", { ascending: false })
+    .order("priority", { ascending: false })
+    .order("assigned_to", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (ticketsError) console.error("[QueuePage] tickets query error:", ticketsError.message);
@@ -119,18 +121,8 @@ export default async function QueuePage({
   }));
 
   // Sort: SLA breached → assigned to me → priority
-  const sorted = [...tickets].sort((a, b) => {
-    if (a.sla_breached && !b.sla_breached) return -1;
-    if (!a.sla_breached && b.sla_breached) return 1;
-    const aMe = a.assigned_to === user.id;
-    const bMe = b.assigned_to === user.id;
-    if (aMe && !bMe) return -1;
-    if (!aMe && bMe) return 1;
-    return (
-      (PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] ?? 3) -
-      (PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER] ?? 3)
-    );
-  });
+  // DB already orders by SLA breach, priority, assignment presence and recency.
+  const sorted = tickets;
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
@@ -171,9 +163,9 @@ export default async function QueuePage({
     const aiCategory = ticket.ai?.suggested_category ?? null;
 
     return (
-      <Link href={ticketPath}>
-        <Card hover className="p-4">
-          <div className="flex items-start gap-4">
+      <Card hover className="p-4">
+        <div className="flex items-start gap-4">
+          <Link href={ticketPath} className="flex items-start gap-4 flex-1 min-w-0">
             <div className="mt-0.5 shrink-0">
               <AlertCircle
                 className={`w-4 h-4 ${
@@ -212,7 +204,14 @@ export default async function QueuePage({
                 </p>
               )}
             </div>
+          </Link>
+          <div className="flex items-start gap-4">
             <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <AssignToMeButton
+                ticketId={ticket.id}
+                currentUserId={user.id}
+                currentAssignee={ticket.assigned_to}
+              />
               {ticket.ai?.sentiment && (
                 <span className="text-base" title={ticket.ai.sentiment}>
                   {sentimentIcon(ticket.ai.sentiment)}
@@ -228,8 +227,8 @@ export default async function QueuePage({
               </span>
             </div>
           </div>
-        </Card>
-      </Link>
+        </div>
+      </Card>
     );
   }
 

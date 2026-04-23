@@ -1,13 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile, isStaffRole } from "@/lib/authz";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
 import { AITriagePanel } from "@/components/ai/AITriagePanel";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
-import { Clock, Shield } from "lucide-react";
+import { AlertTriangle, Clock, Shield } from "lucide-react";
 
 export default async function TicketDetailPage({
   params,
@@ -24,25 +25,29 @@ export default async function TicketDetailPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles").select("role").eq("id", user.id).single();
+  const profile = await getCurrentProfile(supabase, user.id);
+  if (!profile?.organization_id) notFound();
 
-  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+  const isStaff = isStaffRole(profile?.role);
 
   // Flat ticket query — no embedded joins to avoid FK name mismatch errors.
   // PostgREST returns data=null (silently) when a join hint like
   // profiles!tickets_created_by_fkey doesn't match the actual constraint name.
-  const { data: ticket, error: ticketError } = await svc
+  const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
     .select("*")
     .eq("id", id)
+    .eq("organization_id", profile.organization_id)
     .single();
 
   if (ticketError || !ticket) notFound();
 
   // Manual access check: customers can only see their own tickets
   if (!isStaff && ticket.created_by !== user.id) notFound();
+
+  const slaStatus = getSlaStatus(ticket);
+  const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;
+  const resolutionDueAt = ticket.resolution_due_at ?? ticket.sla_resolution_due;
 
   // Fetch related data as separate flat queries
   const [
@@ -52,13 +57,13 @@ export default async function TicketDetailPage({
     { data: comments },
   ] = await Promise.all([
     ticket.category_id
-      ? svc.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
+      ? supabase.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
-    svc.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
     isStaff
-      ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
+      ? supabase.from("ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
-    svc.from("ticket_comments")
+    supabase.from("ticket_comments")
       .select("*, profiles(full_name, avatar_url)")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
@@ -117,6 +122,7 @@ export default async function TicketDetailPage({
 
           <TicketComments
             ticketId={ticket.id}
+            currentStatus={ticket.status}
             comments={comments ?? []}
             currentUserId={user.id}
             isStaff={isStaff}
@@ -125,16 +131,42 @@ export default async function TicketDetailPage({
         </div>
 
         <div className="space-y-4">
-          {ticket.sla_resolution_due && (
+          {(responseDueAt || resolutionDueAt) && (
             <Card>
               <CardContent className="py-3">
-                <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">{t("slaDeadline")}</p>
-                <p className={`text-sm font-medium ${ticket.sla_breached ? "text-red-400" : "text-[var(--color-text-primary)]"}`}>
-                  {new Date(ticket.sla_resolution_due).toLocaleString(
-                    locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-CH",
-                    { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs font-medium text-[var(--color-text-muted)]">{t("slaDeadline")}</p>
+                  {slaStatus && (
+                    <Badge className={slaStatus.className}>
+                      {slaStatus.icon}
+                      {slaStatus.label}
+                    </Badge>
                   )}
-                </p>
+                </div>
+                <div className="space-y-1">
+                  {responseDueAt && (
+                    <p className="text-xs text-[var(--color-text-muted)]">
+                      Response:{" "}
+                      <span className="text-[var(--color-text-primary)]">
+                        {new Date(responseDueAt).toLocaleString(
+                          locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-CH",
+                          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+                        )}
+                      </span>
+                    </p>
+                  )}
+                  {resolutionDueAt && (
+                    <p className={`text-xs ${ticket.sla_breached ? "text-red-400" : "text-[var(--color-text-muted)]"}`}>
+                      Resolution:{" "}
+                      <span className={ticket.sla_breached ? "text-red-400" : "text-[var(--color-text-primary)]"}>
+                        {new Date(resolutionDueAt).toLocaleString(
+                          locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-CH",
+                          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+                        )}
+                      </span>
+                    </p>
+                  )}
+                </div>
                 {ticket.sla_breached && (
                   <p className="text-xs text-red-400 mt-1">{t("slaBreached")}</p>
                 )}
@@ -158,4 +190,75 @@ export default async function TicketDetailPage({
       </div>
     </div>
   );
+}
+
+function getSlaStatus(ticket: {
+  created_at: string;
+  status: string;
+  resolved_at: string | null;
+  sla_breached?: boolean | null;
+  sla_response_breached?: boolean | null;
+  sla_resolution_breached?: boolean | null;
+  sla_first_response_due?: string | null;
+  sla_resolution_due?: string | null;
+  response_due_at?: string | null;
+  resolution_due_at?: string | null;
+  first_response_at?: string | null;
+  first_agent_response_at?: string | null;
+}) {
+  const now = Date.now();
+  const firstResponseAt = ticket.first_agent_response_at ?? ticket.first_response_at;
+  const responseDue = ticket.response_due_at ?? ticket.sla_first_response_due;
+  const resolutionDue = ticket.resolution_due_at ?? ticket.sla_resolution_due;
+  const isResolved = ticket.status === "resolved" || ticket.status === "closed";
+
+  const responseBreached = Boolean(
+    responseDue &&
+      !firstResponseAt &&
+      now > new Date(responseDue).getTime()
+  );
+  const resolutionBreached = Boolean(
+    resolutionDue &&
+      !isResolved &&
+      now > new Date(resolutionDue).getTime()
+  );
+
+  if (ticket.sla_breached || ticket.sla_response_breached || ticket.sla_resolution_breached || responseBreached || resolutionBreached) {
+    return {
+      label: "Breached",
+      icon: <AlertTriangle className="w-3 h-3" />,
+      className: "text-red-400 bg-red-400/10 border-red-400/20",
+    };
+  }
+
+  const activeDueDates = [!firstResponseAt ? responseDue : null, !isResolved ? resolutionDue : null]
+    .filter(Boolean)
+    .map((date) => new Date(date as string).getTime());
+
+  if (activeDueDates.length === 0) {
+    return {
+      label: "On time",
+      icon: <Clock className="w-3 h-3" />,
+      className: "text-green-400 bg-green-400/10 border-green-400/20",
+    };
+  }
+
+  const nextDue = Math.min(...activeDueDates);
+  const totalWindow = nextDue - new Date(ticket.created_at).getTime();
+  const remaining = nextDue - now;
+  const oneHour = 60 * 60 * 1000;
+
+  if (remaining <= oneHour || (totalWindow > 0 && remaining / totalWindow <= 0.25)) {
+    return {
+      label: "At risk",
+      icon: <AlertTriangle className="w-3 h-3" />,
+      className: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+    };
+  }
+
+  return {
+    label: "On time",
+    icon: <Clock className="w-3 h-3" />,
+    className: "text-green-400 bg-green-400/10 border-green-400/20",
+  };
 }

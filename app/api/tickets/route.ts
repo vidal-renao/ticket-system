@@ -3,6 +3,12 @@ import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { triageTicket } from "@/lib/ai/triage";
 import { scrubPII } from "@/lib/ai/pii-scrubber";
 import { retrieveRelevantKnowledge, buildRAGContext } from "@/lib/ai/rag";
+import { getCurrentProfile } from "@/lib/authz";
+import { legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
+import { logTicketLifecycleEvents } from "@/lib/ticket-events";
+import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
+import { createTicketNotification } from "@/lib/notifications";
+import { sendEmail, ticketEmailSubject } from "@/lib/email";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -34,21 +40,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
+  const profile = await getCurrentProfile(supabase, user.id);
 
   if (!profile?.organization_id) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
   // Smart auto-assignment based on selected team
+  const svc = createServiceClientStatic();
   const assignment = await autoAssign(svc, profile.organization_id, team_id ?? null);
+  const createdAt = new Date().toISOString();
+  const slaPolicy = await getSlaPolicyForTicket(svc, profile.organization_id, priority);
+  const slaPatch = buildSlaDeadlinePatch(
+    {
+      id: "",
+      organization_id: profile.organization_id,
+      priority,
+      status: "open",
+      created_at: createdAt,
+      resolved_at: null,
+    },
+    slaPolicy
+  );
 
-  const { data: ticket, error } = await svc
+  const { data: ticket, error } = await supabase
     .from("tickets")
     .insert({
       title: title.trim(),
@@ -58,6 +73,8 @@ export async function POST(request: Request) {
       status: "open",
       priority,
       source: "portal",
+      created_at: createdAt,
+      ...slaPatch,
       ...(assignment.assigned_to && { assigned_to: assignment.assigned_to }),
     })
     .select()
@@ -68,11 +85,48 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (assignment.assigned_to) {
+    await logTicketLifecycleEvents({
+      ticketId: ticket.id,
+      organizationId: profile.organization_id,
+      actorId: user.id,
+      actorRole: profile.role,
+      oldStatus: "new",
+      newStatus: legacyToCanonicalStatus(ticket.status, ticket.assigned_to),
+      oldAssignee: null,
+      newAssignee: assignment.assigned_to,
+    });
+
+    await createTicketNotification(supabase, {
+      userId: assignment.assigned_to,
+      ticketId: ticket.id,
+      type: "ticket.assigned",
+      title: "Ticket assigned",
+      message: `${formatTicketNumber(ticket.ticket_number)} was assigned to you.`,
+    });
+  }
+
+  const { data: organization } = await svc
+    .from("organizations")
+    .select("support_email")
+    .eq("id", profile.organization_id)
+    .single();
+
+  await sendEmail({
+    to: organization?.support_email,
+    subject: ticketEmailSubject(ticket.ticket_number, ticket.title),
+    text: `A new ticket was created.\n\n${formatTicketNumber(ticket.ticket_number)}: ${ticket.title}\nPriority: ${ticket.priority}\n\n${ticket.description}`,
+  });
+
   scheduleBackground(
     runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
   );
 
   return NextResponse.json({ ticket }, { status: 201 });
+}
+
+function formatTicketNumber(ticketNumber: number | null | undefined) {
+  return ticketNumber ? `TK-${String(ticketNumber).padStart(4, "0")}` : "Ticket";
 }
 
 // ─── Auto-assignment engine ─────────────────────────────────────────────────
@@ -86,24 +140,28 @@ async function autoAssign(
   orgId: string,
   teamId: string | null
 ): Promise<AssignmentResult> {
-  if (!teamId) return { assigned_to: null };
+  let teamExists = false;
+  if (teamId) {
+    const { data: team } = await svc
+      .from("teams")
+      .select("id, name")
+      .eq("id", teamId)
+      .eq("organization_id", orgId)
+      .single();
 
-  const { data: team } = await svc
-    .from("teams")
-    .select("id, name")
-    .eq("id", teamId)
-    .single();
-
-  if (!team) return { assigned_to: null };
+    teamExists = Boolean(team);
+  }
 
   // Find agents assigned to this team
-  const { data: teamAgents } = await svc
-    .from("profiles")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("team_id", teamId)
-    .eq("role", "agent")
-    .eq("is_active", true);
+  const { data: teamAgents } = teamExists
+    ? await svc
+        .from("profiles")
+        .select("id")
+        .eq("organization_id", orgId)
+        .eq("team_id", teamId)
+        .eq("role", "agent")
+        .eq("is_active", true)
+    : { data: [] };
 
   const teamAgentIds = (teamAgents ?? []).map((a: { id: string }) => a.id);
 
@@ -140,7 +198,7 @@ async function findLeastBusyAgent(
     .from("tickets")
     .select("assigned_to")
     .in("assigned_to", agentIds)
-    .in("status", ["open", "in_progress"]);
+    .in("status", ["open", "in_progress", "pending_customer"]);
 
   // Build count map with 0 as default for every agent
   const counts: Record<string, number> = {};

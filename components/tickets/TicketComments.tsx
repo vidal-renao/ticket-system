@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { MessageSquare, Lock, Sparkles } from "lucide-react";
@@ -20,13 +21,15 @@ interface Comment {
 
 interface TicketCommentsProps {
   ticketId: string;
+  currentStatus: string;
   comments: Comment[];
   currentUserId: string;
   isStaff: boolean;
   targetLocale: string;
 }
 
-export function TicketComments({ ticketId, comments: initial, currentUserId, isStaff, targetLocale }: TicketCommentsProps) {
+export function TicketComments({ ticketId, currentStatus, comments: initial, currentUserId, isStaff, targetLocale }: TicketCommentsProps) {
+  const router = useRouter();
   const [comments, setComments] = useState(initial);
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -45,8 +48,7 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
     setSuggesting(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitComment(waitForCustomer: boolean) {
     if (!content.trim()) return;
     setLoading(true);
 
@@ -57,6 +59,7 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
         ticket_id: ticketId,
         content: content.trim(),
         is_internal: isInternal,
+        ...(waitForCustomer && { status_after_comment: "WAITING_CUSTOMER" }),
       }),
     });
 
@@ -67,9 +70,19 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
       const { comment } = await res.json();
       setComments((prev) => [...prev, comment]);
       setContent("");
-      toast.success(isInternal ? "Internal note added" : "Reply sent");
+      toast.success(waitForCustomer ? "Reply sent and ticket is waiting for customer" : isInternal ? "Internal note added" : "Reply sent");
+      if (waitForCustomer) router.refresh();
     }
     setLoading(false);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitComment(false);
+  }
+
+  async function handleReplyAndWait() {
+    await submitComment(true);
   }
 
   const inputClass = [
@@ -79,6 +92,8 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
     "focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30",
     "transition-colors",
   ].join(" ");
+
+  const canReplyAndWait = isStaff && !isInternal && currentStatus === "in_progress";
 
   return (
     <Card>
@@ -182,6 +197,17 @@ export function TicketComments({ ticketId, comments: initial, currentUserId, isS
             >
               {isInternal ? "Add Note" : "Send Reply"}
             </Button>
+            {canReplyAndWait && (
+              <Button
+                type="button"
+                size="sm"
+                loading={loading}
+                disabled={!content.trim()}
+                onClick={handleReplyAndWait}
+              >
+                Reply & Wait
+              </Button>
+            )}
           </div>
         </form>
       </CardContent>

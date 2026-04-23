@@ -54,7 +54,7 @@ export default async function AdminPage({
     .single();
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
-  if (!profile || profile.role !== "admin") redirect(ticketsPath);
+  if (!profile || !["admin", "manager"].includes(profile.role)) redirect(ticketsPath);
 
   const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
@@ -230,7 +230,7 @@ export default async function AdminPage({
             )}
           </p>
         </div>
-        <AdminPageControls teams={teams} />
+        {profile.role === "admin" && <AdminPageControls teams={teams} />}
       </div>
 
       {/* Status tabs */}
@@ -361,6 +361,8 @@ export default async function AdminPage({
                         ticketId={ticket.id}
                         currentStatus={ticket.status}
                         currentAssignee={ticket.assigned_to}
+                        currentUserId={user.id}
+                        canReassign={profile.role === "admin" || profile.role === "manager"}
                         agents={allAgents}
                       />
                     </td>

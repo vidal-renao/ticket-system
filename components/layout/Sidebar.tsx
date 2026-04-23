@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
+import { NotificationsMenu, type ShellNotification } from "./NotificationsMenu";
 
 type NavKey =
   | "dashboard"
@@ -93,7 +94,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin",
     labelKey: "admin",
     icon: Building2,
-    roles: ["admin"],
+    roles: ["manager", "admin"],
   },
   {
     href: "/inbox",
@@ -113,6 +114,8 @@ interface SidebarProps {
   role: UserRole;
   userName: string;
   userAvatar?: string | null;
+  notifications: ShellNotification[];
+  unreadNotifications: number;
   onSignOut: () => void;
   onGoHome: () => void;
 }
@@ -124,7 +127,15 @@ const ROLE_HOME: Record<UserRole, string> = {
   admin:    "/dashboard",
 };
 
-export function Sidebar({ role, userName, userAvatar, onSignOut, onGoHome }: SidebarProps) {
+export function Sidebar({
+  role,
+  userName,
+  userAvatar,
+  notifications,
+  unreadNotifications,
+  onSignOut,
+  onGoHome,
+}: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
 
@@ -178,6 +189,11 @@ export function Sidebar({ role, userName, userAvatar, onSignOut, onGoHome }: Sid
           );
         })}
       </nav>
+
+      <NotificationsMenu
+        notifications={notifications}
+        unreadCount={unreadNotifications}
+      />
 
       {/* Home button — signs out and returns to landing */}
       <div className="px-3 pb-2 border-t border-[var(--color-surface-600)] pt-2">

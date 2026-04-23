@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
 import { PageTransition } from "./PageTransition";
 import type { UserRole } from "@/lib/supabase/types";
+import type { ShellNotification } from "./NotificationsMenu";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -11,9 +12,19 @@ interface AppShellProps {
   userName: string;
   userAvatar?: string | null;
   locale: string;
+  notifications: ShellNotification[];
+  unreadNotifications: number;
 }
 
-export function AppShell({ children, role, userName, userAvatar, locale }: AppShellProps) {
+export function AppShell({
+  children,
+  role,
+  userName,
+  userAvatar,
+  locale,
+  notifications,
+  unreadNotifications,
+}: AppShellProps) {
   const supabase = createClient();
 
   async function handleSignOut() {
@@ -34,6 +45,8 @@ export function AppShell({ children, role, userName, userAvatar, locale }: AppSh
         role={role}
         userName={userName}
         userAvatar={userAvatar}
+        notifications={notifications}
+        unreadNotifications={unreadNotifications}
         onSignOut={handleSignOut}
         onGoHome={handleGoHome}
       />
