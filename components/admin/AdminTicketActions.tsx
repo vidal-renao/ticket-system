@@ -144,7 +144,7 @@ export function AdminTicketActions({
         <button
           type="button"
           onClick={() => handleStatus("in_progress", "resumed")}
-          title="Resume work"
+          title="Resume work after review"
           className={`${btnBase} bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20`}
         >
           <Play className="w-3 h-3" /> Resume

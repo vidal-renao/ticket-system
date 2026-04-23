@@ -201,11 +201,11 @@ export function TicketComments({ ticketId, currentStatus, comments: initial, cur
               <Button
                 type="button"
                 size="sm"
-                loading={loading}
-                disabled={!content.trim()}
-                onClick={handleReplyAndWait}
-              >
-                Reply & Wait
+              loading={loading}
+              disabled={!content.trim()}
+              onClick={handleReplyAndWait}
+            >
+                Send for company review
               </Button>
             )}
           </div>

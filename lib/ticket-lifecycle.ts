@@ -107,6 +107,30 @@ export interface TransitionCheck {
   error?: string;
 }
 
+export function getTicketWorkflowLabel(
+  status: TicketStatus | string,
+  assignedTo?: string | null
+): string {
+  const canonical = legacyToCanonicalStatus(status, assignedTo);
+
+  switch (canonical) {
+    case "new":
+      return "New";
+    case "assigned":
+      return "Assigned";
+    case "in_progress":
+      return "In progress";
+    case "waiting_customer":
+      return "Waiting for company review";
+    case "resolved":
+      return "Resolved";
+    case "closed":
+      return "Closed";
+    default:
+      return "Open";
+  }
+}
+
 export function validateTicketTransition(
   current: TicketLifecycleState,
   next: TicketLifecycleState

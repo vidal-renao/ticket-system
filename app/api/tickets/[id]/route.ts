@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { resolveTicketAccess } from "@/lib/ticket-visibility";
-import type { Database } from "@/lib/supabase/types";
 import {
   canonicalToLegacyStatus,
   legacyToCanonicalStatus,
@@ -32,22 +30,30 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
-    svc,
-    profile,
-    id,
-    "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at"
-  );
+  const { data: existing, error: existingError } = await svc
+    .from("tickets")
+    .select("id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
+    .eq("id", id)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
 
-  if (access.kind === "not_found") {
+  if (existingError) {
+    console.error("[PATCH /api/tickets/[id]] existing ticket lookup failed", {
+      ticketId: id,
+      actorId: user.id,
+      role: profile.role,
+      organizationId: profile.organization_id,
+      error: existingError.message,
+    });
+  }
+
+  if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (access.kind === "forbidden") {
+  if (profile.role === "agent" && existing.assigned_to && existing.assigned_to !== user.id) {
     return NextResponse.json({ error: "Access restricted" }, { status: 403 });
   }
-
-  const existing = access.ticket;
 
   const body = await request.json();
 
@@ -114,6 +120,16 @@ export async function PATCH(
         ? existing.assigned_to
         : ((patch.assigned_to as string | null) || null),
   };
+
+  if (
+    patch.assigned_to !== undefined &&
+    !requestedStatus &&
+    existing.status === "open" &&
+    !existing.assigned_to &&
+    nextState.assigned_to
+  ) {
+    patch.status = "open";
+  }
 
   const transition = validateTicketTransition(existing, nextState);
   if (!transition.ok) {
