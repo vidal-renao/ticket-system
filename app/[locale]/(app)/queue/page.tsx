@@ -37,9 +37,10 @@ export default async function QueuePage({
   const { data: { user } } = await supabase.auth.getUser();
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
+  const currentUserId = user?.id ?? "";
 
   const svc = createServiceClientStatic();
-  const profile = await getCurrentProfile(svc, user.id);
+  const profile = await getCurrentProfile(svc, currentUserId);
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
   if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
@@ -47,7 +48,7 @@ export default async function QueuePage({
   }
 
   if (!profile.organization_id) {
-    console.error("[QueuePage] Missing profile organization", { userId: user.id });
+    console.error("[QueuePage] Missing profile organization", { userId: currentUserId });
     redirect(loginPath);
   }
 
@@ -133,13 +134,13 @@ export default async function QueuePage({
     : tickets;
   const sorted = filteredTickets;
 
-  const myTicketCount = tickets.filter((t) => t.assigned_to === user.id).length;
+  const myTicketCount = tickets.filter((t) => t.assigned_to === currentUserId).length;
   const queueCount = tickets.filter((t) => !t.assigned_to).length;
   const breachedCount = tickets.filter((t) => getSlaState(t).key === "breached").length;
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
-    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === user.id
+    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === currentUserId
   );
   const mySpecialty = agentSpecialty
     ? sorted.filter(
@@ -246,7 +247,7 @@ export default async function QueuePage({
             <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               <AssignToMeButton
                 ticketId={ticket.id}
-                currentUserId={user.id}
+                currentUserId={currentUserId}
                 currentAssignee={ticket.assigned_to}
               />
               {ticket.ai?.sentiment && (

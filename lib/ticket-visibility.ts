@@ -16,22 +16,26 @@ type AgentIdentity = {
   specialty?: string | null;
 };
 
-export function applyTicketVisibilityScope<T extends QueryBuilder>(
-  query: T,
+export function applyTicketVisibilityScope(
+  // The Supabase query builder type becomes recursively huge once chained
+  // through server-route generics, so keep this helper intentionally loose.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: any,
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
   options?: { includeUnassignedForAgents?: boolean }
-): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
   const scoped = query.eq("organization_id", profile.organization_id);
 
   if (profile.role !== "agent") {
-    return scoped as T;
+    return scoped;
   }
 
   if (options?.includeUnassignedForAgents === false) {
-    return scoped.eq("assigned_to", profile.id) as T;
+    return scoped.eq("assigned_to", profile.id);
   }
 
-  return scoped.or(`assigned_to.eq.${profile.id},assigned_to.is.null`) as T;
+  return scoped.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
 }
 
 export function getTicketsByRole(
@@ -48,4 +52,3 @@ export function formatAgentIdentity(agent: AgentIdentity | null | undefined): st
   const specialty = agent?.specialty?.trim();
   return specialty ? `${baseName} (${specialty})` : baseName;
 }
-

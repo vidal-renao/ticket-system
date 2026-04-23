@@ -19,6 +19,7 @@ export function AssignToMeButton({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  if (!currentUserId) return null;
   if (currentAssignee === currentUserId) return null;
 
   function handleAssign() {

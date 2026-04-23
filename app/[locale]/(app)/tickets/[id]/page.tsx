@@ -25,8 +25,9 @@ export default async function TicketDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
+  const currentUserId = user?.id ?? "";
 
-  const profile = await getCurrentProfile(supabase, user.id);
+  const profile = await getCurrentProfile(supabase, currentUserId);
   if (!profile?.organization_id) notFound();
 
   const isStaff = isStaffRole(profile?.role);
@@ -120,7 +121,7 @@ export default async function TicketDetailPage({
             ticketId={ticket.id}
             currentStatus={ticket.status}
             comments={comments ?? []}
-            currentUserId={user.id}
+            currentUserId={currentUserId}
             isStaff={isStaff}
             targetLocale={locale}
           />

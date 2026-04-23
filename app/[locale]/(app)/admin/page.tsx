@@ -49,14 +49,15 @@ export default async function AdminPage({
   const { data: { user } } = await supabase.auth.getUser();
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
+  const currentUserId = user?.id ?? "";
 
   const svc = createServiceClientStatic();
-  const profile = await getCurrentProfile(svc, user.id);
+  const profile = await getCurrentProfile(svc, currentUserId);
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
   if (!profile || !["admin", "manager"].includes(profile.role)) redirect(ticketsPath);
   if (!profile.organization_id) {
-    console.error("[AdminPage] Missing profile organization", { userId: user.id });
+    console.error("[AdminPage] Missing profile organization", { userId: currentUserId });
     redirect(ticketsPath);
   }
 
@@ -382,7 +383,7 @@ export default async function AdminPage({
                         ticketId={ticket.id}
                         currentStatus={ticket.status}
                         currentAssignee={ticket.assigned_to}
-                        currentUserId={user.id}
+                        currentUserId={currentUserId}
                         canReassign={profile.role === "admin" || profile.role === "manager"}
                         agents={allAgents}
                       />
