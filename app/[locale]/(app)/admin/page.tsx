@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/authz";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -9,6 +10,7 @@ import { AdminFilters } from "@/components/admin/AdminFilters";
 import { AdminStatusTabs } from "@/components/admin/AdminStatusTabs";
 import { AdminPageControls } from "@/components/admin/AdminPageControls";
 import { AdminTicketActions } from "@/components/admin/AdminTicketActions";
+import { formatAgentIdentity } from "@/lib/ticket-visibility";
 import { Building2, TicketIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTicketRef, statusColor, formatRelativeTime, priorityColor } from "@/lib/utils";
 
@@ -49,16 +51,16 @@ export default async function AdminPage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const profile = await getCurrentProfile(svc, user.id);
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
   if (!profile || !["admin", "manager"].includes(profile.role)) redirect(ticketsPath);
+  if (!profile.organization_id) {
+    console.error("[AdminPage] Missing profile organization", { userId: user.id });
+    redirect(ticketsPath);
+  }
 
-  const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  const orgId = profile.organization_id;
 
   // ── Parallel fetches ───────────────────────────────────────────────────────
   type RawTicket = {
@@ -74,7 +76,7 @@ export default async function AdminPage({
     category_id: string | null;
   };
 
-  type ProfileRow   = { id: string; full_name: string | null; role: string };
+  type ProfileRow   = { id: string; full_name: string | null; role: string; specialty: string | null };
   type CustomerInfo = { id: string; company_name: string };
   type CategoryRow  = { id: string; name: string };
   type TeamRow      = { id: string; name: string };
@@ -115,7 +117,7 @@ export default async function AdminPage({
     })(),
     svc
       .from("profiles")
-      .select("id, full_name, role")
+      .select("id, full_name, role, specialty")
       .eq("organization_id", orgId),
     svc
       .from("categories")
@@ -173,7 +175,7 @@ export default async function AdminPage({
     ...ticket,
     company_name:  companyById[ticket.created_by] ?? null,
     creator_name:  profileById[ticket.created_by]?.full_name ?? null,
-    agent_name:    ticket.assigned_to ? (profileById[ticket.assigned_to]?.full_name ?? null) : null,
+    agent_name:    ticket.assigned_to ? formatAgentIdentity(profileById[ticket.assigned_to]) : null,
     category_name: ticket.category_id
       ? (categoryById[ticket.category_id] ?? null)
       : (aiByTicket[ticket.id] ?? null),
@@ -186,7 +188,7 @@ export default async function AdminPage({
 
   const allAgents = profiles
     .filter((p) => p.role === "agent")
-    .map((p) => ({ id: p.id, name: p.full_name ?? p.id }));
+    .map((p) => ({ id: p.id, name: formatAgentIdentity(p) }));
 
   const categoryNames = [
     ...new Set([

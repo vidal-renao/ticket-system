@@ -11,6 +11,8 @@ export interface CurrentProfile {
   id: string;
   role: UserRole;
   organization_id: string | null;
+  full_name?: string | null;
+  specialty?: string | null;
 }
 
 export function isStaffRole(role: string | null | undefined): role is UserRole {
@@ -23,7 +25,7 @@ export async function getCurrentProfile(
 ): Promise<CurrentProfile | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, organization_id")
+    .select("id, role, organization_id, full_name, specialty")
     .eq("id", userId)
     .single();
 
@@ -33,5 +35,7 @@ export async function getCurrentProfile(
     id: data.id,
     role: data.role,
     organization_id: data.organization_id,
+    full_name: data.full_name ?? null,
+    specialty: data.specialty ?? null,
   };
 }

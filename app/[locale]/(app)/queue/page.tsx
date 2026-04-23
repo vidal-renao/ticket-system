@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/authz";
+import { getTicketsByRole } from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
@@ -37,37 +39,25 @@ export default async function QueuePage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
-
-  // Auth-safe query (columns that always exist)
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const profile = await getCurrentProfile(svc, user.id);
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
   if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
     redirect(ticketsPath);
   }
 
-  const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  if (!profile.organization_id) {
+    console.error("[QueuePage] Missing profile organization", { userId: user.id });
+    redirect(loginPath);
+  }
 
-  // Safely fetch specialty — column may not exist until migration runs
-  const { data: agentExtras } = await svc
-    .from("profiles")
-    .select("specialty")
-    .eq("id", user.id)
-    .single();
-  const agentSpecialty: string | null =
-    (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
+  const agentSpecialty = profile.specialty ?? null;
 
-  let ticketsQuery = svc
-    .from("tickets")
-    .select(
-      "id, ticket_number, title, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
-    )
-    .eq("organization_id", orgId)
-    .in("status", ["open", "in_progress", "pending_customer"]);
+  let ticketsQuery = getTicketsByRole(
+    svc,
+    profile,
+    "id, ticket_number, title, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
+  ).in("status", ["open", "in_progress", "pending_customer"]);
 
   if (filters.status && ["open", "in_progress", "pending_customer"].includes(filters.status)) {
     ticketsQuery = ticketsQuery.eq("status", filters.status);
@@ -75,10 +65,6 @@ export default async function QueuePage({
 
   if (filters.priority && ["low", "medium", "high", "critical"].includes(filters.priority)) {
     ticketsQuery = ticketsQuery.eq("priority", filters.priority);
-  }
-
-  if (profile.role === "agent") {
-    ticketsQuery = ticketsQuery.or(`assigned_to.eq.${user.id},assigned_to.is.null`);
   }
 
   const { data: ticketsRaw, error: ticketsError } = await ticketsQuery

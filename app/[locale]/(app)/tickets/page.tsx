@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentProfile, isStaffRole } from "@/lib/authz";
+import { getTicketsByRole } from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -35,15 +37,14 @@ export default async function TicketsPage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const profile = await getCurrentProfile(svc, user.id);
+  if (!profile?.organization_id) {
+    console.error("[TicketsPage] Missing profile organization", { userId: user.id });
+    redirect(loginPath);
+  }
 
-  const isStaff    = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+  const isStaff    = isStaffRole(profile?.role);
   const isCustomer = profile?.role === "customer";
-  const orgId      = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
 
   // ── Customer query: full columns ─────────────────────────────────────────
   type CustomerTicket = {
@@ -75,14 +76,11 @@ export default async function TicketsPage({
     first_agent_response_at: string | null;
   };
 
-  let staffTicketsQuery = svc
-    .from("tickets")
-    .select("id, ticket_number, title, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at")
-    .eq("organization_id", orgId);
-
-  if (profile?.role === "agent") {
-    staffTicketsQuery = staffTicketsQuery.eq("assigned_to", user.id);
-  }
+  let staffTicketsQuery = getTicketsByRole(
+    svc,
+    profile,
+    "id, ticket_number, title, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at"
+  );
 
   if (isStaff && filters.status && ["open", "in_progress", "pending_customer", "resolved", "closed"].includes(filters.status)) {
     staffTicketsQuery = staffTicketsQuery.eq("status", filters.status);
@@ -96,10 +94,11 @@ export default async function TicketsPage({
     ? await staffTicketsQuery
         .order("created_at", { ascending: false })
         .limit(100)
-    : await svc
-        .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, resolved_at")
-        .eq("organization_id", orgId)
+    : await getTicketsByRole(
+        svc,
+        profile,
+        "id, ticket_number, title, status, priority, created_at, resolved_at"
+      )
         .order("created_at", { ascending: false })
         .limit(100);
 

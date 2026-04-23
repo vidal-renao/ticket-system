@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
+import { applyTicketVisibilityScope } from "@/lib/ticket-visibility";
 import {
   canonicalToLegacyStatus,
   legacyToCanonicalStatus,
@@ -29,18 +30,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { data: existing } = await supabase
-    .from("tickets")
-    .select("id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
-    .eq("id", id)
-    .eq("organization_id", profile.organization_id)
-    .single();
+  const { data: existing } = await applyTicketVisibilityScope(
+    supabase
+      .from("tickets")
+      .select("id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
+      .eq("id", id),
+    profile
+  ).single();
 
   if (!existing) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (profile.role === "agent" && existing.assigned_to && existing.assigned_to !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
+import { applyTicketVisibilityScope } from "@/lib/ticket-visibility";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
@@ -33,18 +34,12 @@ export default async function TicketDetailPage({
   // Flat ticket query — no embedded joins to avoid FK name mismatch errors.
   // PostgREST returns data=null (silently) when a join hint like
   // profiles!tickets_created_by_fkey doesn't match the actual constraint name.
-  const { data: ticket, error: ticketError } = await supabase
-    .from("tickets")
-    .select("*")
-    .eq("id", id)
-    .eq("organization_id", profile.organization_id)
-    .single();
+  const { data: ticket, error: ticketError } = await applyTicketVisibilityScope(
+    supabase.from("tickets").select("*").eq("id", id),
+    profile
+  ).single();
 
   if (ticketError || !ticket) notFound();
-
-  if (profile.role === "agent" && ticket.assigned_to && ticket.assigned_to !== user.id) {
-    notFound();
-  }
 
   const slaStatus = getSlaStatus(ticket);
   const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;
