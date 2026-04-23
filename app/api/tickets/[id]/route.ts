@@ -16,7 +16,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const normalizedTicketNumber = parseTicketIdentifier(rawId);
   const supabase = await createClient();
   const svc = createServiceClientStatic();
 
@@ -30,16 +31,63 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { data: existing, error: existingError } = await svc
+  const baseSelect =
+    "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at";
+
+  let existing:
+    | {
+        id: string;
+        ticket_number: number | null;
+        title: string;
+        created_by: string;
+        organization_id: string;
+        priority: string;
+        status: string;
+        assigned_to: string | null;
+        created_at: string;
+        resolved_at: string | null;
+        first_response_at: string | null;
+        first_agent_response_at: string | null;
+        sla_first_response_due: string | null;
+        sla_resolution_due: string | null;
+        response_due_at: string | null;
+        resolution_due_at: string | null;
+      }
+    | null = null;
+
+  const { data: byId, error: existingError } = await svc
     .from("tickets")
-    .select("id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
-    .eq("id", id)
+    .select(baseSelect)
+    .eq("id", rawId)
     .eq("organization_id", profile.organization_id)
     .maybeSingle();
 
+  existing = byId;
+
+  if (!existing && normalizedTicketNumber !== null) {
+    const { data: byTicketNumber, error: numberLookupError } = await svc
+      .from("tickets")
+      .select(baseSelect)
+      .eq("ticket_number", normalizedTicketNumber)
+      .eq("organization_id", profile.organization_id)
+      .maybeSingle();
+
+    if (numberLookupError) {
+      console.error("[PATCH /api/tickets/[id]] numeric ticket lookup failed", {
+        ticketIdentifier: rawId,
+        actorId: user.id,
+        role: profile.role,
+        organizationId: profile.organization_id,
+        error: numberLookupError.message,
+      });
+    }
+
+    existing = byTicketNumber;
+  }
+
   if (existingError) {
     console.error("[PATCH /api/tickets/[id]] existing ticket lookup failed", {
-      ticketId: id,
+      ticketId: rawId,
       actorId: user.id,
       role: profile.role,
       organizationId: profile.organization_id,
@@ -144,7 +192,7 @@ export async function PATCH(
   const { data, error } = await supabase
     .from("tickets")
     .update(patch)
-    .eq("id", id)
+    .eq("id", existing.id)
     .eq("organization_id", profile.organization_id)
     .select("*, response_due_at, resolution_due_at, first_agent_response_at, sla_response_breached, sla_resolution_breached")
     .single();
@@ -152,7 +200,7 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await logTicketLifecycleEvents({
-    ticketId: id,
+    ticketId: existing.id,
     organizationId: profile.organization_id,
     actorId: user.id,
     actorRole: profile.role,
@@ -165,7 +213,7 @@ export async function PATCH(
   if (existing.assigned_to !== data.assigned_to && data.assigned_to) {
     await createTicketNotification(supabase, {
       userId: data.assigned_to,
-      ticketId: id,
+      ticketId: existing.id,
       type: "ticket.assigned",
       title: "Ticket assigned",
       message: `${formatTicketNumber(data.ticket_number)} was assigned to you.`,
@@ -175,7 +223,7 @@ export async function PATCH(
   if (existing.status !== data.status && data.status === "resolved") {
     await createTicketNotification(supabase, {
       userId: data.created_by,
-      ticketId: id,
+      ticketId: existing.id,
       type: "ticket.resolved",
       title: "Ticket resolved",
       message: `${formatTicketNumber(data.ticket_number)} has been resolved.`,
@@ -196,4 +244,13 @@ export async function PATCH(
 
 function formatTicketNumber(ticketNumber: number | null | undefined) {
   return ticketNumber ? `TK-${String(ticketNumber).padStart(4, "0")}` : "Ticket";
+}
+
+function parseTicketIdentifier(value: string): number | null {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^TK-(\d+)$/i);
+  const numeric = match?.[1] ?? (/^\d+$/.test(trimmed) ? trimmed : null);
+  if (!numeric) return null;
+  const parsed = Number.parseInt(numeric, 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
