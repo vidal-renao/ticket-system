@@ -5,7 +5,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { Zap } from "lucide-react";
 
 interface Props {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; debugAuth?: string }>;
 }
 
 export async function generateMetadata() {
@@ -14,7 +14,7 @@ export async function generateMetadata() {
 }
 
 export default async function LoginPage({ searchParams }: Props) {
-  const { error } = await searchParams;
+  const { error, debugAuth } = await searchParams;
   const t = await getTranslations("auth");
 
   return (
@@ -41,7 +41,7 @@ export default async function LoginPage({ searchParams }: Props) {
             <p className="text-sm text-[var(--color-text-secondary)] mt-1">{t("signInTitle")}</p>
           </div>
 
-          <LoginForm error={error} />
+          <LoginForm error={error} debug={debugAuth === "1"} />
         </div>
 
         {/* Register link */}

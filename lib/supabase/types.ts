@@ -31,13 +31,16 @@ export interface Database {
           id: string;
           name: string;
           slug: string;
-          plan: "starter" | "pro" | "enterprise";
+          plan: "starter" | "pro" | "enterprise" | null;
           logo_url: string | null;
           primary_color: string;
           support_email: string | null;
           settings: Json;
           data_retention_days: number;
           dpa_signed_at: string | null;
+          dpa_signed_by: string | null;
+          data_controller_name: string | null;
+          data_controller_email: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -59,6 +62,8 @@ export interface Database {
           is_active: boolean;
           data_processing_consent: boolean;
           consent_given_at: string | null;
+          consent_ip: string | null;
+          marketing_consent: boolean;
           team_id: string | null;
           specialty: string | null;
           availability_status: AvailabilityStatus | null;

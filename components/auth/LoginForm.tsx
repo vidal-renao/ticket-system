@@ -1,17 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
+import { LoginDebugPanel } from "@/components/auth/LoginDebugPanel";
+
+interface LoginDiagnostic {
+  stage?: string;
+  authErrorName?: string | null;
+  authErrorStatus?: number | null;
+  authErrorCode?: string | null;
+  profileFound?: boolean;
+  profileRole?: string | null;
+  organizationId?: string | null;
+  sessionPresent?: boolean;
+  cookieCount?: number;
+  redirectTo?: string | null;
+}
 
 interface LoginFormProps {
   error?: string;
+  debug?: boolean;
 }
 
-export function LoginForm({ error }: LoginFormProps) {
+export function LoginForm({ error, debug = false }: LoginFormProps) {
   const t = useTranslations("auth");
   const [pending, setPending] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<LoginDiagnostic | null>(null);
 
   useEffect(() => {
     if (error) toast.error(decodeURIComponent(error));
@@ -25,39 +41,46 @@ export function LoginForm({ error }: LoginFormProps) {
     "transition-colors",
   ].join(" ");
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
     setPending(true);
+    setDiagnostic(null);
+
     try {
-      const res = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
-        body: new FormData(e.currentTarget),
+        body: new FormData(event.currentTarget),
       });
 
-      let json: { redirectTo?: string; error?: string };
+      let json: {
+        redirectTo?: string;
+        error?: string;
+        diagnostic?: LoginDiagnostic;
+      };
+
       try {
-        json = await res.json();
+        json = await response.json();
       } catch {
         toast.error(t("errorServer"));
         setPending(false);
         return;
       }
 
-      if (!res.ok) {
+      if (json.diagnostic) setDiagnostic(json.diagnostic);
+
+      if (!response.ok) {
         toast.error(json.error || "Login failed");
         setPending(false);
         return;
       }
 
-      const { redirectTo, error: apiError } = json;
-      if (apiError) {
-        toast.error(apiError);
+      if (json.error) {
+        toast.error(json.error);
         setPending(false);
         return;
       }
 
-      // Hard navigate so the browser sends the freshly-set session cookies
-      window.location.href = redirectTo ?? "/dashboard";
+      window.location.href = json.redirectTo ?? "/dashboard";
     } catch {
       toast.error(t("errorNetwork"));
       setPending(false);
@@ -65,42 +88,23 @@ export function LoginForm({ error }: LoginFormProps) {
   }
 
   return (
-    <form
-      method="post"
-      action="/api/auth/login"
-      onSubmit={handleSubmit}
-      className="space-y-4"
-    >
-      <div className="p-5 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] space-y-4">
+    <form method="post" action="/api/auth/login" onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] p-5">
         <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            {t("email")}
-          </label>
-          <input
-            name="email"
-            type="email"
-            placeholder="you@company.ch"
-            required
-            className={inputClass}
-          />
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{t("email")}</label>
+          <input name="email" type="email" placeholder="you@company.ch" required className={inputClass} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            {t("password")}
-          </label>
-          <input
-            name="password"
-            type="password"
-            placeholder="••••••••"
-            required
-            className={inputClass}
-          />
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{t("password")}</label>
+          <input name="password" type="password" placeholder="••••••••" required className={inputClass} />
         </div>
       </div>
 
       <Button type="submit" loading={pending} className="w-full">
         {t("signIn")}
       </Button>
+
+      {debug && <LoginDebugPanel diagnostic={diagnostic} />}
     </form>
   );
 }
