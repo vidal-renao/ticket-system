@@ -76,3 +76,149 @@ CREATE POLICY "admins_manage_profiles" ON profiles
     organization_id = public.current_profile_org_id()
     AND public.current_profile_role() IN ('admin', 'manager')
   );
+
+-- Replace the most common dependent policies that still query profiles directly.
+-- This keeps the whole tenant model consistent and avoids reintroducing recursion
+-- through tables that rely on profile org/role checks.
+
+DROP POLICY IF EXISTS "org_members_can_read_own_org" ON organizations;
+DROP POLICY IF EXISTS "org_members_read_own_org" ON organizations;
+DROP POLICY IF EXISTS "admins_can_update_own_org" ON organizations;
+DROP POLICY IF EXISTS "admins_update_own_org" ON organizations;
+
+CREATE POLICY "org_members_read_own_org" ON organizations
+  FOR SELECT
+  USING (id = public.current_profile_org_id());
+
+CREATE POLICY "admins_update_own_org" ON organizations
+  FOR UPDATE
+  USING (
+    id = public.current_profile_org_id()
+    AND public.current_profile_role() = 'admin'
+  )
+  WITH CHECK (
+    id = public.current_profile_org_id()
+    AND public.current_profile_role() = 'admin'
+  );
+
+DROP POLICY IF EXISTS "org_members_read_categories" ON categories;
+DROP POLICY IF EXISTS "admins_write_categories" ON categories;
+
+CREATE POLICY "org_members_read_categories" ON categories
+  FOR SELECT
+  USING (organization_id = public.current_profile_org_id());
+
+CREATE POLICY "admins_write_categories" ON categories
+  FOR ALL
+  USING (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('admin', 'manager')
+  )
+  WITH CHECK (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('admin', 'manager')
+  );
+
+DROP POLICY IF EXISTS "org_members_read_sla" ON sla_policies;
+
+CREATE POLICY "org_members_read_sla" ON sla_policies
+  FOR SELECT
+  USING (organization_id = public.current_profile_org_id());
+
+DROP POLICY IF EXISTS "customers_own_tickets" ON tickets;
+DROP POLICY IF EXISTS "staff_org_tickets" ON tickets;
+DROP POLICY IF EXISTS "customers_create_tickets" ON tickets;
+DROP POLICY IF EXISTS "staff_update_tickets" ON tickets;
+
+CREATE POLICY "customers_own_tickets" ON tickets
+  FOR SELECT
+  USING (
+    created_by = auth.uid()
+    AND public.current_profile_role() = 'customer'
+  );
+
+CREATE POLICY "staff_org_tickets" ON tickets
+  FOR SELECT
+  USING (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('agent', 'manager', 'admin')
+  );
+
+CREATE POLICY "customers_create_tickets" ON tickets
+  FOR INSERT
+  WITH CHECK (
+    created_by = auth.uid()
+    AND organization_id = public.current_profile_org_id()
+  );
+
+CREATE POLICY "staff_update_tickets" ON tickets
+  FOR UPDATE
+  USING (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('agent', 'manager', 'admin')
+  )
+  WITH CHECK (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('agent', 'manager', 'admin')
+  );
+
+DROP POLICY IF EXISTS "internal_comments_staff_only" ON ticket_comments;
+DROP POLICY IF EXISTS "members_create_comments" ON ticket_comments;
+
+CREATE POLICY "internal_comments_staff_only" ON ticket_comments
+  FOR SELECT
+  USING (
+    is_internal = FALSE
+    OR public.current_profile_role() IN ('agent', 'manager', 'admin')
+  );
+
+CREATE POLICY "members_create_comments" ON ticket_comments
+  FOR INSERT
+  WITH CHECK (
+    author_id = auth.uid()
+    AND EXISTS (
+      SELECT 1
+      FROM tickets t
+      WHERE t.id = ticket_id
+        AND (
+          t.created_by = auth.uid()
+          OR t.organization_id = public.current_profile_org_id()
+        )
+    )
+  );
+
+DO $$
+BEGIN
+  IF to_regclass('public.ticket_attachments') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "members_read_attachments" ON ticket_attachments;
+
+    CREATE POLICY "members_read_attachments" ON ticket_attachments
+      FOR SELECT
+      USING (
+        EXISTS (
+          SELECT 1
+          FROM tickets t
+          WHERE t.id = ticket_id
+            AND (
+              t.created_by = auth.uid()
+              OR t.organization_id = public.current_profile_org_id()
+            )
+        )
+      );
+  END IF;
+END $$;
+
+DROP POLICY IF EXISTS "staff_read_ai_analysis" ON ai_analysis;
+
+CREATE POLICY "staff_read_ai_analysis" ON ai_analysis
+  FOR SELECT
+  USING (public.current_profile_role() IN ('agent', 'manager', 'admin'));
+
+DROP POLICY IF EXISTS "managers_read_audit_logs" ON audit_logs;
+
+CREATE POLICY "managers_read_audit_logs" ON audit_logs
+  FOR SELECT
+  USING (
+    organization_id = public.current_profile_org_id()
+    AND public.current_profile_role() IN ('manager', 'admin')
+  );
