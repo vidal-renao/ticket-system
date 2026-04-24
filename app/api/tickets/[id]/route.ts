@@ -18,8 +18,8 @@ export async function PATCH(
 ) {
   const { id: rawId } = await params;
   const normalizedTicketNumber = parseTicketIdentifier(rawId);
-  const supabase = await createClient();
   const svc = createServiceClientStatic();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -143,7 +143,7 @@ export async function PATCH(
 
   if (patch.priority && patch.priority !== existing.priority) {
     const policy = await getSlaPolicyForTicket(
-      supabase,
+      svc,
       profile.organization_id,
       patch.priority as string
     );
@@ -189,7 +189,7 @@ export async function PATCH(
   if (patch.status === "closed") patch.closed_at = now;
   if (patch.status === "in_progress") patch.closed_at = null;
 
-  const { data, error } = await supabase
+  const { data, error } = await svc
     .from("tickets")
     .update(patch)
     .eq("id", existing.id)
@@ -211,7 +211,7 @@ export async function PATCH(
   });
 
   if (existing.assigned_to !== data.assigned_to && data.assigned_to) {
-    await createTicketNotification(supabase, {
+    await createTicketNotification(svc, {
       userId: data.assigned_to,
       ticketId: existing.id,
       type: "ticket.assigned",
@@ -221,7 +221,7 @@ export async function PATCH(
   }
 
   if (existing.status !== data.status && data.status === "resolved") {
-    await createTicketNotification(supabase, {
+    await createTicketNotification(svc, {
       userId: data.created_by,
       ticketId: existing.id,
       type: "ticket.resolved",
@@ -236,8 +236,8 @@ export async function PATCH(
     });
   }
 
-  const slaTicket = await ensureSlaDeadlines(supabase, data);
-  await applySlaAssessment(supabase, slaTicket, user.id, profile.role);
+  const slaTicket = await ensureSlaDeadlines(svc, data);
+  await applySlaAssessment(svc, slaTicket, user.id, profile.role);
 
   return NextResponse.json({ ticket: data });
 }
