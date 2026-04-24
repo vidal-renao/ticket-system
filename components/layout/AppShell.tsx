@@ -81,7 +81,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-surface-950)]">
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 border-b border-[var(--color-surface-600)] bg-[var(--color-surface-900)]/95 backdrop-blur">
+      <div className="xl:hidden fixed top-0 inset-x-0 z-40 border-b border-[var(--color-surface-600)] bg-[var(--color-surface-900)]/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
           <button
             type="button"
@@ -117,7 +117,7 @@ export function AppShell({
         <button
           type="button"
           aria-label="Close navigation overlay"
-          className="md:hidden fixed inset-0 z-30 bg-black/60"
+          className="xl:hidden fixed inset-0 z-30 bg-black/60"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -132,11 +132,11 @@ export function AppShell({
         onSignOut={handleSignOut}
         onGoHome={handleGoHome}
         onNavigate={() => setMobileMenuOpen(false)}
-        className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 xl:static xl:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       />
-      <main className="flex-1 overflow-y-auto pt-16 md:pt-0 min-w-0">
+      <main className="flex-1 overflow-y-auto pt-16 xl:pt-0 min-w-0">
         <PageTransition>{children}</PageTransition>
       </main>
     </div>
