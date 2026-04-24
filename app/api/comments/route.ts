@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: comment, error } = await supabase
+  const { data: comment, error } = await svc
     .from("ticket_comments")
     .insert({
       ticket_id,
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
   if (!is_internal) {
     const recipientId = isStaff ? ticket.created_by : ticket.assigned_to;
     if (recipientId && recipientId !== user.id) {
-      await createTicketNotification(supabase, {
+      await createTicketNotification(svc, {
         userId: recipientId,
         ticketId: ticket_id,
         type: "comment.public",
@@ -123,10 +123,10 @@ export async function POST(request: Request) {
     }
   }
 
-  let slaTicket = await ensureSlaDeadlines(supabase, ticket);
+  let slaTicket = await ensureSlaDeadlines(svc, ticket);
   if (isStaff && !is_internal && !ticket.first_response_at && !ticket.first_agent_response_at) {
     const firstResponseAt = new Date().toISOString();
-    const { data: updatedFirstResponse, error: firstResponseError } = await supabase
+    const { data: updatedFirstResponse, error: firstResponseError } = await svc
       .from("tickets")
       .update({
         first_response_at: firstResponseAt,
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
 
   if (requestedStatus) {
     const nextLegacyStatus = canonicalToLegacyStatus(requestedStatus);
-    const { data: updatedTicket, error: ticketError } = await supabase
+    const { data: updatedTicket, error: ticketError } = await svc
       .from("tickets")
       .update({ status: nextLegacyStatus })
       .eq("id", ticket_id)
@@ -167,7 +167,7 @@ export async function POST(request: Request) {
     slaTicket = updatedTicket;
   }
 
-  await applySlaAssessment(supabase, slaTicket, user.id, profile.role);
+  await applySlaAssessment(svc, slaTicket, user.id, profile.role);
 
   return NextResponse.json({ comment }, { status: 201 });
 }

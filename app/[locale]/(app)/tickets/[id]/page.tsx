@@ -67,22 +67,22 @@ export default async function TicketDetailPage({
     { data: creatorCompanyInfo },
   ] = await Promise.all([
     ticket.category_id
-      ? supabase.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
+      ? svc.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
-    supabase.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
+    svc.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
     isStaff
-      ? supabase.from("ai_analysis").select("*").eq("ticket_id", id).single()
+      ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
-    supabase.from("ticket_comments")
+    svc.from("ticket_comments")
       .select("*, profiles(full_name, avatar_url)")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
-    supabase
+    svc
       .from("organizations")
       .select("name, slug")
       .eq("id", ticket.organization_id)
       .single(),
-    supabase
+    svc
       .from("customers_info")
       .select("company_name, industry")
       .eq("id", ticket.created_by)
