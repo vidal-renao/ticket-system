@@ -12,6 +12,7 @@ import { sendEmail, ticketEmailSubject } from "@/lib/email";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
+  const svc = createServiceClientStatic();
 
   const {
     data: { user },
@@ -40,14 +41,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const profile = await getCurrentProfile(supabase, user.id);
+  const profile = await getCurrentProfile(svc, user.id);
 
   if (!profile?.organization_id) {
+    console.error("[POST /api/tickets] Missing organization on profile", {
+      userId: user.id,
+      role: profile?.role ?? null,
+    });
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
   // Smart auto-assignment based on selected team
-  const svc = createServiceClientStatic();
   const assignment = await autoAssign(svc, profile.organization_id, team_id ?? null);
   const createdAt = new Date().toISOString();
   const slaPolicy = await getSlaPolicyForTicket(svc, profile.organization_id, priority);
