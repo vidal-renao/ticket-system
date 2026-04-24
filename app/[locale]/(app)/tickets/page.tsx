@@ -3,7 +3,14 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { applyTicketSlaFilter, formatAgentIdentity, getInitials, getTicketsByRole } from "@/lib/ticket-visibility";
+import {
+  applyTicketSlaFilter,
+  debugTicketFilters,
+  formatAgentIdentity,
+  getInitials,
+  getTicketIdsBySuggestedCategory,
+  getTicketsByRole,
+} from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -82,6 +89,23 @@ export default async function TicketsPage({
     ? { includeUnassignedForAgents: false }
     : undefined;
 
+  let filteredTicketIds: string[] | null = null;
+
+  if (isStaff && filters.category) {
+    filteredTicketIds = await getTicketIdsBySuggestedCategory(
+      svc,
+      profile.organization_id,
+      filters.category
+    );
+  }
+
+  if (isStaff && filters.specialty === "mine") {
+    const specialty = profile.specialty?.trim();
+    filteredTicketIds = specialty
+      ? await getTicketIdsBySuggestedCategory(svc, profile.organization_id, specialty)
+      : [];
+  }
+
   let staffTicketsQuery = getTicketsByRole(
     svc,
     profile,
@@ -99,13 +123,21 @@ export default async function TicketsPage({
 
   if (isStaff) {
     staffTicketsQuery = applyTicketSlaFilter(staffTicketsQuery, filters.sla);
-    console.info("[TicketsPage] scoped staff filters", {
+    debugTicketFilters("[TicketsPage] scoped staff filters", {
       userId: user.id,
       role: profile.role,
-      organizationId: profile.organization_id,
       filters,
       includeUnassignedForAgents: staffQueryOptions?.includeUnassignedForAgents ?? true,
     });
+  }
+
+  if (isStaff && filteredTicketIds) {
+    staffTicketsQuery = staffTicketsQuery.in(
+      "id",
+      filteredTicketIds.length
+        ? filteredTicketIds
+        : ["00000000-0000-0000-0000-000000000000"]
+    );
   }
 
   const { data: tickets, error } = isStaff
@@ -122,9 +154,8 @@ export default async function TicketsPage({
 
   if (error) console.error("[TicketsPage] query error:", error.message);
 
-  // Fetch AI-suggested categories separately to avoid join issues
   let aiCategoryMap: Record<string, string | null> = {};
-  if (!isStaff && tickets && tickets.length > 0) {
+  if (tickets && tickets.length > 0) {
     const ticketIds = (tickets as { id: string }[]).map((t) => t.id);
     const { data: aiRows, error: aiError } = await svc
       .from("ai_analysis")
@@ -132,7 +163,6 @@ export default async function TicketsPage({
       .in("ticket_id", ticketIds)
       .order("created_at", { ascending: false });
     if (aiError) console.error("[TicketsPage] ai_analysis query error:", aiError.message);
-    // Keep only the most recent analysis per ticket
     if (aiRows) {
       for (const row of aiRows) {
         if (!(row.ticket_id in aiCategoryMap)) {
@@ -187,16 +217,7 @@ export default async function TicketsPage({
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const currentAgentInitials = getInitials(profile.full_name);
   const availableCategories = [...new Set(Object.values(aiCategoryMap).filter((value): value is string => Boolean(value)))].sort();
-  const visibleStaffTickets = staffTickets.filter((ticket) => {
-    const ticketCategory = aiCategoryMap[ticket.id] ?? "";
-    if (filters.category && ticketCategory !== filters.category) return false;
-    if (filters.specialty === "mine") {
-      const specialty = profile.specialty?.trim().toLowerCase();
-      if (!specialty) return false;
-      return ticketCategory.toLowerCase() === specialty;
-    }
-    return true;
-  });
+  const visibleStaffTickets = staffTickets;
 
   function ticketsFilterHref(next: { status?: string; priority?: string; sla?: string; category?: string; specialty?: string }) {
     const sp = new URLSearchParams();

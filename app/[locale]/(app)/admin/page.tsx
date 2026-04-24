@@ -301,61 +301,58 @@ export default async function AdminPage({
                       ticket.sla_breached ? "bg-red-950/20" : ""
                     }`}
                   >
-                    {/* Ref — contains the full-row overlay link */}
+                    {/* Ref */}
                     <td className="px-4 py-3">
                       <Link
                         href={ticketPath}
-                        className="absolute inset-0"
+                        className="font-mono text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                         aria-label={`${formatTicketRef(ticket.ticket_number)}: ${ticket.title}`}
-                      />
-                      <span className="relative font-mono text-xs text-indigo-400 pointer-events-none">
+                      >
                         {formatTicketRef(ticket.ticket_number)}
-                      </span>
+                      </Link>
                     </td>
 
                     {/* Company */}
                     <td className="px-4 py-3">
-                      <span className="relative pointer-events-none">
-                        {ticket.company_name ? (
-                          <span className="text-xs font-medium text-[var(--color-text-primary)]">
-                            {ticket.company_name}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">
-                            {t("internal")}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-
-                    {/* Subject */}
-                    <td className="px-4 py-3 hidden md:table-cell max-w-[220px]">
-                      <span className="relative text-sm text-[var(--color-text-primary)] truncate block pointer-events-none">
-                        {ticket.title}
-                      </span>
-                      {ticket.agent_name && (
-                        <span className="relative text-xs text-[var(--color-text-muted)] truncate block pointer-events-none">
-                          → {ticket.agent_name}
+                      {ticket.company_name ? (
+                        <span className="text-xs font-medium text-[var(--color-text-primary)]">
+                          {ticket.company_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)] italic">
+                          {t("internal")}
                         </span>
                       )}
                     </td>
 
+                    {/* Subject */}
+                    <td className="px-4 py-3 hidden md:table-cell max-w-[220px]">
+                      <Link href={ticketPath} className="block group">
+                        <span className="text-sm text-[var(--color-text-primary)] truncate block group-hover:text-indigo-300 transition-colors">
+                          {ticket.title}
+                        </span>
+                        {ticket.agent_name && (
+                          <span className="text-xs text-[var(--color-text-muted)] truncate block">
+                            → {ticket.agent_name}
+                          </span>
+                        )}
+                      </Link>
+                    </td>
+
                     {/* Category */}
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className="relative pointer-events-none">
-                        {ticket.category_name ? (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                            {ticket.category_name}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[var(--color-text-muted)] italic">—</span>
-                        )}
-                      </span>
+                      {ticket.category_name ? (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                          {ticket.category_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--color-text-muted)] italic">—</span>
+                      )}
                     </td>
 
                     {/* Priority */}
                     <td className="px-4 py-3">
-                      <div className="relative flex items-center gap-1 pointer-events-none">
+                      <div className="flex items-center gap-1">
                         <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
                         {ticket.sla_breached && (
                           <Badge className="text-red-400 bg-red-400/10 border-red-400/20 text-[10px]">SLA!</Badge>
@@ -365,14 +362,12 @@ export default async function AdminPage({
 
                     {/* Status */}
                     <td className="px-4 py-3">
-                      <span className="relative pointer-events-none">
-                        <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
-                      </span>
+                      <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
                     </td>
 
                     {/* Date */}
                     <td className="px-4 py-3 hidden xl:table-cell">
-                      <span className="relative text-xs text-[var(--color-text-muted)] pointer-events-none">
+                      <span className="text-xs text-[var(--color-text-muted)]">
                         {formatRelativeTime(ticket.created_at)}
                       </span>
                     </td>

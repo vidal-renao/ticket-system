@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, UserPlus } from "lucide-react";
@@ -22,7 +23,9 @@ export function AssignToMeButton({
   if (!currentUserId) return null;
   if (currentAssignee === currentUserId) return null;
 
-  function handleAssign() {
+  function handleAssign(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
     startTransition(async () => {
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",

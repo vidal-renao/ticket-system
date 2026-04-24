@@ -1,27 +1,20 @@
 import type { MetadataRoute } from "next";
-import { routing } from "@/i18n/routing";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
+const LOCALES = ["de", "en", "es"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const locales = routing.locales;
+  const publicRoutes = ["", "/home", "/login", "/register"] as const;
+  const appRoutes = ["/tickets", "/queue", "/dashboard"] as const;
 
-  const loginRoutes = locales.map((locale) => ({
-    url: locale === routing.defaultLocale
-      ? `${BASE_URL}/login`
-      : `${BASE_URL}/${locale}/login`,
-    lastModified: new Date(),
-    changeFrequency: "yearly" as const,
-    priority: 0.8,
-  }));
+  return LOCALES.flatMap((locale) => {
+    const prefix = locale === "de" ? "" : `/${locale}`;
 
-  return [
-    {
-      url: BASE_URL,
+    return [...publicRoutes, ...appRoutes].map((route) => ({
+      url: `${BASE_URL}${prefix}${route}`,
       lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 1,
-    },
-    ...loginRoutes,
-  ];
+      changeFrequency: route === "" ? "weekly" : "daily",
+      priority: route === "" ? 1 : route === "/login" || route === "/register" ? 0.6 : 0.8,
+    }));
+  });
 }

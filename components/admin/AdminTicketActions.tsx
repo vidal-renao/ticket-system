@@ -1,5 +1,6 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Play, CheckCircle2, RotateCcw, XCircle, Loader2, UserPlus } from "lucide-react";
@@ -79,10 +80,16 @@ export function AdminTicketActions({
     "flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-40";
 
   return (
-    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="flex items-center gap-1.5"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {/* Assign select */}
       <select
         value={assignee}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         onChange={(e) => handleAssign(e.target.value)}
         disabled={isPending || isClosed || !canReassign}
         aria-label="Reassign ticket"
@@ -98,7 +105,11 @@ export function AdminTicketActions({
       {canAssignToMe && (
         <button
           type="button"
-          onClick={() => handleAssign(currentUserId)}
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAssign(currentUserId);
+          }}
           disabled={isPending}
           title="Assign to me"
           className={`${btnBase} bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20`}
@@ -113,7 +124,11 @@ export function AdminTicketActions({
         /* open → start working */
         <button
           type="button"
-          onClick={() => handleStatus("in_progress", "started")}
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleStatus("in_progress", "started");
+          }}
           disabled={!assignee}
           title="Start working"
           className={`${btnBase} bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20`}
@@ -125,7 +140,11 @@ export function AdminTicketActions({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => handleStatus("pending_customer", "waiting for customer")}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStatus("pending_customer", "waiting for customer");
+            }}
             title="Reply and wait for customer"
             className={`${btnBase} bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20`}
           >
@@ -133,7 +152,11 @@ export function AdminTicketActions({
           </button>
           <button
             type="button"
-            onClick={() => handleStatus("resolved", "resolved")}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStatus("resolved", "resolved");
+            }}
             title="Mark as resolved"
             className={`${btnBase} bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20`}
           >
@@ -143,7 +166,11 @@ export function AdminTicketActions({
       ) : currentStatus === "pending_customer" || currentStatus === "pending_third_party" ? (
         <button
           type="button"
-          onClick={() => handleStatus("in_progress", "resumed")}
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleStatus("in_progress", "resumed");
+          }}
           title="Resume work after review"
           className={`${btnBase} bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20`}
         >
@@ -154,7 +181,11 @@ export function AdminTicketActions({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => handleStatus("closed", "closed")}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStatus("closed", "closed");
+            }}
             title="Close ticket"
             className={`${btnBase} bg-[var(--color-surface-800)] border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-green-400 hover:border-green-500/30`}
           >
@@ -162,7 +193,11 @@ export function AdminTicketActions({
           </button>
           <button
             type="button"
-            onClick={() => handleStatus("in_progress", "reopened")}
+            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStatus("in_progress", "reopened");
+            }}
             title="Reopen ticket"
             className={`${btnBase} bg-[var(--color-surface-800)] border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-amber-400 hover:border-amber-500/30`}
           >
@@ -173,7 +208,11 @@ export function AdminTicketActions({
         /* closed — no actions */
         <button
           type="button"
-          onClick={() => handleStatus("in_progress", "reopened")}
+          onClick={(e: MouseEvent<HTMLButtonElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleStatus("in_progress", "reopened");
+          }}
           title="Reopen ticket"
           className={`${btnBase} bg-[var(--color-surface-800)] border-[var(--color-surface-600)] text-[var(--color-text-muted)] hover:text-amber-400 hover:border-amber-500/30`}
         >

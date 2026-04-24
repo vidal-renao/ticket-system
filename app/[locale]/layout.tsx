@@ -68,7 +68,6 @@ export default async function LocaleLayout({
   return (
     <>
       <HtmlLang locale={locale} />
-      {/* JSON-LD structured data — Google indexes from <body> fine */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -3,7 +3,14 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
-import { applyTicketSlaFilter, formatAgentIdentity, getInitials, getTicketsByRole } from "@/lib/ticket-visibility";
+import {
+  applyTicketSlaFilter,
+  debugTicketFilters,
+  formatAgentIdentity,
+  getInitials,
+  getTicketIdsBySuggestedCategory,
+  getTicketsByRole,
+} from "@/lib/ticket-visibility";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
@@ -54,6 +61,23 @@ export default async function QueuePage({
 
   const agentSpecialty = profile.specialty ?? null;
 
+  let filteredTicketIds: string[] | null = null;
+
+  if (filters.category) {
+    filteredTicketIds = await getTicketIdsBySuggestedCategory(
+      svc,
+      profile.organization_id,
+      filters.category
+    );
+  }
+
+  if (filters.specialty === "mine") {
+    const specialty = agentSpecialty?.trim();
+    filteredTicketIds = specialty
+      ? await getTicketIdsBySuggestedCategory(svc, profile.organization_id, specialty)
+      : [];
+  }
+
   let ticketsQuery = getTicketsByRole(
     svc,
     profile,
@@ -69,13 +93,21 @@ export default async function QueuePage({
   }
 
   ticketsQuery = applyTicketSlaFilter(ticketsQuery, filters.sla);
-  console.info("[QueuePage] scoped queue filters", {
+  debugTicketFilters("[QueuePage] scoped queue filters", {
     userId: currentUserId,
     role: profile.role,
-    organizationId: profile.organization_id,
     specialty: agentSpecialty,
     filters,
   });
+
+  if (filteredTicketIds) {
+    ticketsQuery = ticketsQuery.in(
+      "id",
+      filteredTicketIds.length
+        ? filteredTicketIds
+        : ["00000000-0000-0000-0000-000000000000"]
+    );
+  }
 
   const { data: ticketsRaw, error: ticketsError } = await ticketsQuery
     .order("sla_breached", { ascending: false })
@@ -172,16 +204,7 @@ export default async function QueuePage({
     ai: aiByTicket[t.id] ?? null,
   }));
 
-  const sorted = tickets.filter((ticket) => {
-    const ticketCategory = ticket.ai?.suggested_category ?? "";
-    if (filters.category && ticketCategory !== filters.category) return false;
-    if (filters.specialty === "mine") {
-      const specialty = agentSpecialty?.trim().toLowerCase();
-      if (!specialty) return false;
-      return ticketCategory.toLowerCase() === specialty;
-    }
-    return true;
-  });
+  const sorted = tickets;
 
   const myTicketCount = tickets.filter((t) => t.assigned_to === currentUserId).length;
   const queueCount = tickets.filter((t) => !t.assigned_to).length;

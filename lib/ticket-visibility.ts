@@ -1,10 +1,5 @@
 import type { CurrentProfile } from "@/lib/authz";
 
-type QueryBuilder = {
-  eq: (column: string, value: unknown) => QueryBuilder;
-  or: (filters: string) => QueryBuilder;
-};
-
 type QueryClient = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
@@ -27,9 +22,21 @@ type TicketAccessResult<T> =
   | { kind: "forbidden"; ticket: TicketAccessRow }
   | { kind: "not_found" };
 
+const DEBUG_ACCESS = process.env.DEBUG === "true";
+
+function debugInfo(message: string, payload: Record<string, unknown>) {
+  if (DEBUG_ACCESS) console.info(message, payload);
+}
+
+function debugWarn(message: string, payload: Record<string, unknown>) {
+  if (DEBUG_ACCESS) console.warn(message, payload);
+}
+
+function debugError(message: string, payload: Record<string, unknown>) {
+  if (DEBUG_ACCESS) console.error(message, payload);
+}
+
 export function applyTicketVisibilityScope(
-  // The Supabase query builder type becomes recursively huge once chained
-  // through server-route generics, so keep this helper intentionally loose.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: any,
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
@@ -56,6 +63,30 @@ export function getTicketsByRole(
   options?: { includeUnassignedForAgents?: boolean }
 ) {
   return applyTicketVisibilityScope(client.from("tickets").select(select), profile, options);
+}
+
+export async function getTicketIdsBySuggestedCategory(
+  client: QueryClient,
+  organizationId: string,
+  category: string
+): Promise<string[]> {
+  const { data, error } = await client
+    .from("ai_analysis")
+    .select("ticket_id, tickets!inner(id, organization_id)")
+    .eq("suggested_category", category)
+    .eq("tickets.organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    debugError("[TicketFilters] failed category lookup", {
+      organizationId,
+      category,
+      error: error.message,
+    });
+    return [];
+  }
+
+  return [...new Set(((data ?? []) as Array<{ ticket_id: string | null }>).map((row) => row.ticket_id).filter((value): value is string => Boolean(value)))];
 }
 
 export function applyTicketSlaFilter(
@@ -115,7 +146,7 @@ export async function resolveTicketAccess<T>(
     .maybeSingle();
 
   if (baseError) {
-    console.error("[TicketAccess] failed base lookup", {
+    debugError("[TicketAccess] failed base lookup", {
       ticketId,
       userId: profile.id,
       role: profile.role,
@@ -128,12 +159,10 @@ export async function resolveTicketAccess<T>(
   }
 
   if (baseTicket.organization_id !== profile.organization_id) {
-    console.warn("[TicketAccess] organization mismatch", {
+    debugWarn("[TicketAccess] organization mismatch", {
       ticketId,
       userId: profile.id,
       role: profile.role,
-      ticketOrganizationId: baseTicket.organization_id,
-      profileOrganizationId: profile.organization_id,
     });
     return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
   }
@@ -144,10 +173,9 @@ export async function resolveTicketAccess<T>(
     baseTicket.assigned_to !== profile.id &&
     options?.includeUnassignedForAgents !== false
   ) {
-    console.warn("[TicketAccess] agent attempted to access foreign assignment", {
+    debugWarn("[TicketAccess] agent attempted to access foreign assignment", {
       ticketId,
       userId: profile.id,
-      assignedTo: baseTicket.assigned_to,
     });
     return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
   }
@@ -157,10 +185,9 @@ export async function resolveTicketAccess<T>(
     options?.includeUnassignedForAgents === false &&
     baseTicket.assigned_to !== profile.id
   ) {
-    console.warn("[TicketAccess] agent attempted to access non-owned ticket", {
+    debugWarn("[TicketAccess] agent attempted to access non-owned ticket", {
       ticketId,
       userId: profile.id,
-      assignedTo: baseTicket.assigned_to,
     });
     return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
   }
@@ -174,7 +201,7 @@ export async function resolveTicketAccess<T>(
   const { data: ticket, error } = await scopedQuery.single();
 
   if (error) {
-    console.error("[TicketAccess] failed scoped lookup", {
+    debugError("[TicketAccess] failed scoped lookup", {
       ticketId,
       userId: profile.id,
       role: profile.role,
@@ -204,4 +231,12 @@ export function getInitials(name: string | null | undefined): string {
 
   if (parts.length === 0) return "??";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+export function isDebugLoggingEnabled() {
+  return DEBUG_ACCESS;
+}
+
+export function debugTicketFilters(message: string, payload: Record<string, unknown>) {
+  debugInfo(message, payload);
 }

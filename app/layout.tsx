@@ -1,16 +1,46 @@
 import { Inter } from "next/font/google";
+import type { Metadata } from "next";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
-/**
- * Root layout — required by Next.js 15.5+ to provide <html> and <body>.
- * The `lang` attribute is set dynamically per locale via HtmlLang (client component).
- * `suppressHydrationWarning` prevents React warnings on lang mismatch during hydration.
- */
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "HelpDesk AI",
+    template: "%s | HelpDesk AI",
+  },
+  description:
+    "AI-powered IT helpdesk SaaS for Swiss SMEs with multilingual support, SLA tracking, and operational workflows for support teams.",
+  applicationName: "HelpDesk AI",
+  openGraph: {
+    title: "HelpDesk AI",
+    description:
+      "Operational helpdesk software for Swiss SMEs with multilingual support, SLA tracking, and AI-assisted triage.",
+    url: APP_URL,
+    siteName: "HelpDesk AI",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HelpDesk AI",
+    description:
+      "Operational helpdesk software for Swiss SMEs with multilingual support, SLA tracking, and AI-assisted triage.",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="de" className="dark" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
+    <html lang="de" suppressHydrationWarning>
+      <body
+        className={`${inter.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>
