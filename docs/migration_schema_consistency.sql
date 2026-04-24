@@ -92,7 +92,18 @@ END $$;
 
 ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS team_id UUID,
-  ADD COLUMN IF NOT EXISTS specialty TEXT;
+  ADD COLUMN IF NOT EXISTS specialty TEXT,
+  ADD COLUMN IF NOT EXISTS availability_status TEXT DEFAULT 'offline';
+
+UPDATE profiles
+SET availability_status = CASE
+  WHEN role IN ('agent', 'manager', 'admin') AND is_active THEN 'online'
+  ELSE 'offline'
+END
+WHERE availability_status IS NULL;
+
+ALTER TABLE profiles
+  ALTER COLUMN availability_status SET DEFAULT 'offline';
 
 DO $$ BEGIN
   IF NOT EXISTS (

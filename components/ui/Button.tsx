@@ -14,24 +14,24 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150",
+          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           // Variants
           variant === "primary" && [
-            "bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700",
-            "text-white shadow-lg shadow-indigo-500/20",
+            "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20",
+            "hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-xl hover:shadow-indigo-500/25 active:translate-y-0 active:bg-indigo-700",
           ],
           variant === "secondary" && [
-            "bg-[var(--color-surface-700)] hover:bg-[var(--color-surface-600)]",
-            "text-[var(--color-text-primary)] border border-[var(--color-surface-600)]",
+            "border border-[var(--color-surface-600)] bg-[var(--color-surface-700)] text-[var(--color-text-primary)]",
+            "hover:-translate-y-0.5 hover:bg-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]",
           ],
           variant === "ghost" && [
-            "bg-transparent hover:bg-[var(--color-surface-700)]",
-            "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]",
+            "bg-transparent text-[var(--color-text-secondary)]",
+            "hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-primary)]",
           ],
           variant === "danger" && [
-            "bg-red-600/20 hover:bg-red-600/30 border border-red-500/30",
-            "text-red-400 hover:text-red-300",
+            "border border-red-500/30 bg-red-600/20 text-red-400",
+            "hover:-translate-y-0.5 hover:bg-red-600/30 hover:text-red-300",
           ],
           // Sizes
           size === "sm" && "px-3 py-1.5 text-xs",

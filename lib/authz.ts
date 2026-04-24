@@ -1,4 +1,4 @@
-import type { UserRole } from "@/lib/supabase/types";
+import type { AvailabilityStatus, UserRole } from "@/lib/supabase/types";
 
 type QueryClient = {
   // The Supabase client type is intentionally kept narrow here so this helper
@@ -13,6 +13,7 @@ export interface CurrentProfile {
   organization_id: string | null;
   full_name?: string | null;
   specialty?: string | null;
+  availability_status?: AvailabilityStatus | null;
 }
 
 export function isStaffRole(role: string | null | undefined): role is UserRole {
@@ -25,7 +26,7 @@ export async function getCurrentProfile(
 ): Promise<CurrentProfile | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, role, organization_id, full_name, specialty")
+    .select("id, role, organization_id, full_name, specialty, availability_status")
     .eq("id", userId)
     .single();
 
@@ -37,5 +38,6 @@ export async function getCurrentProfile(
     organization_id: data.organization_id,
     full_name: data.full_name ?? null,
     specialty: data.specialty ?? null,
+    availability_status: data.availability_status ?? null,
   };
 }

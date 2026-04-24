@@ -14,7 +14,8 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
-import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight } from "lucide-react";
+import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
+import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight, Gauge, Layers3 } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon, formatRelativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,34 @@ export async function generateMetadata() {
   return { title: t("title") };
 }
 
+type RawTicket = {
+  id: string;
+  ticket_number: number;
+  title: string;
+  created_by: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  sla_breached?: boolean;
+  response_due_at?: string | null;
+  resolution_due_at?: string | null;
+  sla_first_response_due?: string | null;
+  sla_resolution_due?: string | null;
+  first_response_at?: string | null;
+  first_agent_response_at?: string | null;
+  contains_pii?: boolean;
+  assigned_to?: string | null;
+};
+
+type AiRow = {
+  ticket_id: string;
+  suggested_category?: string | null;
+  suggested_priority?: string;
+  sentiment?: string;
+  confidence_score?: number;
+  summary?: string;
+};
+
 export default async function QueuePage({
   params,
   searchParams,
@@ -33,49 +62,38 @@ export default async function QueuePage({
   params: Promise<{ locale: string }>;
   searchParams: Promise<{ page?: string; status?: string; priority?: string; sla?: string; category?: string; specialty?: string }>;
 }) {
-  const { locale }       = await params;
+  const { locale } = await params;
   const filters = await searchParams;
   const pageStr = filters.page;
-  const t  = await getTranslations("queue");
+  const t = await getTranslations("queue");
   const tp = await getTranslations("priority");
   const ti = await getTranslations("ticket");
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
-  const currentUserId = user?.id ?? "";
+  const currentUserId = user.id;
 
   const svc = createServiceClientStatic();
   const profile = await getCurrentProfile(svc, currentUserId);
-
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
-  if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
-    redirect(ticketsPath);
-  }
 
-  if (!profile.organization_id) {
-    console.error("[QueuePage] Missing profile organization", { userId: currentUserId });
-    redirect(loginPath);
-  }
+  if (!profile || !["agent", "manager", "admin"].includes(profile.role)) redirect(ticketsPath);
+  if (!profile.organization_id) redirect(loginPath);
 
   const agentSpecialty = profile.specialty ?? null;
-
   let filteredTicketIds: string[] | null = null;
 
   if (filters.category) {
-    filteredTicketIds = await getTicketIdsBySuggestedCategory(
-      svc,
-      profile.organization_id,
-      filters.category
-    );
+    filteredTicketIds = await getTicketIdsBySuggestedCategory(svc, profile.organization_id, filters.category);
   }
 
   if (filters.specialty === "mine") {
     const specialty = agentSpecialty?.trim();
-    filteredTicketIds = specialty
-      ? await getTicketIdsBySuggestedCategory(svc, profile.organization_id, specialty)
-      : [];
+    filteredTicketIds = specialty ? await getTicketIdsBySuggestedCategory(svc, profile.organization_id, specialty) : [];
   }
 
   let ticketsQuery = getTicketsByRole(
@@ -101,12 +119,7 @@ export default async function QueuePage({
   });
 
   if (filteredTicketIds) {
-    ticketsQuery = ticketsQuery.in(
-      "id",
-      filteredTicketIds.length
-        ? filteredTicketIds
-        : ["00000000-0000-0000-0000-000000000000"]
-    );
+    ticketsQuery = ticketsQuery.in("id", filteredTicketIds.length ? filteredTicketIds : ["00000000-0000-0000-0000-000000000000"]);
   }
 
   const { data: ticketsRaw, error: ticketsError } = await ticketsQuery
@@ -117,36 +130,8 @@ export default async function QueuePage({
 
   if (ticketsError) console.error("[QueuePage] tickets query error:", ticketsError.message);
 
-  type RawTicket = {
-    id: string;
-    ticket_number: number;
-    title: string;
-    created_by: string;
-    status: string;
-    priority: string;
-    created_at: string;
-    sla_breached?: boolean;
-    response_due_at?: string | null;
-    resolution_due_at?: string | null;
-    sla_first_response_due?: string | null;
-    sla_resolution_due?: string | null;
-    first_response_at?: string | null;
-    first_agent_response_at?: string | null;
-    contains_pii?: boolean;
-    assigned_to?: string | null;
-  };
-
-  type AiRow = {
-    ticket_id: string;
-    suggested_category?: string | null;
-    suggested_priority?: string;
-    sentiment?: string;
-    confidence_score?: number;
-    summary?: string;
-  };
-
-  const rawList   = (ticketsRaw ?? []) as RawTicket[];
-  const ticketIds = rawList.map((t) => t.id);
+  const rawList = (ticketsRaw ?? []) as RawTicket[];
+  const ticketIds = rawList.map((ticket) => ticket.id);
   const creatorIds = [...new Set(rawList.map((ticket) => ticket.created_by).filter(Boolean))];
   const assigneeIds = [...new Set(rawList.map((ticket) => ticket.assigned_to).filter((value): value is string => Boolean(value)))];
 
@@ -165,11 +150,7 @@ export default async function QueuePage({
     if (!(row.ticket_id in aiByTicket)) aiByTicket[row.ticket_id] = row;
   }
 
-  const [
-    { data: organization },
-    { data: customerCompanyRows },
-    { data: assigneeRows },
-  ] = await Promise.all([
+  const [{ data: organization }, { data: customerCompanyRows }, { data: assigneeRows }] = await Promise.all([
     svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
     creatorIds.length
       ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
@@ -194,153 +175,129 @@ export default async function QueuePage({
   );
 
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
-  const currentAgentInitials = getInitials(profile.full_name);
   const availableCategories = [...new Set(Object.values(aiByTicket).map((row) => row?.suggested_category).filter((value): value is string => Boolean(value)))].sort();
 
-  type TicketWithAI = RawTicket & { ai: AiRow | null };
-
-  const tickets: TicketWithAI[] = rawList.map((t) => ({
-    ...t,
-    ai: aiByTicket[t.id] ?? null,
+  const tickets = rawList.map((ticket) => ({
+    ...ticket,
+    ai: aiByTicket[ticket.id] ?? null,
   }));
 
-  const sorted = tickets;
-
-  const myTicketCount = tickets.filter((t) => t.assigned_to === currentUserId).length;
-  const queueCount = tickets.filter((t) => !t.assigned_to).length;
-  const breachedCount = tickets.filter((t) => getSlaState(t).key === "breached").length;
-
-  const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
-  const myTickets = sorted.filter(
-    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === currentUserId
-  );
+  const myTicketCount = tickets.filter((ticket) => ticket.assigned_to === currentUserId).length;
+  const queueCount = tickets.filter((ticket) => !ticket.assigned_to).length;
+  const breachedCount = tickets.filter((ticket) => getSlaState(ticket).key === "breached").length;
+  const critical = tickets.filter((ticket) => ticket.priority === "critical" || ticket.sla_breached);
+  const myTickets = tickets.filter((ticket) => !ticket.sla_breached && ticket.priority !== "critical" && ticket.assigned_to === currentUserId);
   const mySpecialty = agentSpecialty
-    ? sorted.filter(
-        (t) =>
-          !t.sla_breached &&
-          t.priority !== "critical" &&
-          !t.assigned_to &&
-          t.ai?.suggested_category?.toLowerCase() === agentSpecialty.toLowerCase()
+    ? tickets.filter(
+        (ticket) =>
+          !ticket.sla_breached &&
+          ticket.priority !== "critical" &&
+          !ticket.assigned_to &&
+          ticket.ai?.suggested_category?.toLowerCase() === agentSpecialty.toLowerCase()
       )
     : [];
-  const mySpecialtyIds = new Set(mySpecialty.map((t) => t.id));
-  const others = sorted.filter(
-    (t) =>
-      !t.sla_breached &&
-      t.priority !== "critical" &&
-      !t.assigned_to &&
-      !mySpecialtyIds.has(t.id)
+  const mySpecialtyIds = new Set(mySpecialty.map((ticket) => ticket.id));
+  const others = tickets.filter(
+    (ticket) =>
+      !ticket.sla_breached && ticket.priority !== "critical" && !ticket.assigned_to && !mySpecialtyIds.has(ticket.id)
   );
 
-  // Pagination applies only to "Others" section
-  const currentPage  = Math.max(1, parseInt(pageStr ?? "1", 10));
+  const currentPage = Math.max(1, parseInt(pageStr ?? "1", 10));
   const totalOthersPages = Math.max(1, Math.ceil(others.length / OTHERS_PAGE_SIZE));
-  const safePage     = Math.min(currentPage, totalOthersPages);
-  const pagedOthers  = others.slice((safePage - 1) * OTHERS_PAGE_SIZE, safePage * OTHERS_PAGE_SIZE);
+  const safePage = Math.min(currentPage, totalOthersPages);
+  const pagedOthers = others.slice((safePage - 1) * OTHERS_PAGE_SIZE, safePage * OTHERS_PAGE_SIZE);
 
-  function othersPageHref(p: number) {
+  function othersPageHref(page: number) {
     const base = locale === "de" ? "/queue" : `/${locale}/queue`;
-    const sp = new URLSearchParams();
-    if (filters.status) sp.set("status", filters.status);
-    if (filters.priority) sp.set("priority", filters.priority);
-    if (filters.sla) sp.set("sla", filters.sla);
-    if (p > 1) sp.set("page", String(p));
-    const q = sp.toString();
-    return q ? `${base}?${q}` : base;
+    const search = new URLSearchParams();
+    if (filters.status) search.set("status", filters.status);
+    if (filters.priority) search.set("priority", filters.priority);
+    if (filters.sla) search.set("sla", filters.sla);
+    if (page > 1) search.set("page", String(page));
+    const query = search.toString();
+    return query ? `${base}?${query}` : base;
   }
 
   function filterHref(next: { status?: string; priority?: string; sla?: string; category?: string; specialty?: string }) {
-    const sp = new URLSearchParams();
+    const search = new URLSearchParams();
     const status = next.status ?? filters.status;
     const priority = next.priority ?? filters.priority;
     const sla = next.sla ?? filters.sla;
     const category = next.category ?? filters.category;
     const specialty = next.specialty ?? filters.specialty;
-    if (status) sp.set("status", status);
-    if (priority) sp.set("priority", priority);
-    if (sla) sp.set("sla", sla);
-    if (category) sp.set("category", category);
-    if (specialty) sp.set("specialty", specialty);
-    const q = sp.toString();
+    if (status) search.set("status", status);
+    if (priority) search.set("priority", priority);
+    if (sla) search.set("sla", sla);
+    if (category) search.set("category", category);
+    if (specialty) search.set("specialty", specialty);
+    const query = search.toString();
     const base = locale === "de" ? "/queue" : `/${locale}/queue`;
-    return q ? `${base}?${q}` : base;
+    return query ? `${base}?${query}` : base;
   }
 
   function clearFilterHref(key: "status" | "priority" | "sla" | "category" | "specialty") {
     return filterHref({ [key]: "" });
   }
 
-  function TicketCard({ ticket }: { ticket: TicketWithAI }) {
-    const ticketPath =
-      locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
+  function TicketCard({ ticket }: { ticket: (typeof tickets)[number] }) {
+    const ticketPath = locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
     const aiCategory = ticket.ai?.suggested_category ?? null;
     const slaState = getSlaState(ticket);
     const companyContext = companyContextByCreator[ticket.created_by];
     const assigneeProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
     const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assigneeProfile) : "Unassigned";
-    const assigneeInitials = ticket.assigned_to ? getInitials(assigneeProfile?.full_name) : "--";
+    const assigneeName = assigneeProfile?.full_name?.trim() || assigneeLabel;
 
     return (
       <Card hover className="p-4">
         <div className="flex items-start gap-4">
-          <Link href={ticketPath} className="flex items-start gap-4 flex-1 min-w-0">
+          <Link href={ticketPath} className="flex min-w-0 flex-1 items-start gap-4">
             <div className="mt-0.5 shrink-0">
               <AlertCircle
-                className={`w-4 h-4 ${
-                  ticket.priority === "critical" ? "text-red-400" :
-                  ticket.priority === "high"     ? "text-orange-400" :
-                  ticket.priority === "medium"   ? "text-yellow-400" : "text-green-400"
+                className={`h-4 w-4 ${
+                  ticket.priority === "critical"
+                    ? "text-red-400"
+                    : ticket.priority === "high"
+                      ? "text-orange-400"
+                      : ticket.priority === "medium"
+                        ? "text-yellow-400"
+                        : "text-green-400"
                 }`}
               />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-mono text-[var(--color-text-muted)]">
-                  {formatTicketRef(ticket.ticket_number)}
-                </span>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-mono text-[var(--color-text-muted)]">{formatTicketRef(ticket.ticket_number)}</span>
                 {aiCategory ? (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <span className="rounded border border-indigo-500/20 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300">
                     {aiCategory}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-[var(--color-text-muted)] italic">
-                    {ti("aiProcessing")}
-                  </span>
+                  <span className="text-[10px] italic text-[var(--color-text-muted)]">{ti("aiProcessing")}</span>
                 )}
                 {ticket.contains_pii && (
                   <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
-                    <Shield className="w-2.5 h-2.5" aria-hidden="true" /> {ti("piiWarning")}
+                    <Shield className="h-2.5 w-2.5" aria-hidden="true" /> {ti("piiWarning")}
                   </span>
                 )}
               </div>
-              <p className="text-sm font-medium text-[var(--color-text-primary)] truncate mb-1">
-                {ticket.title}
-              </p>
-              <div className="flex flex-wrap items-center gap-2 mb-1">
+              <p className="mb-1 truncate text-sm font-semibold text-[var(--color-text-primary)]">{ticket.title}</p>
+              <div className="mb-1 flex flex-wrap items-center gap-3">
                 <span className="text-[11px] text-[var(--color-text-muted)]">
                   {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
                 </span>
                 <span className="inline-flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
-                  <span className="w-5 h-5 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-[10px] font-semibold">
-                    {assigneeInitials}
-                  </span>
+                  <PresenceAvatar name={assigneeName} status={ticket.assigned_to ? "online" : "offline"} size="sm" />
                   {assigneeLabel}
                 </span>
               </div>
-              {ticket.ai?.summary && (
-                <p className="text-xs text-[var(--color-text-muted)] truncate">
-                  {ticket.ai.summary}
-                </p>
-              )}
+              {ticket.ai?.summary && <p className="truncate text-xs text-[var(--color-text-muted)]">{ticket.ai.summary}</p>}
             </div>
           </Link>
+
           <div className="flex items-start gap-4">
-            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-              <AssignToMeButton
-                ticketId={ticket.id}
-                currentUserId={currentUserId}
-                currentAssignee={ticket.assigned_to}
-              />
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <AssignToMeButton ticketId={ticket.id} currentUserId={currentUserId} currentAssignee={ticket.assigned_to} />
               {ticket.ai?.sentiment && (
                 <span className="text-base" title={ticket.ai.sentiment}>
                   {sentimentIcon(ticket.ai.sentiment)}
@@ -349,13 +306,229 @@ export default async function QueuePage({
               <Badge className={slaState.className}>{slaState.label}</Badge>
               <Badge className={priorityColor(ticket.priority)}>{tp(ticket.priority)}</Badge>
               <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                <Clock className="w-3 h-3" />
+                <Clock className="h-3 w-3" />
                 {formatRelativeTime(ticket.created_at)}
               </span>
             </div>
           </div>
         </div>
       </Card>
+    );
+  }
+
+  function SectionHeader({ label, count, icon }: { label: string; count: number; icon: React.ReactNode }) {
+    return (
+      <div className="mb-3 flex items-center gap-2">
+        {icon}
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">{label}</h2>
+        <span className="ml-auto text-xs text-[var(--color-text-muted)]">{count}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">{t("title")}</h1>
+          <p className="mt-0.5 text-sm text-[var(--color-text-muted)]">{t("summary", { total: tickets.length, urgent: critical.length })}</p>
+        </div>
+      </div>
+
+      <Card className="mb-5 p-4">
+        <div className="flex items-center gap-3">
+          <PresenceAvatar
+            name={profile.full_name?.trim() || "Agent"}
+            status={profile.availability_status}
+            queueCount={myTicketCount}
+            size="md"
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+              {profile.full_name?.trim() || "Agent"} · {organization?.name ?? "Organization"}
+            </p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {(agentSpecialty?.trim() || "General support")} · {companyCode}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">My tickets</p>
+            <Gauge className="h-4 w-4 text-indigo-300" />
+          </div>
+          <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">{myTicketCount}</p>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Open queue</p>
+            <Layers3 className="h-4 w-4 text-blue-300" />
+          </div>
+          <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">{queueCount}</p>
+        </Card>
+        <Card className="border-red-500/20 bg-red-950/20 p-4">
+          <p className="text-xs uppercase tracking-wider text-red-200/80">Breached</p>
+          <p className="mt-2 text-3xl font-semibold text-red-200">{breachedCount}</p>
+        </Card>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        {[
+          { key: "status", label: "Status", value: "open", text: "Open" },
+          { key: "status", label: "Status", value: "in_progress", text: "In progress" },
+          { key: "status", label: "Status", value: "pending_customer", text: "Waiting customer" },
+          { key: "priority", label: "Priority", value: "critical", text: "Critical" },
+          { key: "priority", label: "Priority", value: "high", text: "High" },
+          { key: "sla", label: "SLA", value: "on_time", text: "On time" },
+          { key: "sla", label: "SLA", value: "at_risk", text: "At risk" },
+          { key: "sla", label: "SLA", value: "breached", text: "Breached" },
+        ].map((filter) => {
+          const key = filter.key as "status" | "priority" | "sla";
+          const active =
+            (key === "status" && filters.status === filter.value) ||
+            (key === "priority" && filters.priority === filter.value) ||
+            (key === "sla" && filters.sla === filter.value);
+          return (
+            <Link
+              key={`${filter.key}-${filter.value}`}
+              href={active ? clearFilterHref(key) : filterHref({ [key]: filter.value })}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                active
+                  ? "border-indigo-500 bg-indigo-600 text-white"
+                  : "border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-[var(--color-surface-500)]"
+              }`}
+            >
+              {filter.label}: {filter.text}
+            </Link>
+          );
+        })}
+        {availableCategories.map((category) => {
+          const active = filters.category === category;
+          return (
+            <Link
+              key={`category-${category}`}
+              href={active ? clearFilterHref("category") : filterHref({ category })}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                active
+                  ? "border-indigo-500 bg-indigo-600 text-white"
+                  : "border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-[var(--color-surface-500)]"
+              }`}
+            >
+              Category: {category}
+            </Link>
+          );
+        })}
+        {agentSpecialty?.trim() && (
+          <Link
+            href={filters.specialty === "mine" ? clearFilterHref("specialty") : filterHref({ specialty: "mine" })}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+              filters.specialty === "mine"
+                ? "border-indigo-500 bg-indigo-600 text-white"
+                : "border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-[var(--color-surface-500)]"
+            }`}
+          >
+            Specialty: {agentSpecialty.trim()}
+          </Link>
+        )}
+      </div>
+
+      {critical.length > 0 && (
+        <div className="mb-6">
+          <SectionHeader label={t("urgentSla")} count={critical.length} icon={<AlertCircle className="h-4 w-4 text-red-400" />} />
+          <div className="space-y-3">
+            {critical.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {myTickets.length > 0 && (
+        <div className="mb-6">
+          <SectionHeader label={t("myTickets")} count={myTickets.length} icon={<Zap className="h-4 w-4 text-indigo-400" />} />
+          <div className="space-y-3">
+            {myTickets.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mySpecialty.length > 0 && (
+        <div className="mb-6">
+          <SectionHeader label={t("mySpecialty")} count={mySpecialty.length} icon={<Zap className="h-4 w-4 text-violet-400" />} />
+          <div className="space-y-3">
+            {mySpecialty.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {others.length > 0 && (
+        <div>
+          <SectionHeader label="Unassigned queue" count={others.length} icon={<Clock className="h-4 w-4 text-[var(--color-text-muted)]" />} />
+          <div className="mb-4 space-y-3">
+            {pagedOthers.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+
+          {totalOthersPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {(safePage - 1) * OTHERS_PAGE_SIZE + 1}-{Math.min(safePage * OTHERS_PAGE_SIZE, others.length)} of {others.length}
+              </p>
+              <div className="flex items-center gap-1">
+                {safePage > 1 && (
+                  <Link
+                    href={othersPageHref(safePage - 1)}
+                    className="flex items-center gap-1 rounded-lg border border-[var(--color-surface-600)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-surface-500)]"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                  </Link>
+                )}
+                {Array.from({ length: Math.min(totalOthersPages, 7) }, (_, index) => {
+                  const page = Math.max(1, Math.min(safePage - 3, totalOthersPages - 6)) + index;
+                  return (
+                    <Link
+                      key={page}
+                      href={othersPageHref(page)}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs transition-colors ${
+                        page === safePage
+                          ? "bg-indigo-600 font-semibold text-white"
+                          : "border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-[var(--color-surface-500)]"
+                      }`}
+                    >
+                      {page}
+                    </Link>
+                  );
+                })}
+                {safePage < totalOthersPages && (
+                  <Link
+                    href={othersPageHref(safePage + 1)}
+                    className="flex items-center gap-1 rounded-lg border border-[var(--color-surface-600)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-surface-500)]"
+                  >
+                    Next <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tickets.length === 0 && (
+        <Card className="flex flex-col items-center justify-center py-16 text-center">
+          <Zap className="mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
+          <p className="font-medium text-[var(--color-text-secondary)]">{t("empty")}</p>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{t("emptyDesc")}</p>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -419,237 +592,4 @@ function getSlaState(ticket: {
     label: "SLA on time",
     className: "text-green-400 bg-green-400/10 border-green-400/20",
   };
-}
-
-  function SectionHeader({
-    label,
-    count,
-    icon,
-  }: {
-    label: string;
-    count: number;
-    icon: React.ReactNode;
-  }) {
-    return (
-      <div className="flex items-center gap-2 mb-3">
-        {icon}
-        <h2 className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-          {label}
-        </h2>
-        <span className="ml-auto text-xs text-[var(--color-text-muted)]">{count}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t("title")}</h1>
-          <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
-            {t("summary", { total: sorted.length, urgent: critical.length })}
-          </p>
-        </div>
-      </div>
-
-      <Card className="p-4 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 flex items-center justify-center text-sm font-semibold">
-            {currentAgentInitials}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">
-              {profile.full_name?.trim() || "Agent"} · {organization?.name ?? "Organization"}
-            </p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {(agentSpecialty?.trim() || "General support")} · {companyCode}
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <Card className="p-3">
-          <p className="text-xs text-[var(--color-text-muted)]">My Tickets</p>
-          <p className="text-2xl font-semibold text-[var(--color-text-primary)]">{myTicketCount}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-xs text-[var(--color-text-muted)]">Queue</p>
-          <p className="text-2xl font-semibold text-[var(--color-text-primary)]">{queueCount}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-xs text-[var(--color-text-muted)]">Breached</p>
-          <p className="text-2xl font-semibold text-red-400">{breachedCount}</p>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {[
-          { key: "status", label: "Status", value: "open", text: "Open" },
-          { key: "status", label: "Status", value: "in_progress", text: "In progress" },
-          { key: "status", label: "Status", value: "pending_customer", text: "Waiting customer" },
-          { key: "priority", label: "Priority", value: "critical", text: "Critical" },
-          { key: "priority", label: "Priority", value: "high", text: "High" },
-          { key: "sla", label: "SLA", value: "on_time", text: "On time" },
-          { key: "sla", label: "SLA", value: "at_risk", text: "At risk" },
-          { key: "sla", label: "SLA", value: "breached", text: "Breached" },
-        ].map((filter) => {
-          const key = filter.key as "status" | "priority" | "sla";
-          const active =
-            (key === "status" && filters.status === filter.value) ||
-            (key === "priority" && filters.priority === filter.value) ||
-            (key === "sla" && filters.sla === filter.value);
-          return (
-            <Link
-              key={`${filter.key}-${filter.value}`}
-              href={active ? clearFilterHref(key) : filterHref({ [key]: filter.value })}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                active
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
-              }`}
-            >
-              {filter.label}: {filter.text}
-            </Link>
-          );
-        })}
-        {availableCategories.map((category) => {
-          const active = filters.category === category;
-          return (
-            <Link
-              key={`category-${category}`}
-              href={active ? clearFilterHref("category") : filterHref({ category })}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                active
-                  ? "bg-indigo-600 text-white border-indigo-500"
-                  : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
-              }`}
-            >
-              Category: {category}
-            </Link>
-          );
-        })}
-        {agentSpecialty?.trim() && (
-          <Link
-            href={filters.specialty === "mine" ? clearFilterHref("specialty") : filterHref({ specialty: "mine" })}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-              filters.specialty === "mine"
-                ? "bg-indigo-600 text-white border-indigo-500"
-                : "text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
-            }`}
-          >
-            Specialty: {agentSpecialty.trim()}
-          </Link>
-        )}
-      </div>
-
-      {/* Critical / SLA */}
-      {critical.length > 0 && (
-        <div className="mb-6">
-          <SectionHeader
-            label={t("urgentSla")}
-            count={critical.length}
-            icon={<AlertCircle className="w-4 h-4 text-red-400" />}
-          />
-          <div className="space-y-2">
-            {critical.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Assigned to me */}
-      {myTickets.length > 0 && (
-        <div className="mb-6">
-          <SectionHeader
-            label={t("myTickets")}
-            count={myTickets.length}
-            icon={<Zap className="w-4 h-4 text-indigo-400" />}
-          />
-          <div className="space-y-2">
-            {myTickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
-          </div>
-        </div>
-      )}
-
-      {/* My specialty */}
-      {mySpecialty.length > 0 && (
-        <div className="mb-6">
-          <SectionHeader
-            label={t("mySpecialty")}
-            count={mySpecialty.length}
-            icon={<Zap className="w-4 h-4 text-violet-400" />}
-          />
-          <div className="space-y-2">
-            {mySpecialty.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Others — paginated */}
-      {others.length > 0 && (
-        <div>
-          <SectionHeader
-            label="Unassigned Queue"
-            count={others.length}
-            icon={<Clock className="w-4 h-4 text-[var(--color-text-muted)]" />}
-          />
-          <div className="space-y-2 mb-4">
-            {pagedOthers.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
-          </div>
-
-          {/* Pagination */}
-          {totalOthersPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {(safePage - 1) * OTHERS_PAGE_SIZE + 1}–
-                {Math.min(safePage * OTHERS_PAGE_SIZE, others.length)} of {others.length}
-              </p>
-              <div className="flex items-center gap-1">
-                {safePage > 1 && (
-                  <Link
-                    href={othersPageHref(safePage - 1)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)] transition-colors"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" /> Prev
-                  </Link>
-                )}
-                {Array.from({ length: Math.min(totalOthersPages, 7) }, (_, i) => {
-                  const p = Math.max(1, Math.min(safePage - 3, totalOthersPages - 6)) + i;
-                  return (
-                    <Link
-                      key={p}
-                      href={othersPageHref(p)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs transition-colors ${
-                        p === safePage
-                          ? "bg-indigo-600 text-white font-semibold"
-                          : "text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)]"
-                      }`}
-                    >
-                      {p}
-                    </Link>
-                  );
-                })}
-                {safePage < totalOthersPages && (
-                  <Link
-                    href={othersPageHref(safePage + 1)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border border-[var(--color-surface-600)] hover:border-[var(--color-surface-500)] transition-colors"
-                  >
-                    Next <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {sorted.length === 0 && (
-        <Card className="flex flex-col items-center justify-center py-16 text-center">
-          <Zap className="w-10 h-10 text-[var(--color-text-muted)] mb-3" />
-          <p className="text-[var(--color-text-secondary)] font-medium">{t("empty")}</p>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">{t("emptyDesc")}</p>
-        </Card>
-      )}
-    </div>
-  );
 }

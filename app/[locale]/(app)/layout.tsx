@@ -21,7 +21,7 @@ export default async function AppLayout({
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
-    .select("full_name, role, specialty, avatar_url")
+    .select("full_name, role, specialty, avatar_url, availability_status")
     .eq("id", user.id)
     .single();
 
@@ -38,7 +38,7 @@ export default async function AppLayout({
       ? profile.specialty?.trim() || "General support"
       : profile.role;
 
-  const [{ data: notifications }, { count: unreadNotifications }] = await Promise.all([
+  const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult] = await Promise.all([
     svc
       .from("notifications")
       .select("id, ticket_id, type, title, message, is_read, created_at")
@@ -50,6 +50,13 @@ export default async function AppLayout({
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false),
+    ["agent", "manager", "admin"].includes(profile.role)
+      ? svc
+          .from("tickets")
+          .select("id", { count: "exact", head: true })
+          .eq("assigned_to", user.id)
+          .in("status", ["open", "in_progress", "pending_customer"])
+      : Promise.resolve({ count: 0 }),
   ]);
 
   return (
@@ -58,6 +65,8 @@ export default async function AppLayout({
       userName={resolvedName}
       userSubtitle={resolvedSubtitle}
       userAvatar={profile.avatar_url}
+      userStatus={profile.availability_status}
+      queueCount={assignedCountResult.count ?? 0}
       locale={locale}
       notifications={notifications ?? []}
       unreadNotifications={unreadNotifications ?? 0}

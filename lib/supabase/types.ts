@@ -21,6 +21,7 @@ export type TicketPriority = "low" | "medium" | "high" | "critical";
 export type UserRole = "customer" | "agent" | "manager" | "admin";
 export type TicketSource = "portal" | "email" | "api" | "phone";
 export type SentimentType = "calm" | "neutral" | "frustrated" | "urgent" | "angry";
+export type AvailabilityStatus = "online" | "offline" | "busy";
 
 export interface Database {
   public: {
@@ -60,6 +61,7 @@ export interface Database {
           consent_given_at: string | null;
           team_id: string | null;
           specialty: string | null;
+          availability_status: AvailabilityStatus | null;
           created_at: string;
           updated_at: string;
         };

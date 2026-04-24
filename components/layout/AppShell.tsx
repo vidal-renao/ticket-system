@@ -14,6 +14,8 @@ interface AppShellProps {
   userName: string;
   userSubtitle?: string | null;
   userAvatar?: string | null;
+  userStatus?: "online" | "offline" | "busy" | null;
+  queueCount?: number;
   locale: string;
   notifications: ShellNotification[];
   unreadNotifications: number;
@@ -25,6 +27,8 @@ export function AppShell({
   userName,
   userSubtitle,
   userAvatar,
+  userStatus,
+  queueCount = 0,
   locale,
   notifications,
   unreadNotifications,
@@ -127,6 +131,8 @@ export function AppShell({
         userName={userName}
         userSubtitle={userSubtitle}
         userAvatar={userAvatar}
+        userStatus={userStatus}
+        queueCount={queueCount}
         notifications={liveNotifications}
         unreadNotifications={liveUnreadNotifications}
         onSignOut={handleSignOut}

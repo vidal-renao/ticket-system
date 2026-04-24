@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
 import { NotificationsMenu, type ShellNotification } from "./NotificationsMenu";
+import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 
 type NavKey =
   | "dashboard"
@@ -42,72 +43,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    href: "/dashboard",
-    labelKey: "dashboard",
-    icon: LayoutDashboard,
-    roles: ["manager", "admin"],
-  },
-  {
-    href: "/tickets",
-    labelKey: "myTickets",
-    icon: TicketIcon,
-    roles: ["customer"],
-  },
-  {
-    href: "/tickets/new",
-    labelKey: "newTicket",
-    icon: PlusCircle,
-    roles: ["customer"],
-  },
-  {
-    href: "/queue",
-    labelKey: "queue",
-    icon: Zap,
-    roles: ["agent", "manager", "admin"],
-  },
-  {
-    href: "/tickets",
-    labelKey: "allTickets",
-    icon: TicketIcon,
-    roles: ["agent", "manager", "admin"],
-  },
-  {
-    href: "/analytics",
-    labelKey: "analytics",
-    icon: BarChart3,
-    roles: ["manager", "admin"],
-  },
-  {
-    href: "/analytics/predictive",
-    labelKey: "predictive",
-    icon: TrendingUp,
-    roles: ["manager", "admin"],
-  },
-  {
-    href: "/team",
-    labelKey: "team",
-    icon: Users,
-    roles: ["manager", "admin"],
-  },
-  {
-    href: "/admin",
-    labelKey: "admin",
-    icon: Building2,
-    roles: ["manager", "admin"],
-  },
-  {
-    href: "/inbox",
-    labelKey: "inbox",
-    icon: MessageSquare,
-    roles: ["admin", "manager", "agent", "customer"],
-  },
-  {
-    href: "/settings",
-    labelKey: "settings",
-    icon: Settings,
-    roles: ["admin", "manager", "agent", "customer"],
-  },
+  { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, roles: ["manager", "admin"] },
+  { href: "/tickets", labelKey: "myTickets", icon: TicketIcon, roles: ["customer"] },
+  { href: "/tickets/new", labelKey: "newTicket", icon: PlusCircle, roles: ["customer"] },
+  { href: "/queue", labelKey: "queue", icon: Zap, roles: ["agent", "manager", "admin"] },
+  { href: "/tickets", labelKey: "allTickets", icon: TicketIcon, roles: ["agent", "manager", "admin"] },
+  { href: "/analytics", labelKey: "analytics", icon: BarChart3, roles: ["manager", "admin"] },
+  { href: "/analytics/predictive", labelKey: "predictive", icon: TrendingUp, roles: ["manager", "admin"] },
+  { href: "/team", labelKey: "team", icon: Users, roles: ["manager", "admin"] },
+  { href: "/admin", labelKey: "admin", icon: Building2, roles: ["manager", "admin"] },
+  { href: "/inbox", labelKey: "inbox", icon: MessageSquare, roles: ["admin", "manager", "agent", "customer"] },
+  { href: "/settings", labelKey: "settings", icon: Settings, roles: ["admin", "manager", "agent", "customer"] },
 ];
 
 interface SidebarProps {
@@ -115,6 +61,8 @@ interface SidebarProps {
   userName: string;
   userSubtitle?: string | null;
   userAvatar?: string | null;
+  userStatus?: "online" | "offline" | "busy" | null;
+  queueCount?: number;
   notifications: ShellNotification[];
   unreadNotifications: number;
   onSignOut: () => void;
@@ -125,9 +73,9 @@ interface SidebarProps {
 
 const ROLE_HOME: Record<UserRole, string> = {
   customer: "/tickets",
-  agent:    "/queue",
-  manager:  "/dashboard",
-  admin:    "/dashboard",
+  agent: "/queue",
+  manager: "/dashboard",
+  admin: "/dashboard",
 };
 
 export function Sidebar({
@@ -135,6 +83,8 @@ export function Sidebar({
   userName,
   userSubtitle,
   userAvatar,
+  userStatus,
+  queueCount = 0,
   notifications,
   unreadNotifications,
   onSignOut,
@@ -146,39 +96,35 @@ export function Sidebar({
   const t = useTranslations("nav");
 
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
-
-  // Fix: if another visible item has an exact pathname match, don't activate parent via startsWith
   const hasExactMatch = visibleItems.some((item) => pathname === item.href);
 
   return (
-    <aside className={cn("flex flex-col w-60 min-h-screen border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]", className)}>
-      {/* Logo — links back to role home without signing out */}
+    <aside
+      className={cn(
+        "flex min-h-screen w-60 flex-col border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]",
+        className
+      )}
+    >
       <Link
         href={ROLE_HOME[role]}
         onClick={onNavigate}
-        className="flex items-center gap-2.5 px-5 py-5 border-b border-[var(--color-surface-600)] hover:bg-[var(--color-surface-800)] transition-colors"
+        className="flex items-center gap-2.5 border-b border-[var(--color-surface-600)] px-5 py-5 transition-colors hover:bg-[var(--color-surface-800)]"
       >
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-          <Zap className="w-4 h-4 text-white" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-500/30">
+          <Zap className="h-4 w-4 text-white" />
         </div>
         <div>
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">HelpDesk AI</p>
-          <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{role}</p>
+          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{role}</p>
         </div>
       </Link>
 
-      {/* Navigation */}
-      <nav aria-label="Main navigation" className="flex-1 px-3 py-4 space-y-0.5">
+      <nav aria-label="Main navigation" className="flex-1 space-y-0.5 px-3 py-4">
         {visibleItems.map((item) => {
           const Icon = item.icon;
-          const labelKey =
-            role === "agent" && item.labelKey === "allTickets"
-              ? "myTickets"
-              : item.labelKey;
-          // If another visible item has an exact pathname match (e.g. /analytics/predictive),
-        // do NOT activate the parent (/analytics) via startsWith — avoids dual-highlight.
-        const isActive = pathname === item.href ||
-          (!hasExactMatch && pathname.startsWith(item.href + "/"));
+          const labelKey = role === "agent" && item.labelKey === "allTickets" ? "myTickets" : item.labelKey;
+          const isActive = pathname === item.href || (!hasExactMatch && pathname.startsWith(item.href + "/"));
+
           return (
             <Link
               key={`${item.href}-${item.labelKey}`}
@@ -186,67 +132,57 @@ export function Sidebar({
               onClick={onNavigate}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
                 isActive
-                  ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20"
+                  ? "border border-indigo-500/20 bg-indigo-600/15 text-indigo-400"
                   : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-primary)]"
               )}
             >
-              <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {t(labelKey)}
-              {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
-              )}
+              {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />}
             </Link>
           );
         })}
       </nav>
 
-      <NotificationsMenu
-        notifications={notifications}
-        unreadCount={unreadNotifications}
-      />
+      <NotificationsMenu notifications={notifications} unreadCount={unreadNotifications} />
 
-      {/* Home button — signs out and returns to landing */}
-      <div className="px-3 pb-2 border-t border-[var(--color-surface-600)] pt-2">
+      <div className="border-t border-[var(--color-surface-600)] px-3 pb-2 pt-2">
         <button
           type="button"
           onClick={onGoHome}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-[var(--color-text-muted)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
         >
-          <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <Home className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("home")}
         </button>
       </div>
 
-      {/* Locale switcher */}
       <div className="border-t border-[var(--color-surface-600)]">
         <LocaleSwitcher />
       </div>
 
-      {/* User footer */}
-      <div className="px-3 py-4 border-t border-[var(--color-surface-600)]">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-          {userAvatar ? (
-            <img src={userAvatar} alt={userName} className="w-8 h-8 rounded-full" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-[var(--color-surface-700)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)]">
-              {userName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">{userName}</p>
-            {userSubtitle && (
-              <p className="text-[11px] text-[var(--color-text-muted)] truncate">{userSubtitle}</p>
-            )}
+      <div className="border-t border-[var(--color-surface-600)] px-3 py-4">
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+          <PresenceAvatar
+            name={userName}
+            avatarUrl={userAvatar}
+            status={userStatus}
+            queueCount={role === "agent" || role === "manager" || role === "admin" ? queueCount : null}
+            size="sm"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{userName}</p>
+            {userSubtitle && <p className="truncate text-[11px] text-[var(--color-text-muted)]">{userSubtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onSignOut}
             aria-label={t("signOut")}
-            className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+            className="rounded p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-secondary)]"
           >
-            <LogOut className="w-4 h-4" aria-hidden="true" />
+            <LogOut className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>

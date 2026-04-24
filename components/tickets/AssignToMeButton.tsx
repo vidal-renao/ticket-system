@@ -20,22 +20,29 @@ export function AssignToMeButton({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  if (!currentUserId) return null;
-  if (currentAssignee === currentUserId) return null;
+  if (!currentUserId || currentAssignee === currentUserId) return null;
+
+  function normalizeError(message: string) {
+    if (message.toLowerCase() === "not found") {
+      return "The ticket could not be loaded. Refresh the queue and try again.";
+    }
+    return message;
+  }
 
   function handleAssign(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
+
     startTransition(async () => {
-      const res = await fetch(`/api/tickets/${ticketId}`, {
+      const response = await fetch(`/api/tickets/${ticketId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assigned_to: currentUserId }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error ?? "Failed to assign ticket");
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        toast.error(normalizeError(data.error ?? "Failed to assign ticket"));
         return;
       }
 
@@ -50,10 +57,10 @@ export function AssignToMeButton({
       onClick={handleAssign}
       disabled={isPending}
       aria-live="polite"
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white border border-indigo-400/40 bg-indigo-600 hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-80 shadow-sm shadow-indigo-950/20 transition-colors"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-400/30 bg-indigo-600/90 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-indigo-950/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-500 disabled:cursor-wait disabled:opacity-80"
     >
-      {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
-      {isPending ? "Assigning..." : "Assign to me"}
+      {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+      {isPending ? "Assigning..." : "Assign"}
     </button>
   );
 }
