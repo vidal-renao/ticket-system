@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed:vidal": "node scripts/seed-vidal-real-estate.mjs"
+    "seed:vidal": "node scripts/seed-vidal-real-estate.mjs",
+    "seed:full": "node scripts/seed-full.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",

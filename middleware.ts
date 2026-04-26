@@ -6,7 +6,7 @@ import { routing } from "@/i18n/routing";
 const handleI18nRouting = createIntlMiddleware(routing);
 
 // Paths that do not require authentication (locale-suffix matched).
-const AUTH_PATHS = ["/login", "/register", "/home"];
+const AUTH_PATHS = ["/login", "/register", "/home", "/forgot-password", "/reset-password"];
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -46,6 +46,15 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const requestCookieNames = request.cookies.getAll().map((cookie) => cookie.name);
+  console.log("[middleware] auth check", {
+    path,
+    method: request.method,
+    userId: user?.id ?? null,
+    requestCookieNames,
+    hasSbCookie: requestCookieNames.some((name) => name.includes("sb-")),
+  });
+
   const isPublicPath = AUTH_PATHS.some((publicPath) => path.endsWith(publicPath));
   const isRoot = path === "/";
 
@@ -57,6 +66,13 @@ export async function middleware(request: NextRequest) {
 
     const loginPath =
       locale === routing.defaultLocale ? "/login" : `/${locale}/login`;
+
+    console.log("[middleware] redirecting to login", {
+      path,
+      locale,
+      loginPath,
+      requestCookieNames,
+    });
 
     return NextResponse.redirect(new URL(loginPath, request.url));
   }

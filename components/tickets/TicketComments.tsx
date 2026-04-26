@@ -111,7 +111,7 @@ export function TicketComments({ ticketId, currentStatus, comments: initial, cur
           <p className="text-sm text-[var(--color-text-muted)] text-center py-4">No activity yet.</p>
         )}
 
-        {comments.map((comment) => (
+        {comments.filter((c) => isStaff || !c.is_internal).map((comment) => (
           <div key={comment.id} className={`flex gap-3 ${comment.is_internal ? "opacity-80" : ""}`}>
             <div className="w-7 h-7 rounded-full bg-[var(--color-surface-700)] flex items-center justify-center text-xs font-semibold text-[var(--color-text-secondary)] shrink-0">
               {comment.profiles?.full_name?.charAt(0).toUpperCase() ?? "?"}

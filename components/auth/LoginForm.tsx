@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 import { LoginDebugPanel } from "@/components/auth/LoginDebugPanel";
 
 interface LoginDiagnostic {
@@ -28,9 +29,10 @@ export function LoginForm({ error, debug = false }: LoginFormProps) {
   const t = useTranslations("auth");
   const [pending, setPending] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LoginDiagnostic | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (error) toast.error(decodeURIComponent(error));
+    if (error) toast.error(decodeURIComponent(error), { duration: 6000 });
   }, [error]);
 
   const inputClass = [
@@ -61,28 +63,23 @@ export function LoginForm({ error, debug = false }: LoginFormProps) {
       try {
         json = await response.json();
       } catch {
-        toast.error(t("errorServer"));
+        toast.error(t("errorServer"), { duration: 6000 });
         setPending(false);
         return;
       }
 
       if (json.diagnostic) setDiagnostic(json.diagnostic);
 
-      if (!response.ok) {
-        toast.error(json.error || "Login failed");
-        setPending(false);
-        return;
-      }
-
-      if (json.error) {
-        toast.error(json.error);
+      if (!response.ok || json.error) {
+        const message = json.error || t("errorInvalid");
+        toast.error(message, { duration: 6000 });
         setPending(false);
         return;
       }
 
       window.location.href = json.redirectTo ?? "/dashboard";
     } catch {
-      toast.error(t("errorNetwork"));
+      toast.error(t("errorNetwork"), { duration: 6000 });
       setPending(false);
     }
   }
@@ -91,12 +88,48 @@ export function LoginForm({ error, debug = false }: LoginFormProps) {
     <form method="post" action="/api/auth/login" onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-4 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] p-5">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{t("email")}</label>
-          <input name="email" type="email" placeholder="you@company.ch" required className={inputClass} />
+          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">
+            {t("email")}
+          </label>
+          <input
+            name="email"
+            type="email"
+            placeholder={t("emailPlaceholder")}
+            required
+            autoComplete="email"
+            className={inputClass}
+          />
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{t("password")}</label>
-          <input name="password" type="password" placeholder="••••••••" required className={inputClass} />
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-medium text-[var(--color-text-secondary)]">
+              {t("password")}
+            </label>
+            <a
+              href="forgot-password"
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              {t("forgotPassword")}
+            </a>
+          </div>
+          <div className="relative">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              placeholder={t("passwordPlaceholder")}
+              required
+              autoComplete="current-password"
+              className={`${inputClass} pr-10`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+              aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
 

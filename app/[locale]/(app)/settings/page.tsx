@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
-import { Shield, ShieldAlert, Key, Users, Building2 } from "lucide-react";
+import { Shield, ShieldAlert, Key, Users, Building2, Radio } from "lucide-react";
 import { getOrgSettings } from "@/app/actions/org-settings";
 import { PIIScrubbingToggle } from "@/components/settings/PIIScrubbingToggle";
 import { OrgCodeDisplay } from "@/components/settings/OrgCodeDisplay";
 import { CustomerProfileForm } from "@/components/settings/CustomerProfileForm";
+import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function SettingsPage({
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
-    .select("role, organization_id, full_name")
+    .select("role, organization_id, full_name, availability_status")
     .eq("id", user.id)
     .single();
 
@@ -186,38 +187,61 @@ export default async function SettingsPage({
         </Card>
       )}
 
-      {/* ── AGENT / MANAGER: Team info ── */}
+      {/* ── AGENT / MANAGER: Availability + Team info ── */}
       {isAgent && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-indigo-400" aria-hidden="true" />
-              <span className="text-sm font-medium text-[var(--color-text-secondary)]">
-                {t("teamInfo")}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-[var(--color-surface-700)]">
-              <span className="text-xs text-[var(--color-text-muted)]">{t("yourTeam")}</span>
-              <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                {agentTeamName ?? (
-                  <span className="text-[var(--color-text-muted)] italic text-xs">
-                    {t("noTeamAssigned")}
-                  </span>
-                )}
-              </span>
-            </div>
-            {agentProfile?.specialty && (
-              <div className="flex items-center justify-between py-2">
-                <span className="text-xs text-[var(--color-text-muted)]">{t("yourSpecialty")}</span>
-                <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                  {agentProfile.specialty}
+        <>
+          <Card className="mb-5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+                  {t("availability")}
                 </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-[var(--color-text-muted)] mb-3">{t("availabilityDesc")}</p>
+              <AgentAvailabilityToggle
+                userId={user.id}
+                initial={(profile.availability_status ?? "offline") as "online" | "offline" | "busy"}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+                <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+                  {t("teamInfo")}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-[var(--color-surface-700)]">
+                <span className="text-xs text-[var(--color-text-muted)]">{t("yourTeam")}</span>
+                <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                  {agentTeamName ?? (
+                    <span className="text-[var(--color-text-muted)] italic text-xs">
+                      {t("noTeamAssigned")}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {agentProfile?.specialty && (
+                <div className="flex items-center justify-between py-2 border-b border-[var(--color-surface-700)]">
+                  <span className="text-xs text-[var(--color-text-muted)]">{t("yourSpecialty")}</span>
+                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                    {agentProfile.specialty}
+                  </span>
+                </div>
+              )}
+              <p className="text-[11px] text-[var(--color-text-muted)] pt-1">
+                {t("lockedFieldsNote")}
+              </p>
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );

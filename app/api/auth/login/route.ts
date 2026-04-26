@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
     password,
   });
 
+  console.log("[auth/login] signInWithPassword result", {
+    email: email.trim().toLowerCase(),
+    hasError: Boolean(signInError),
+    cookieNamesAfterSignIn: cookiesToSet.map((cookie) => cookie.name),
+    cookieCountAfterSignIn: cookiesToSet.length,
+  });
+
   if (signInError) {
     return NextResponse.json(
       {
@@ -58,6 +65,13 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (sessionError || !session || !user) {
+    console.log("[auth/login] missing session after sign-in", {
+      email: email.trim().toLowerCase(),
+      sessionError: sessionError?.message ?? null,
+      sessionPresent: Boolean(session),
+      userPresent: Boolean(user),
+      cookieNamesAfterSessionCheck: cookiesToSet.map((cookie) => cookie.name),
+    });
     return NextResponse.json(
       {
         error: sessionError?.message ?? "Authentication succeeded but no session was returned",
@@ -79,6 +93,11 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (profileError || !profile) {
+    console.log("[auth/login] missing profile after sign-in", {
+      email: email.trim().toLowerCase(),
+      userId: user.id,
+      profileError: profileError?.message ?? null,
+    });
     return NextResponse.json(
       {
         error: "Login succeeded, but no matching profile was found for this user.",
@@ -94,6 +113,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (!profile.organization_id) {
+    console.log("[auth/login] profile without organization", {
+      email: email.trim().toLowerCase(),
+      userId: user.id,
+      role: profile.role,
+    });
     return NextResponse.json(
       {
         error: "Login succeeded, but the profile has no organization assigned.",
@@ -131,6 +155,16 @@ export async function POST(request: NextRequest) {
   for (const { name, value, options } of cookiesToSet) {
     response.cookies.set(name, value, { path: "/", ...options });
   }
+
+  console.log("[auth/login] response ready", {
+    email: email.trim().toLowerCase(),
+    userId: user.id,
+    role,
+    redirectTo,
+    responseCookieNames: cookiesToSet.map((cookie) => cookie.name),
+    responseCookieCount: cookiesToSet.length,
+    requestCookieNames: request.cookies.getAll().map((cookie) => cookie.name),
+  });
 
   return response;
 }

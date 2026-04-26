@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
 import { AITriagePanel } from "@/components/ai/AITriagePanel";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
+import { SlaCountdown, CustomerReopenButton } from "@/components/tickets/SlaCountdown";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 import { AlertTriangle, Clock, Shield } from "lucide-react";
 
@@ -200,28 +201,20 @@ export default async function TicketDetailPage({
                     </Badge>
                   )}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {responseDueAt && (
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      Response:{" "}
-                      <span className="text-[var(--color-text-primary)]">
-                        {new Date(responseDueAt).toLocaleString(
-                          locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-CH",
-                          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
-                        )}
-                      </span>
-                    </p>
+                    <SlaCountdown
+                      dueAt={responseDueAt}
+                      label="Response"
+                      breached={ticket.sla_breached ?? false}
+                    />
                   )}
                   {resolutionDueAt && (
-                    <p className={`text-xs ${ticket.sla_breached ? "text-red-400" : "text-[var(--color-text-muted)]"}`}>
-                      Resolution:{" "}
-                      <span className={ticket.sla_breached ? "text-red-400" : "text-[var(--color-text-primary)]"}>
-                        {new Date(resolutionDueAt).toLocaleString(
-                          locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-CH",
-                          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
-                        )}
-                      </span>
-                    </p>
+                    <SlaCountdown
+                      dueAt={resolutionDueAt}
+                      label="Resolution"
+                      breached={ticket.sla_breached ?? false}
+                    />
                   )}
                 </div>
                 {ticket.sla_breached && (
@@ -240,6 +233,22 @@ export default async function TicketDetailPage({
               <CardContent className="py-3">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] mb-1">{t("aiTriage")}</p>
                 <p className="text-xs text-[var(--color-text-muted)]">{t("aiProcessing")}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Customer reopen within 48h */}
+          {!isStaff && ticket.status === "resolved" && (
+            <Card>
+              <CardContent className="py-3">
+                <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">
+                  Issue not resolved?
+                </p>
+                <CustomerReopenButton
+                  ticketId={ticket.id}
+                  resolvedAt={ticket.resolved_at}
+                  locale={locale}
+                />
               </CardContent>
             </Card>
           )}
