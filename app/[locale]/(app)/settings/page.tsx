@@ -32,11 +32,18 @@ export default async function SettingsPage({
   if (!user) redirect(loginPath);
 
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
+  let { data: profile, error: profileError } = await svc
     .from("profiles")
     .select("role, organization_id, full_name, availability_status")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  // Fallback if availability_status column hasn't been migrated yet
+  if (!profile && profileError) {
+    const fallback = await svc.from("profiles").select("role, organization_id, full_name").eq("id", user.id).maybeSingle();
+    profile = fallback.data as typeof profile;
+    profileError = fallback.error;
+  }
 
   if (!profile) redirect(loginPath);
 

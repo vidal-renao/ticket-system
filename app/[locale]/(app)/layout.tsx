@@ -19,24 +19,30 @@ export default async function AppLayout({
   // Use service client to bypass RLS on profiles — auth is already verified above.
   // This prevents redirect loops when profiles RLS policies are misconfigured.
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
+  const { data: profile, error: profileError } = await svc
     .from("profiles")
     .select("full_name, role, specialty, avatar_url, availability_status")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile) redirect(loginPath);
+  // If the query errors (e.g. availability_status column not yet migrated), fall back
+  // to a minimal select so login still works before the migration is applied.
+  const resolvedProfile = profile ?? (profileError
+    ? (await svc.from("profiles").select("full_name, role, specialty, avatar_url").eq("id", user.id).maybeSingle()).data
+    : null);
+
+  if (!resolvedProfile) redirect(loginPath);
 
   const resolvedName =
-    profile.full_name?.trim() ||
+    resolvedProfile.full_name?.trim() ||
     (typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "") ||
     user.email?.split("@")[0] ||
     "User";
 
   const resolvedSubtitle =
-    profile.role === "agent"
-      ? profile.specialty?.trim() || "General support"
-      : profile.role;
+    resolvedProfile.role === "agent"
+      ? resolvedProfile.specialty?.trim() || "General support"
+      : resolvedProfile.role;
 
   const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult] = await Promise.all([
     svc
@@ -50,7 +56,7 @@ export default async function AppLayout({
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false),
-    ["agent", "manager", "admin"].includes(profile.role)
+    ["agent", "manager", "admin"].includes(resolvedProfile.role)
       ? svc
           .from("tickets")
           .select("id", { count: "exact", head: true })
@@ -61,11 +67,11 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      role={profile.role}
+      role={resolvedProfile.role}
       userName={resolvedName}
       userSubtitle={resolvedSubtitle}
-      userAvatar={profile.avatar_url}
-      userStatus={profile.availability_status}
+      userAvatar={resolvedProfile.avatar_url}
+      userStatus={(resolvedProfile as any).availability_status ?? null}
       queueCount={assignedCountResult.count ?? 0}
       locale={locale}
       notifications={notifications ?? []}
