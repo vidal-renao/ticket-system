@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
 import { PageTransition } from "./PageTransition";
@@ -38,6 +39,7 @@ export function AppShell({
   inboxUnreadCount = 0,
 }: AppShellProps) {
   const supabase = createClient();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [liveNotifications, setLiveNotifications] = useState(notifications);
   const [liveUnreadNotifications, setLiveUnreadNotifications] = useState(unreadNotifications);
@@ -81,16 +83,57 @@ export function AppShell({
     };
   }, []);
 
+  // Set status offline when tab/window closes (sendBeacon is fire-and-forget)
+  useEffect(() => {
+    function handleUnload() {
+      navigator.sendBeacon("/api/profile/offline");
+    }
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
+  // Realtime: listen for availability_status changes on profiles so sidebar updates live
+  useEffect(() => {
+    const channel = supabase
+      .channel("profile-availability")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, {
+        event: "UPDATE",
+        schema: "public",
+        table: "profiles",
+      }, () => {
+        // Trigger notification refresh which also re-renders the shell
+        fetch("/api/notifications", { cache: "no-store" })
+          .then((r) => r.json())
+          .then((data) => {
+            setLiveNotifications(data.notifications ?? []);
+            setLiveUnreadNotifications(data.unreadCount ?? 0);
+            setLiveInboxUnread(data.inboxUnreadCount ?? 0);
+          })
+          .catch(() => {});
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase]);
+
   async function handleSignOut() {
+    // Set offline before signing out so status is accurate
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("profiles").update({ availability_status: "offline" }).eq("id", user.id);
+      }
+    } catch { /* silent — sign out proceeds regardless */ }
     await supabase.auth.signOut();
     const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
     window.location.href = loginPath;
   }
 
-  async function handleGoHome() {
-    // Navigate to public landing — keep session active so user can return to app
+  function handleGoHome() {
+    // Navigate to landing page WITHOUT signing out — session stays active
     const homePath = locale === "de" ? "/home" : `/${locale}/home`;
-    window.location.href = homePath;
+    router.push(homePath);
   }
 
   return (

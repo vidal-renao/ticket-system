@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
@@ -53,6 +53,46 @@ export function TicketComments({
   const [isInternal, setIsInternal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Realtime: presence-based typing indicator
+  useEffect(() => {
+    const supabase = createClient();
+    const presenceChannel = supabase.channel(`ticket-typing-${ticketId}`, {
+      config: { presence: { key: currentUserId } },
+    });
+
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState<{ name: string }>();
+        const names = Object.entries(state)
+          .filter(([key]) => key !== currentUserId)
+          .map(([, presences]) => (presences as { name: string }[])[0]?.name)
+          .filter(Boolean) as string[];
+        setTypingUsers(names);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(presenceChannel); };
+  }, [ticketId, currentUserId]);
+
+  function handleTyping(value: string) {
+    setContent(value);
+    const supabase = createClient();
+    const presenceChannel = supabase.channel(`ticket-typing-${ticketId}`, {
+      config: { presence: { key: currentUserId } },
+    });
+    if (value.trim()) {
+      presenceChannel.track({ name: "someone" });
+    } else {
+      presenceChannel.untrack();
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      presenceChannel.untrack();
+    }, 3000);
+  }
 
   // Realtime: subscribe to new comments on this ticket
   useEffect(() => {
@@ -281,13 +321,27 @@ export function TicketComments({
               </button>
             </div>
           )}
+          {typingUsers.length > 0 && (
+            <p className="text-[11px] text-indigo-400 flex items-center gap-1.5">
+              <span className="flex gap-0.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="w-1 h-1 rounded-full bg-indigo-400 animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </span>
+              Someone is typing…
+            </p>
+          )}
           <label htmlFor="comment-content" className="sr-only">
             {isInternal ? "Internal note" : "Reply"}
           </label>
           <textarea
             id="comment-content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => handleTyping(e.target.value)}
             placeholder={
               isInternal
                 ? "Add internal note (visible to staff only)..."

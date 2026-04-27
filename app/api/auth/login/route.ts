@@ -134,6 +134,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Mark user as online on successful login (staff only)
+  if (["agent", "manager", "admin"].includes(profile.role)) {
+    await svc.from("profiles").update({ availability_status: "online" }).eq("id", user.id);
+  }
+
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";
   const prefix = locale === "de" ? "" : `/${locale}`;
   const role = profile.role ?? "customer";

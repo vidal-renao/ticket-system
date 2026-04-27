@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Bell } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { formatRelativeTime } from "@/lib/utils";
@@ -20,6 +21,14 @@ interface NotificationsMenuProps {
 }
 
 export function NotificationsMenu({ notifications, unreadCount }: NotificationsMenuProps) {
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+
+  function markRead(id: string) {
+    if (readIds.has(id)) return;
+    setReadIds((prev) => new Set([...prev, id]));
+    fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => {});
+  }
+
   return (
     <section className="px-3 py-3 border-t border-[var(--color-surface-600)]">
       <div className="flex items-center justify-between px-3 mb-2">
@@ -39,10 +48,12 @@ export function NotificationsMenu({ notifications, unreadCount }: NotificationsM
           <p className="px-3 py-2 text-xs text-[var(--color-text-muted)]">No recent notifications</p>
         ) : (
           notifications.map((notification) => {
+            const isRead = notification.is_read || readIds.has(notification.id);
+
             const content = (
               <>
                 <div className="flex items-start gap-2">
-                  {!notification.is_read && (
+                  {!isRead && (
                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
                   )}
                   <div className="min-w-0">
@@ -64,7 +75,7 @@ export function NotificationsMenu({ notifications, unreadCount }: NotificationsM
 
             const className =
               "block px-3 py-2 rounded-lg border transition-colors " +
-              (notification.is_read
+              (isRead
                 ? "border-transparent hover:bg-[var(--color-surface-800)]"
                 : "border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/15");
 
@@ -73,11 +84,18 @@ export function NotificationsMenu({ notifications, unreadCount }: NotificationsM
                 key={notification.id}
                 href={`/tickets/${notification.ticket_id}`}
                 className={className}
+                onClick={() => markRead(notification.id)}
               >
                 {content}
               </Link>
             ) : (
-              <div key={notification.id} className={className}>
+              <div
+                key={notification.id}
+                className={className}
+                onClick={() => markRead(notification.id)}
+                role="button"
+                tabIndex={0}
+              >
                 {content}
               </div>
             );
@@ -87,4 +105,3 @@ export function NotificationsMenu({ notifications, unreadCount }: NotificationsM
     </section>
   );
 }
-

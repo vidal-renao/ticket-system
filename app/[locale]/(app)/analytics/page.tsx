@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
-import { BarChart3, Zap, AlertCircle, ShieldAlert, Clock } from "lucide-react";
+import { BarChart3, Zap, AlertCircle, ShieldAlert, Clock, Timer, CheckCircle2, Target } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon } from "@/lib/utils";
 import type { SentimentType, TicketPriority } from "@/lib/supabase/types";
 
@@ -51,7 +51,7 @@ export default async function AnalyticsPage({
   // Step 1: fetch org tickets (IDs needed to scope ai_analysis query)
   const { data: allTickets } = await svc
     .from("tickets")
-    .select("id, priority, status")
+    .select("id, priority, status, created_at, resolved_at, sla_breached, first_response_at, first_agent_response_at")
     .eq("organization_id", orgId);
 
   const ticketIds: string[] = (allTickets ?? []).map((t: any) => t.id);
@@ -110,6 +110,36 @@ export default async function AnalyticsPage({
   const catAccuracyRate = feedbackTotal   > 0 ? Math.round((categoryAccepted / feedbackTotal) * 100) : 0;
   const maxSentiment    = Math.max(...Object.values(sentimentCounts), 1);
 
+  // ITIL/ITSM metrics
+  const resolvedTickets = (allTickets ?? []).filter((t: any) => t.resolved_at && t.created_at);
+  const mttrMs = resolvedTickets.length > 0
+    ? resolvedTickets.reduce((sum: number, t: any) => {
+        return sum + (new Date(t.resolved_at).getTime() - new Date(t.created_at).getTime());
+      }, 0) / resolvedTickets.length
+    : 0;
+  const mttrHours = Math.round(mttrMs / (1000 * 60 * 60));
+  const mttrLabel = mttrHours >= 24
+    ? `${Math.round(mttrHours / 24)}d`
+    : mttrHours > 0 ? `${mttrHours}h` : "—";
+
+  // FCR: % of resolved tickets that were resolved without SLA breach (proxy for first-call resolution)
+  const resolvedTotal = resolvedTickets.length;
+  const resolvedOnTime = resolvedTickets.filter((t: any) => !t.sla_breached).length;
+  const fcrRate = resolvedTotal > 0 ? Math.round((resolvedOnTime / resolvedTotal) * 100) : 0;
+
+  // First Response Time: average time from ticket creation to first agent response
+  const respondedTickets = (allTickets ?? []).filter((t: any) => (t.first_agent_response_at || t.first_response_at) && t.created_at);
+  const avgFrtMs = respondedTickets.length > 0
+    ? respondedTickets.reduce((sum: number, t: any) => {
+        const firstResponse = t.first_agent_response_at ?? t.first_response_at;
+        return sum + (new Date(firstResponse).getTime() - new Date(t.created_at).getTime());
+      }, 0) / respondedTickets.length
+    : 0;
+  const avgFrtMinutes = Math.round(avgFrtMs / (1000 * 60));
+  const frtLabel = avgFrtMinutes >= 60
+    ? `${Math.round(avgFrtMinutes / 60)}h`
+    : avgFrtMinutes > 0 ? `${avgFrtMinutes}m` : "—";
+
   // Priority distribution
   const priorityCounts: Record<TicketPriority, number> = {
     critical: 0, high: 0, medium: 0, low: 0,
@@ -142,8 +172,8 @@ export default async function AnalyticsPage({
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{t("subtitle")}</p>
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* AI KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <KPICard
           icon={<Zap className="w-5 h-5 text-indigo-400" />}
           label={t("aiAnalyzed")}
@@ -165,6 +195,34 @@ export default async function AnalyticsPage({
           label={t("slaAtRisk")}
           value={slaAtRisk?.length ?? 0}
           alert={(slaAtRisk?.length ?? 0) > 0}
+        />
+      </div>
+
+      {/* ITIL/ITSM KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KPICard
+          icon={<Timer className="w-5 h-5 text-blue-400" />}
+          label="MTTR (avg resolution)"
+          value={mttrLabel}
+          tooltip="Mean Time To Resolution — average time from ticket creation to closure"
+        />
+        <KPICard
+          icon={<CheckCircle2 className="w-5 h-5 text-green-400" />}
+          label="FCR rate"
+          value={`${fcrRate}%`}
+          tooltip="First Call Resolution — % resolved within SLA without breach"
+        />
+        <KPICard
+          icon={<Clock className="w-5 h-5 text-cyan-400" />}
+          label="Avg first response"
+          value={frtLabel}
+          tooltip="Average time from ticket creation to first agent reply"
+        />
+        <KPICard
+          icon={<Target className="w-5 h-5 text-purple-400" />}
+          label="Tickets resolved"
+          value={resolvedTotal}
+          tooltip="Total resolved tickets in this organization"
         />
       </div>
 
@@ -343,23 +401,26 @@ export default async function AnalyticsPage({
 }
 
 function KPICard({
-  icon, label, value, alert,
+  icon, label, value, alert, tooltip,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number | string;
   alert?: boolean;
+  tooltip?: string;
 }) {
   return (
-    <Card className={alert ? "border-red-500/30" : ""}>
-      <CardContent className="py-4">
-        <div className="flex items-start justify-between mb-3">
-          {icon}
-          {alert && <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
-        </div>
-        <p className="text-2xl font-bold text-[var(--color-text-primary)]">{value}</p>
-        <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{label}</p>
-      </CardContent>
-    </Card>
+    <div title={tooltip}>
+      <Card className={alert ? "border-red-500/30" : ""}>
+        <CardContent className="py-4">
+          <div className="flex items-start justify-between mb-3">
+            {icon}
+            {alert && <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />}
+          </div>
+          <p className="text-2xl font-bold text-[var(--color-text-primary)]">{value}</p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{label}</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

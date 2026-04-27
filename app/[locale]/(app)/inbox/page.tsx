@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
-import { MessageSquare, Lock, Building2, UserCircle2 } from "lucide-react";
+import { MessageSquare, Lock, Building2, UserCircle2, Send, Bell, Clock } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { InboxMarkReadTrigger } from "./InboxMarkReadTrigger";
@@ -45,10 +45,13 @@ interface CustomerInfo {
 
 export default async function InboxPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { locale } = await params;
+  const { tab = "all" } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -69,18 +72,14 @@ export default async function InboxPage({
   const isStaff = ["agent", "manager", "admin"].includes(profile.role);
   const orgId = profile.organization_id as string | null;
 
-  // ── Fetch recent comments ──────────────────────────────────────────────────
-  // For customers: only their own tickets
-  // For staff: all org tickets (excluding internal notes for display grouping)
-  let comments: CommentRow[] = [];
+  // ── Fetch comments ──────────────────────────────────────────────────────────
+  let allComments: CommentRow[] = [];
 
   if (isStaff && orgId) {
-    // Fetch all tickets in org first (need ticket IDs for comment filter)
     const { data: orgTickets } = await svc
       .from("tickets")
       .select("id")
       .eq("organization_id", orgId);
-
     const ticketIds = (orgTickets ?? []).map((t: { id: string }) => t.id);
 
     if (ticketIds.length > 0) {
@@ -89,16 +88,14 @@ export default async function InboxPage({
         .select("id, content, is_internal, is_ai_generated, created_at, ticket_id, author_id")
         .in("ticket_id", ticketIds)
         .order("created_at", { ascending: false })
-        .limit(100);
-      comments = (data ?? []) as CommentRow[];
+        .limit(200);
+      allComments = (data ?? []) as CommentRow[];
     }
   } else {
-    // Customer: only their own tickets
     const { data: myTickets } = await svc
       .from("tickets")
       .select("id")
       .eq("created_by", user.id);
-
     const ticketIds = (myTickets ?? []).map((t: { id: string }) => t.id);
 
     if (ticketIds.length > 0) {
@@ -106,78 +103,118 @@ export default async function InboxPage({
         .from("ticket_comments")
         .select("id, content, is_internal, is_ai_generated, created_at, ticket_id, author_id")
         .in("ticket_id", ticketIds)
-        .eq("is_internal", false) // customers never see internal notes
+        .eq("is_internal", false)
         .order("created_at", { ascending: false })
-        .limit(100);
-      comments = (data ?? []) as CommentRow[];
+        .limit(200);
+      allComments = (data ?? []) as CommentRow[];
     }
   }
 
-  // ── Get unique ticket + author IDs ─────────────────────────────────────────
-  const uniqueTicketIds = [...new Set(comments.map((c) => c.ticket_id))];
-  const uniqueAuthorIds = [...new Set(comments.map((c) => c.author_id))];
+  // ── Build lookup maps ───────────────────────────────────────────────────────
+  const uniqueTicketIds = [...new Set(allComments.map((c) => c.ticket_id))];
+  const uniqueAuthorIds = [...new Set(allComments.map((c) => c.author_id))];
 
-  const [
-    { data: ticketsRaw },
-    { data: profilesRaw },
-  ] = await Promise.all([
+  const [{ data: ticketsRaw }, { data: profilesRaw }] = await Promise.all([
     uniqueTicketIds.length
-      ? svc
-          .from("tickets")
-          .select("id, ticket_number, title, status, created_by, organization_id")
-          .in("id", uniqueTicketIds)
+      ? svc.from("tickets").select("id, ticket_number, title, status, created_by, organization_id").in("id", uniqueTicketIds)
       : Promise.resolve({ data: [] as TicketRow[] }),
     uniqueAuthorIds.length
-      ? svc
-          .from("profiles")
-          .select("id, full_name, role")
-          .in("id", uniqueAuthorIds)
+      ? svc.from("profiles").select("id, full_name, role").in("id", uniqueAuthorIds)
       : Promise.resolve({ data: [] as ProfileRow[] }),
   ]);
 
   const tickets = (ticketsRaw ?? []) as TicketRow[];
   const authors = (profilesRaw ?? []) as ProfileRow[];
 
-  // Fetch company names for customer authors
-  const customerAuthorIds = authors
-    .filter((p) => p.role === "customer")
-    .map((p) => p.id);
-
+  const customerAuthorIds = authors.filter((p) => p.role === "customer").map((p) => p.id);
   const { data: customerInfosRaw } = customerAuthorIds.length
-    ? await svc
-        .from("customers_info")
-        .select("id, company_name")
-        .in("id", customerAuthorIds)
+    ? await svc.from("customers_info").select("id, company_name").in("id", customerAuthorIds)
     : { data: [] as CustomerInfo[] };
 
-  // ── Build lookup maps ──────────────────────────────────────────────────────
   const ticketById = Object.fromEntries(tickets.map((t) => [t.id, t]));
   const authorById = Object.fromEntries(authors.map((p) => [p.id, p]));
   const companyById = Object.fromEntries(
     ((customerInfosRaw ?? []) as CustomerInfo[]).map((c) => [c.id, c.company_name])
   );
 
-  // ── Group comments by ticket (latest first per ticket) ────────────────────
-  const seen = new Set<string>();
-  const grouped: Array<{
-    ticket: TicketRow;
+  // ── Build enriched comment list ─────────────────────────────────────────────
+  type EnrichedComment = {
     comment: CommentRow;
+    ticket: TicketRow;
     authorName: string;
+    authorRole: string;
     isCustomerMessage: boolean;
     companyName: string | null;
-  }> = [];
+    isMyMessage: boolean;
+  };
 
-  for (const comment of comments) {
-    if (seen.has(comment.ticket_id)) continue;
-    seen.add(comment.ticket_id);
+  const enriched: EnrichedComment[] = [];
+  for (const comment of allComments) {
     const ticket = ticketById[comment.ticket_id];
     if (!ticket) continue;
     const author = authorById[comment.author_id];
-    const authorName = author?.full_name ?? "Unknown";
-    const isCustomerMessage = author?.role === "customer";
-    const companyName = isCustomerMessage ? (companyById[comment.author_id] ?? null) : null;
-    grouped.push({ ticket, comment, authorName, isCustomerMessage, companyName });
+    enriched.push({
+      comment,
+      ticket,
+      authorName: author?.full_name ?? "Unknown",
+      authorRole: author?.role ?? "unknown",
+      isCustomerMessage: author?.role === "customer",
+      companyName: author?.role === "customer" ? (companyById[comment.author_id] ?? null) : null,
+      isMyMessage: comment.author_id === user.id,
+    });
   }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  // "all"     — latest per ticket (same as before)
+  // "unread"  — tickets with customer messages (staff) or staff messages (customer) not yet read
+  // "sent"    — messages authored by current user
+  // "pending" — tickets in pending_customer status (staff) / open tickets waiting on staff (customer)
+
+  function getFiltered(): EnrichedComment[] {
+    if (tab === "sent") {
+      return enriched.filter((e) => e.isMyMessage);
+    }
+    if (tab === "pending") {
+      const pending = isStaff
+        ? enriched.filter((e) => e.ticket.status === "pending_customer")
+        : enriched.filter((e) => ["open", "in_progress"].includes(e.ticket.status));
+      // de-dupe by ticket
+      const seen = new Set<string>();
+      return pending.filter((e) => {
+        if (seen.has(e.ticket.id)) return false;
+        seen.add(e.ticket.id);
+        return true;
+      });
+    }
+    if (tab === "unread") {
+      const unread = isStaff
+        ? enriched.filter((e) => e.isCustomerMessage)
+        : enriched.filter((e) => !e.isCustomerMessage);
+      const seen = new Set<string>();
+      return unread.filter((e) => {
+        if (seen.has(e.ticket.id)) return false;
+        seen.add(e.ticket.id);
+        return true;
+      });
+    }
+    // "all" — one per ticket (latest)
+    const seen = new Set<string>();
+    return enriched.filter((e) => {
+      if (seen.has(e.ticket.id)) return false;
+      seen.add(e.ticket.id);
+      return true;
+    });
+  }
+
+  const filtered = getFiltered();
+  const inboxPath = locale === "de" ? "/inbox" : `/${locale}/inbox`;
+
+  const TABS = [
+    { key: "all",     label: "All",     icon: MessageSquare },
+    { key: "unread",  label: isStaff ? "Customer Messages" : "Staff Replies", icon: Bell },
+    { key: "sent",    label: "Sent",    icon: Send },
+    { key: "pending", label: "Pending", icon: Clock },
+  ];
 
   const ticketPath = (id: string) =>
     locale === "de" ? `/tickets/${id}` : `/${locale}/tickets/${id}`;
@@ -185,7 +222,7 @@ export default async function InboxPage({
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <InboxMarkReadTrigger />
-      <div className="mb-6">
+      <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">
           <MessageSquare className="w-5 h-5 text-indigo-400" aria-hidden="true" />
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">Inbox</h1>
@@ -195,30 +232,50 @@ export default async function InboxPage({
         </p>
       </div>
 
-      {grouped.length === 0 ? (
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 mb-5 p-1 bg-[var(--color-surface-800)] rounded-xl border border-[var(--color-surface-700)]">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <Link
+            key={key}
+            href={`${inboxPath}?tab=${key}`}
+            className={`flex items-center gap-1.5 flex-1 justify-center px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              tab === key
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
         <Card className="flex flex-col items-center justify-center py-16 text-center">
           <MessageSquare className="w-10 h-10 text-[var(--color-text-muted)] mb-3" />
-          <p className="text-[var(--color-text-secondary)] font-medium">No messages yet.</p>
+          <p className="text-[var(--color-text-secondary)] font-medium">No messages here.</p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
-            {isStaff ? "Comments on org tickets will appear here." : "Replies to your tickets will appear here."}
+            {tab === "pending" ? "No tickets waiting for a response." :
+             tab === "sent"    ? "You haven't sent any messages yet." :
+             tab === "unread"  ? "All caught up!" :
+             isStaff ? "Comments on org tickets will appear here." : "Replies to your tickets will appear here."}
           </p>
         </Card>
       ) : (
         <div className="space-y-2">
-          {grouped.map(({ ticket, comment, authorName, isCustomerMessage, companyName }) => (
+          {filtered.map(({ ticket, comment, authorName, isCustomerMessage, companyName }) => (
             <Link
               key={comment.id}
               href={ticketPath(ticket.id)}
               className="block rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] hover:border-indigo-500/30 hover:bg-[var(--color-surface-800)] transition-all group"
             >
               <div className="px-4 py-3.5">
-                {/* Ticket ref + status */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-mono text-[11px] text-indigo-400">
                     {formatTicketRef(ticket.ticket_number)}
                   </span>
                   <Badge className={`text-[10px] px-1.5 py-0.5 ${statusColor(ticket.status)}`}>
-                    {ticket.status.replace("_", " ")}
+                    {ticket.status.replace(/_/g, " ")}
                   </Badge>
                   {comment.is_internal && (
                     <span className="flex items-center gap-0.5 text-[10px] text-amber-400">
@@ -233,12 +290,10 @@ export default async function InboxPage({
                   </span>
                 </div>
 
-                {/* Ticket title */}
                 <p className="text-sm font-medium text-[var(--color-text-primary)] truncate mb-1.5 group-hover:text-indigo-300 transition-colors">
                   {ticket.title}
                 </p>
 
-                {/* Author + message preview */}
                 <div className="flex items-start gap-2">
                   <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5 ${
                     isCustomerMessage

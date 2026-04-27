@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Users,
   BriefcaseBusiness,
+  UserCog,
 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 
@@ -164,7 +165,11 @@ export default async function AdminPage({
     category_name: ticket.category_id ? categoryById[ticket.category_id] ?? null : aiByTicket[ticket.id] ?? null,
   }));
 
-  const companies = [...new Set(enriched.map((ticket) => ticket.company_name).filter((value): value is string => Boolean(value)))].sort();
+  // Build company list: include all org customers (even those with no tickets yet)
+  const allCompanyNames = new Set<string>();
+  enriched.forEach((t) => { if (t.company_name) allCompanyNames.add(t.company_name); });
+  ((customerInfosRaw ?? []) as CustomerInfo[]).forEach((c) => { if (c.company_name?.trim()) allCompanyNames.add(c.company_name.trim()); });
+  const companies = [...allCompanyNames].sort();
   const allAgents = profiles
     .filter((entry) => ["agent", "manager", "admin"].includes(entry.role))
     .map((entry) => ({ id: entry.id, name: formatAgentIdentity(entry) }));
@@ -238,7 +243,16 @@ export default async function AdminPage({
             )}
           </p>
         </div>
-        {profile.role === "admin" && <AdminPageControls teams={teams} />}
+        <div className="flex items-center gap-3">
+          <Link
+            href={locale === "de" ? "/admin/users" : `/${locale}/admin/users`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-indigo-500/30 hover:text-indigo-400 transition-colors"
+          >
+            <UserCog className="h-3.5 w-3.5" />
+            Manage Users
+          </Link>
+          {profile.role === "admin" && <AdminPageControls teams={teams} />}
+        </div>
       </div>
 
       <section className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-[1.6fr_1fr]">

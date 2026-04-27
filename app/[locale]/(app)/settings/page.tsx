@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
-import { Shield, ShieldAlert, Key, Users, Building2, Radio } from "lucide-react";
+import { Shield, ShieldAlert, Key, Users, Building2, Radio, Lock, UserCircle2 } from "lucide-react";
 import { getOrgSettings } from "@/app/actions/org-settings";
 import { PIIScrubbingToggle } from "@/components/settings/PIIScrubbingToggle";
 import { OrgCodeDisplay } from "@/components/settings/OrgCodeDisplay";
 import { CustomerProfileForm } from "@/components/settings/CustomerProfileForm";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
+import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
+import { AvatarUpload } from "@/components/settings/AvatarUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,7 @@ export default async function SettingsPage({
   const svc = createServiceClientStatic();
   let { data: profile, error: profileError } = await svc
     .from("profiles")
-    .select("role, organization_id, full_name, availability_status")
+    .select("role, organization_id, full_name, avatar_url, availability_status")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -103,12 +105,71 @@ export default async function SettingsPage({
     agentTeamName = team?.name ?? null;
   }
 
+  const employeeId = user.id.slice(0, 8).toUpperCase();
+  const lastLogin = user.last_sign_in_at
+    ? new Date(user.last_sign_in_at).toLocaleString(locale === "de" ? "de-CH" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+    : "—";
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t("title")}</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{t("subtitle")}</p>
       </div>
+
+      {/* ── PROFILE HEADER ── */}
+      <Card className="mb-5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserCircle2 className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+            <span className="text-sm font-medium text-[var(--color-text-secondary)]">My Profile</span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <AvatarUpload
+            userId={user.id}
+            name={profile.full_name ?? user.email?.split("@")[0] ?? "User"}
+            currentUrl={(profile as any).avatar_url ?? null}
+          />
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-[var(--color-surface-700)]">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Email</p>
+              <p className="text-sm text-[var(--color-text-primary)]">{user.email}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Employee ID</p>
+              <p className="text-sm font-mono text-[var(--color-text-primary)]">{employeeId}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Role</p>
+              <p className="text-sm capitalize text-[var(--color-text-primary)]">{profile.role}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Last login</p>
+              <p className="text-sm text-[var(--color-text-primary)]">{lastLogin}</p>
+            </div>
+            {agentProfile?.specialty && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Specialty</p>
+                <p className="text-sm text-[var(--color-text-primary)]">{agentProfile.specialty}</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── CHANGE PASSWORD ── */}
+      <Card className="mb-5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+            <span className="text-sm font-medium text-[var(--color-text-secondary)]">Change Password</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm />
+        </CardContent>
+      </Card>
 
       {/* ── ADMIN: Org Code + Compliance ── */}
       {isAdmin && (

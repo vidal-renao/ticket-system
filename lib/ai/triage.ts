@@ -5,7 +5,11 @@ const client = new Anthropic({
 });
 
 export interface TriageResult {
-  suggested_category: "Networking" | "Hardware" | "Software" | "Security" | "Billing" | "Other";
+  suggested_category:
+    | "Networking" | "Hardware" | "Software" | "Security" | "Billing"
+    | "Email & Communication" | "Printer & Peripherals" | "VPN & Remote Access"
+    | "Microsoft 365" | "Active Directory & Accounts" | "Backup & Recovery"
+    | "Performance & Speed" | "Mobile Devices" | "Other";
   suggested_priority: "low" | "medium" | "high" | "critical";
   confidence_score: number;
   sentiment: "calm" | "neutral" | "frustrated" | "urgent" | "angry";
@@ -34,7 +38,7 @@ You MUST respond with ONLY a valid JSON object — no markdown, no explanation, 
 
 JSON SCHEMA:
 {
-  "suggested_category": "Networking" | "Hardware" | "Software" | "Security" | "Billing" | "Other",
+  "suggested_category": "Networking" | "Hardware" | "Software" | "Security" | "Billing" | "Email & Communication" | "Printer & Peripherals" | "VPN & Remote Access" | "Microsoft 365" | "Active Directory & Accounts" | "Backup & Recovery" | "Performance & Speed" | "Mobile Devices" | "Other",
   "suggested_priority": "low" | "medium" | "high" | "critical",
   "confidence_score": <number: 0-100>,
   "sentiment": "calm" | "neutral" | "frustrated" | "urgent" | "angry",
@@ -54,12 +58,20 @@ PRIORITY DECISION MATRIX:
 - low:      Cosmetic issue, single user, how-to question, minor inconvenience
 
 CATEGORY GUIDELINES:
-- Networking: VPN, WiFi, DNS, firewall, connectivity, bandwidth
-- Hardware:   Laptops, printers, monitors, phones, peripherals, physical damage
-- Software:   Applications, OS, crashes, updates, licensing, configuration
-- Security:   Password resets, suspicious activity, phishing, access revocation, data leaks
-- Billing:    Invoices, subscriptions, cost allocation, purchase requests
-- Other:      General questions, onboarding requests, unclear issues
+- Networking:                  WiFi, DNS, firewall, internet connectivity, LAN/WAN, bandwidth
+- Hardware:                    Laptops, desktops, monitors, physical damage, USB devices
+- Software:                    Applications, OS, crashes, updates, licensing, configuration
+- Security:                    Suspicious activity, phishing, malware, access revocation, data leaks
+- Billing:                     Invoices, subscriptions, cost allocation, purchase requests
+- Email & Communication:       Outlook, Exchange, email delivery, calendar sync, Teams messaging
+- Printer & Peripherals:       Printers, scanners, projectors, USB/Bluetooth devices
+- VPN & Remote Access:         VPN clients, remote desktop (RDP), TeamViewer, split-tunneling
+- Microsoft 365:               Office apps, SharePoint, OneDrive, Teams, licensing, tenant issues
+- Active Directory & Accounts: User accounts, password resets, group policies, LDAP, SSO
+- Backup & Recovery:           File recovery, backup failures, restore requests, data loss
+- Performance & Speed:         Slow PC, high CPU/memory, disk space, application lag
+- Mobile Devices:              Smartphones, tablets, MDM enrollment, mobile email, app installs
+- Other:                       General questions, onboarding requests, unclear issues
 
 SENTIMENT CALIBRATION:
 - angry:      Offensive language, threats, ALL CAPS, "unacceptable"

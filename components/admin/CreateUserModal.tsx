@@ -193,14 +193,28 @@ export function CreateUserModal({
               <div>
                 <label className={label}>
                   Specialty{" "}
-                  <span className="text-[var(--color-text-muted)] font-normal">(optional — defaults to team name)</span>
+                  <span className="text-[var(--color-text-muted)] font-normal">(optional)</span>
                 </label>
-                <input
+                <select
                   value={specialty}
                   onChange={(e) => setSpecialty(e.target.value)}
-                  placeholder="e.g. Hardware, Networking, Cloud…"
                   className={input}
-                />
+                >
+                  <option value="">Default (team name)</option>
+                  <option value="hardware">Hardware</option>
+                  <option value="software">Software</option>
+                  <option value="networking">Networking</option>
+                  <option value="security">Security</option>
+                  <option value="billing">Billing</option>
+                  <option value="email">Email & Communication</option>
+                  <option value="printing">Printer & Peripherals</option>
+                  <option value="vpn">VPN & Remote Access</option>
+                  <option value="m365">Microsoft 365</option>
+                  <option value="active_directory">Active Directory & Accounts</option>
+                  <option value="backup">Backup & Recovery</option>
+                  <option value="mobile">Mobile Devices</option>
+                  <option value="other">General Support</option>
+                </select>
               </div>
             </>
           )}

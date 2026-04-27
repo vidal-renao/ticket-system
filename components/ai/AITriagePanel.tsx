@@ -140,6 +140,7 @@ export function AITriagePanel({ analysis, ticketId }: AITriagePanelProps) {
             <p className="text-xs text-[var(--color-text-muted)] mt-1.5 leading-relaxed">
               {analysis.reasoning}
             </p>
+            <TranslateButton text={analysis.reasoning} className="mt-1.5" />
           </details>
         )}
 
