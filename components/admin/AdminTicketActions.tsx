@@ -132,7 +132,7 @@ export function AdminTicketActions({
             event.stopPropagation();
             handleStatus("in_progress", "started");
           }}
-          disabled={!assignee}
+          disabled={!assignee && !canReassign}
           title="Start working"
           className={`${buttonBase} border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20`}
         >

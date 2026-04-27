@@ -71,6 +71,7 @@ export default async function TeamPage({
     .from("profiles")
     .select("id, full_name, role, department, is_active, created_at")
     .eq("organization_id", orgId)
+    .in("role", ["agent", "manager", "admin"])
     .order("role")
     .order("full_name");
 
@@ -78,7 +79,8 @@ export default async function TeamPage({
   const { data: extrasRaw } = await svc
     .from("profiles")
     .select("id, specialty, team_id")
-    .eq("organization_id", orgId);
+    .eq("organization_id", orgId)
+    .in("role", ["agent", "manager", "admin"]);
 
   const extrasMap = Object.fromEntries(
     ((extrasRaw ?? []) as { id: string; specialty: string | null; team_id: string | null }[]).map(
@@ -115,7 +117,7 @@ export default async function TeamPage({
   );
 
   // Stats
-  const agents    = members.filter((m) => m.role === "agent" || m.role === "manager");
+  const agents    = members.filter((m) => m.role === "agent" || m.role === "manager" || m.role === "admin");
   const customers = members.filter((m) => m.role === "customer");
   const active    = members.filter((m) => m.is_active);
 

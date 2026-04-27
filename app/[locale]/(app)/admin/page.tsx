@@ -166,7 +166,7 @@ export default async function AdminPage({
 
   const companies = [...new Set(enriched.map((ticket) => ticket.company_name).filter((value): value is string => Boolean(value)))].sort();
   const allAgents = profiles
-    .filter((entry) => entry.role === "agent")
+    .filter((entry) => ["agent", "manager", "admin"].includes(entry.role))
     .map((entry) => ({ id: entry.id, name: formatAgentIdentity(entry) }));
   const categoryNames = [...new Set([...categories.map((entry) => entry.name), ...Object.values(aiByTicket).filter((value): value is string => Boolean(value))])].sort();
 
