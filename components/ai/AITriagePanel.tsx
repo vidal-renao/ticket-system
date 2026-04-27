@@ -8,6 +8,7 @@ import { Zap, ChevronDown, ChevronUp, Copy, CheckCircle2 } from "lucide-react";
 import { priorityColor, sentimentIcon } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AIAnalysis } from "@/lib/supabase/types";
+import { TranslateButton } from "@/components/tickets/TranslateButton";
 
 interface AITriagePanelProps {
   analysis: AIAnalysis;
@@ -126,6 +127,7 @@ export function AITriagePanel({ analysis, ticketId }: AITriagePanelProps) {
                 {expanded ? "Show less" : "Show more"}
               </button>
             </div>
+            <TranslateButton text={analysis.smart_response} className="mt-2" />
           </div>
         )}
 

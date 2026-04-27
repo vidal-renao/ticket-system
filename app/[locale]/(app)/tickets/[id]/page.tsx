@@ -165,7 +165,6 @@ export default async function TicketDetailPage({
               {ticket.description && (
                 <TranslateButton
                   text={ticket.description}
-                  targetLocale={locale}
                   className="mt-3"
                 />
               )}
@@ -178,7 +177,6 @@ export default async function TicketDetailPage({
             comments={comments ?? []}
             currentUserId={currentUserId}
             isStaff={isStaff}
-            targetLocale={locale}
           />
         </div>
 

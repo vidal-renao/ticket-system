@@ -31,7 +31,6 @@ interface TicketCommentsProps {
   comments: Comment[];
   currentUserId: string;
   isStaff: boolean;
-  targetLocale: string;
 }
 
 const ROLE_BADGE: Record<string, string> = {
@@ -46,7 +45,6 @@ export function TicketComments({
   comments: initial,
   currentUserId,
   isStaff,
-  targetLocale,
 }: TicketCommentsProps) {
   const router = useRouter();
   const t = useTranslations("ticket");
@@ -202,7 +200,6 @@ export function TicketComments({
           </div>
           <TranslateButton
             text={comment.content}
-            targetLocale={targetLocale}
             className="mt-1.5"
           />
         </div>
