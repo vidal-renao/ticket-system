@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { MessageSquare, Lock, Building2, UserCircle2 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
+import { InboxMarkReadTrigger } from "./InboxMarkReadTrigger";
 
 export const dynamic = "force-dynamic";
 
@@ -183,6 +184,7 @@ export default async function InboxPage({
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <InboxMarkReadTrigger />
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <MessageSquare className="w-5 h-5 text-indigo-400" aria-hidden="true" />

@@ -21,6 +21,7 @@ interface AppShellProps {
   locale: string;
   notifications: ShellNotification[];
   unreadNotifications: number;
+  inboxUnreadCount?: number;
 }
 
 export function AppShell({
@@ -34,11 +35,13 @@ export function AppShell({
   locale,
   notifications,
   unreadNotifications,
+  inboxUnreadCount = 0,
 }: AppShellProps) {
   const supabase = createClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [liveNotifications, setLiveNotifications] = useState(notifications);
   const [liveUnreadNotifications, setLiveUnreadNotifications] = useState(unreadNotifications);
+  const [liveInboxUnread, setLiveInboxUnread] = useState(inboxUnreadCount);
 
   useEffect(() => {
     setLiveNotifications(notifications);
@@ -47,6 +50,10 @@ export function AppShell({
   useEffect(() => {
     setLiveUnreadNotifications(unreadNotifications);
   }, [unreadNotifications]);
+
+  useEffect(() => {
+    setLiveInboxUnread(inboxUnreadCount);
+  }, [inboxUnreadCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +66,7 @@ export function AppShell({
         if (cancelled) return;
         setLiveNotifications(data.notifications ?? []);
         setLiveUnreadNotifications(data.unreadCount ?? 0);
+        setLiveInboxUnread(data.inboxUnreadCount ?? 0);
       } catch {
         // Keep the current UI state if polling fails.
       }
@@ -137,6 +145,7 @@ export function AppShell({
         queueCount={queueCount}
         notifications={liveNotifications}
         unreadNotifications={liveUnreadNotifications}
+        inboxUnreadCount={liveInboxUnread}
         onSignOut={handleSignOut}
         onGoHome={handleGoHome}
         onNavigate={() => setMobileMenuOpen(false)}

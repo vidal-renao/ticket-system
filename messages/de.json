@@ -146,7 +146,22 @@
     "aiTriage": "KI-Zuweisung",
     "aiProcessing": "Wird verarbeitet...",
     "uncategorized": "Unkategorisiert",
-    "internal": "Intern"
+    "internal": "Intern",
+    "messagesSection": "Nachrichten",
+    "internalSection": "Interne Notizen",
+    "noMessages": "Noch keine Nachrichten",
+    "noInternalNotes": "Keine internen Notizen"
+  },
+  "aiChat": {
+    "title": "KI-Support-Assistent",
+    "statusNoAgents": "Kein Agent verfügbar — KI-Assistent aktiv",
+    "statusAgentOnline": "Ein Agent ist jetzt verfügbar",
+    "placeholder": "Beschreiben Sie Ihr Problem...",
+    "send": "Senden",
+    "saveChat": "Gespräch speichern",
+    "chatSaved": "Gespeichert",
+    "typing": "KI schreibt...",
+    "emptyHint": "Stellen Sie mir eine Frage zu Ihrem IT-Problem."
   },
   "priority": {
     "low": "Niedrig",

@@ -12,7 +12,11 @@ export async function GET() {
   }
 
   const svc = createServiceClientStatic();
-  const [{ data: notifications, error: notificationsError }, { count, error: countError }] = await Promise.all([
+  const [
+    { data: notifications, error: notificationsError },
+    { count, error: countError },
+    { count: inboxUnreadCount },
+  ] = await Promise.all([
     svc
       .from("notifications")
       .select("id, ticket_id, type, title, message, is_read, created_at")
@@ -24,11 +28,22 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false),
+    svc
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false)
+      .eq("type", "comment.public"),
   ]);
 
   if (notificationsError || countError) {
     return NextResponse.json(
-      { error: notificationsError?.message ?? countError?.message ?? "Failed to load notifications" },
+      {
+        error:
+          notificationsError?.message ??
+          countError?.message ??
+          "Failed to load notifications",
+      },
       { status: 500 }
     );
   }
@@ -36,5 +51,27 @@ export async function GET() {
   return NextResponse.json({
     notifications: notifications ?? [],
     unreadCount: count ?? 0,
+    inboxUnreadCount: inboxUnreadCount ?? 0,
   });
+}
+
+/** Mark all comment.public notifications as read for the current user. */
+export async function PATCH() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const svc = createServiceClientStatic();
+  await svc
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", user.id)
+    .eq("type", "comment.public");
+
+  return NextResponse.json({ ok: true });
 }

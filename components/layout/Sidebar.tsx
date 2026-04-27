@@ -65,6 +65,7 @@ interface SidebarProps {
   queueCount?: number;
   notifications: ShellNotification[];
   unreadNotifications: number;
+  inboxUnreadCount?: number;
   onSignOut: () => void;
   onGoHome: () => void;
   onNavigate?: () => void;
@@ -87,6 +88,7 @@ export function Sidebar({
   queueCount = 0,
   notifications,
   unreadNotifications,
+  inboxUnreadCount = 0,
   onSignOut,
   onGoHome,
   onNavigate,
@@ -140,7 +142,17 @@ export function Sidebar({
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {t(labelKey)}
-              {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />}
+              {item.href === "/inbox" && inboxUnreadCount > 0 && (
+                <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                  {inboxUnreadCount > 9 ? "9+" : inboxUnreadCount}
+                </span>
+              )}
+              {isActive && item.href !== "/inbox" && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
+              )}
+              {isActive && item.href === "/inbox" && inboxUnreadCount === 0 && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
+              )}
             </Link>
           );
         })}

@@ -44,7 +44,7 @@ export default async function AppLayout({
       ? resolvedProfile.specialty?.trim() || "General support"
       : resolvedProfile.role;
 
-  const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult] = await Promise.all([
+  const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult, { count: inboxUnreadCount }] = await Promise.all([
     svc
       .from("notifications")
       .select("id, ticket_id, type, title, message, is_read, created_at")
@@ -63,6 +63,12 @@ export default async function AppLayout({
           .eq("assigned_to", user.id)
           .in("status", ["open", "in_progress", "pending_customer"])
       : Promise.resolve({ count: 0 }),
+    svc
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false)
+      .eq("type", "comment.public"),
   ]);
 
   return (
@@ -76,6 +82,7 @@ export default async function AppLayout({
       locale={locale}
       notifications={notifications ?? []}
       unreadNotifications={unreadNotifications ?? 0}
+      inboxUnreadCount={inboxUnreadCount ?? 0}
     >
       {children}
     </AppShell>

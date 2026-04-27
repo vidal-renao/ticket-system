@@ -191,7 +191,22 @@
     "aiTriage": "Triage IA",
     "aiProcessing": "Procesando...",
     "uncategorized": "Sin categoría",
-    "internal": "Interno"
+    "internal": "Interno",
+    "messagesSection": "Mensajes",
+    "internalSection": "Notas internas",
+    "noMessages": "Aún no hay mensajes",
+    "noInternalNotes": "Sin notas internas"
+  },
+  "aiChat": {
+    "title": "Asistente IA de Soporte",
+    "statusNoAgents": "Sin agentes disponibles — Asistente IA activo",
+    "statusAgentOnline": "Un agente está disponible ahora",
+    "placeholder": "Describe tu problema...",
+    "send": "Enviar",
+    "saveChat": "Guardar conversación",
+    "chatSaved": "Conversación guardada",
+    "typing": "La IA está escribiendo...",
+    "emptyHint": "Pregúntame cualquier cosa sobre tu problema de TI."
   },
   "priority": {
     "low": "Baja",

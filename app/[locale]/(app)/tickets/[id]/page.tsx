@@ -12,6 +12,7 @@ import { TranslateButton } from "@/components/tickets/TranslateButton";
 import { SlaCountdown, CustomerReopenButton } from "@/components/tickets/SlaCountdown";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 import { AlertTriangle, Clock, Shield } from "lucide-react";
+import { AISupportChat } from "@/components/tickets/AISupportChat";
 
 export default async function TicketDetailPage({
   params,
@@ -75,7 +76,7 @@ export default async function TicketDetailPage({
       ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
     svc.from("ticket_comments")
-      .select("*, profiles(full_name, avatar_url)")
+      .select("*, profiles:author_id(full_name, avatar_url, role)")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
     svc
@@ -89,6 +90,16 @@ export default async function TicketDetailPage({
       .eq("id", ticket.created_by)
       .maybeSingle(),
   ]);
+
+  // For customers: check if any staff is online to decide whether to show AI chat
+  const onlineAgentCount = !isStaff && ticket.organization_id
+    ? (await svc
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ticket.organization_id)
+        .in("role", ["agent", "manager", "admin"])
+        .eq("availability_status", "online")).count ?? 0
+    : null;
 
   const companyName =
     creatorCompanyInfo?.company_name?.trim() ||
@@ -235,6 +246,15 @@ export default async function TicketDetailPage({
                 <p className="text-xs text-[var(--color-text-muted)]">{t("aiProcessing")}</p>
               </CardContent>
             </Card>
+          )}
+
+          {/* AI Support Chat — shown to customers when no agents are online */}
+          {!isStaff && onlineAgentCount === 0 && (
+            <AISupportChat
+              ticketId={ticket.id}
+              orgId={ticket.organization_id}
+              locale={locale}
+            />
           )}
 
           {/* Customer reopen within 48h */}
