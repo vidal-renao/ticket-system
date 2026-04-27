@@ -138,21 +138,6 @@
     "mySpecialty": "Mein Fachgebiet",
     "otherTickets": "Weitere Anfragen"
   },
-  "dashboard": {
-    "title": "Betriebsübersicht",
-    "subtitle": "Echtzeit-Betriebsübersicht",
-    "openTickets": "Offene Anfragen",
-    "critical": "Kritisch",
-    "resolved": "Gelöst",
-    "slaBreached": "SLA verletzt",
-    "recentTickets": "Letzte Anfragen",
-    "aiPerformance": "KI-Leistung",
-    "acceptanceRate": "Akzeptanzrate",
-    "avgConfidence": "Ø Konfidenz",
-    "aiBasedOn": "Basierend auf {count} analysierten Anfragen",
-    "byCategory": "Nach Kategorie",
-    "noData": "Noch keine Daten"
-  },
   "ticket": {
     "description": "Beschreibung",
     "slaDeadline": "SLA-Frist",
@@ -256,6 +241,51 @@
     "role_manager": "Manager",
     "role_agent": "Agent",
     "role_customer": "Kunde"
+  },
+  "session": {
+    "expiring": "Sitzung läuft ab",
+    "expiringMessage": "Ihre Sitzung läuft in Kürze ab. Möchten Sie angemeldet bleiben?",
+    "stayLoggedIn": "Angemeldet bleiben",
+    "signOut": "Abmelden"
+  },
+  "agentDashboard": {
+    "title": "Meine Übersicht",
+    "subtitle": "Ihre zugewiesenen Anfragen und aktueller Status",
+    "assignedOpen": "Zugewiesen & offen",
+    "resolvedToday": "Heute gelöst",
+    "availability": "Meine Verfügbarkeit",
+    "assignedTickets": "Zugewiesene Anfragen",
+    "noAssignedTickets": "Keine offenen Anfragen – gut gemacht!",
+    "slaBreached": "SLA verletzt",
+    "slaOk": "SLA ok"
+  },
+  "customerDashboard": {
+    "title": "Mein Support-Portal",
+    "subtitle": "Ihre Anfragen und deren aktueller Status",
+    "openTickets": "Offene Anfragen",
+    "resolvedTickets": "Gelöste Anfragen",
+    "newRequest": "Neue Anfrage erstellen",
+    "newRequestHint": "Unsere KI priorisiert und leitet sie automatisch weiter.",
+    "recentTickets": "Letzte Anfragen",
+    "noTickets": "Noch keine Anfragen",
+    "noTicketsHint": "Erstellen Sie Ihre erste Support-Anfrage.",
+    "lastUpdate": "Aktualisiert"
+  },
+  "dashboard": {
+    "title": "Betriebsübersicht",
+    "subtitle": "Echtzeit-Betriebsübersicht",
+    "openTickets": "Offene Anfragen",
+    "critical": "Kritisch",
+    "resolved": "Gelöst",
+    "slaBreached": "SLA verletzt",
+    "recentTickets": "Letzte Anfragen",
+    "aiPerformance": "KI-Leistung",
+    "acceptanceRate": "Akzeptanzrate",
+    "avgConfidence": "Ø Konfidenz",
+    "aiBasedOn": "Basierend auf {count} analysierten Anfragen",
+    "byCategory": "Nach Kategorie",
+    "teamAvailability": "Team-Verfügbarkeit",
+    "noData": "Noch keine Daten"
   },
   "admin": {
     "title": "Admin-Panel",

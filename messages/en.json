@@ -138,6 +138,35 @@
     "mySpecialty": "My Specialty",
     "otherTickets": "Other Tickets"
   },
+  "session": {
+    "expiring": "Session expiring",
+    "expiringMessage": "Your session is about to expire. Stay logged in?",
+    "stayLoggedIn": "Stay logged in",
+    "signOut": "Sign out"
+  },
+  "agentDashboard": {
+    "title": "My Overview",
+    "subtitle": "Your assigned tickets and current status",
+    "assignedOpen": "Assigned & open",
+    "resolvedToday": "Resolved today",
+    "availability": "My Availability",
+    "assignedTickets": "Assigned Tickets",
+    "noAssignedTickets": "No open tickets — great job!",
+    "slaBreached": "SLA breached",
+    "slaOk": "SLA ok"
+  },
+  "customerDashboard": {
+    "title": "My Support Portal",
+    "subtitle": "Your tickets and their current status",
+    "openTickets": "Open Tickets",
+    "resolvedTickets": "Resolved Tickets",
+    "newRequest": "Create New Request",
+    "newRequestHint": "Our AI will prioritize and route it automatically.",
+    "recentTickets": "Recent Tickets",
+    "noTickets": "No tickets yet",
+    "noTicketsHint": "Submit your first support request.",
+    "lastUpdate": "Updated"
+  },
   "dashboard": {
     "title": "Executive Dashboard",
     "subtitle": "Real-time operations overview",
@@ -151,6 +180,7 @@
     "avgConfidence": "Avg confidence",
     "aiBasedOn": "Based on {count} analyzed tickets",
     "byCategory": "By Category",
+    "teamAvailability": "Team Availability",
     "noData": "No data yet"
   },
   "ticket": {

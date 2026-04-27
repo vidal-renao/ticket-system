@@ -7,6 +7,8 @@ import { PageTransition } from "./PageTransition";
 import type { UserRole } from "@/lib/supabase/types";
 import type { ShellNotification } from "./NotificationsMenu";
 import { Bell, Menu, X, Zap } from "lucide-react";
+import { ScrollToTop } from "./ScrollToTop";
+import { SessionTimeoutModal } from "./SessionTimeoutModal";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -145,6 +147,8 @@ export function AppShell({
       <main className="flex-1 overflow-y-auto pt-16 xl:pt-0 min-w-0">
         <PageTransition>{children}</PageTransition>
       </main>
+      <ScrollToTop />
+      <SessionTimeoutModal locale={locale} />
     </div>
   );
 }

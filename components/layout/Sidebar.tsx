@@ -101,7 +101,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex min-h-screen w-60 flex-col border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]",
+        "flex h-screen w-60 flex-col border-r border-[var(--color-surface-600)] bg-[var(--color-surface-900)]",
         className
       )}
     >
@@ -119,7 +119,7 @@ export function Sidebar({
         </div>
       </Link>
 
-      <nav aria-label="Main navigation" className="flex-1 space-y-0.5 px-3 py-4">
+      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto space-y-0.5 px-3 py-4">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const labelKey = role === "agent" && item.labelKey === "allTickets" ? "myTickets" : item.labelKey;

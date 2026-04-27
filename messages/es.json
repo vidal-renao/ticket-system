@@ -138,6 +138,35 @@
     "mySpecialty": "Mi Especialidad",
     "otherTickets": "Otros Tickets"
   },
+  "session": {
+    "expiring": "Sesión expirando",
+    "expiringMessage": "Su sesión está a punto de expirar. ¿Desea seguir conectado?",
+    "stayLoggedIn": "Seguir conectado",
+    "signOut": "Cerrar sesión"
+  },
+  "agentDashboard": {
+    "title": "Mi Resumen",
+    "subtitle": "Sus tickets asignados y estado actual",
+    "assignedOpen": "Asignados y abiertos",
+    "resolvedToday": "Resueltos hoy",
+    "availability": "Mi Disponibilidad",
+    "assignedTickets": "Tickets Asignados",
+    "noAssignedTickets": "Sin tickets abiertos — ¡bien hecho!",
+    "slaBreached": "SLA incumplido",
+    "slaOk": "SLA ok"
+  },
+  "customerDashboard": {
+    "title": "Mi Portal de Soporte",
+    "subtitle": "Sus tickets y su estado actual",
+    "openTickets": "Tickets Abiertos",
+    "resolvedTickets": "Tickets Resueltos",
+    "newRequest": "Crear Nueva Solicitud",
+    "newRequestHint": "Nuestra IA la priorizará y enrutará automáticamente.",
+    "recentTickets": "Tickets Recientes",
+    "noTickets": "Sin tickets aún",
+    "noTicketsHint": "Envíe su primera solicitud de soporte.",
+    "lastUpdate": "Actualizado"
+  },
   "dashboard": {
     "title": "Panel Ejecutivo",
     "subtitle": "Visión operativa en tiempo real",
@@ -151,6 +180,7 @@
     "avgConfidence": "Confianza media",
     "aiBasedOn": "Basado en {count} tickets analizados",
     "byCategory": "Por Categoría",
+    "teamAvailability": "Disponibilidad del Equipo",
     "noData": "Sin datos aún"
   },
   "ticket": {
