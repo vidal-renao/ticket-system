@@ -1,16 +1,17 @@
-"use client";
-
 import Link from "next/link";
 import { Zap, Shield, Globe, BarChart3, Clock, ArrowRight, Star } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { LandingNav } from "./LandingNav";
 import { ComparisonTable } from "./ComparisonTable";
 import { PricingSection } from "./PricingSection";
 
 interface LandingPageProps {
   locale: string;
+  isLoggedIn?: boolean;
 }
 
-const COPY: Record<string, {
+// Legacy inline copy kept for ComparisonTable / PricingSection locale prop — not used by LandingPage itself.
+const _COPY_UNUSED: Record<string, {
   hero_label: string;
   hero_title: string;
   hero_sub: string;
@@ -185,18 +186,39 @@ const COPY: Record<string, {
   },
 };
 
-export function LandingPage({ locale }: LandingPageProps) {
-  const c = COPY[locale] ?? COPY.en;
-  const loginHref  = locale === "de" ? "/login"  : `/${locale}/login`;
-  const signupHref = locale === "de" ? "/signup" : `/${locale}/signup`;
+export async function LandingPage({ locale, isLoggedIn = false }: LandingPageProps) {
+  const t = await getTranslations("landing");
+  const prefix = locale === "de" ? "" : `/${locale}`;
+  const loginHref   = `${prefix}/login`;
+  const registerHref = `${prefix}/register`;
+
+  const features: { icon: React.ElementType; title: string; desc: string }[] = [
+    { icon: Zap,      title: t("feature1Title"), desc: t("feature1Desc") },
+    { icon: Shield,   title: t("feature2Title"), desc: t("feature2Desc") },
+    { icon: Globe,    title: t("feature3Title"), desc: t("feature3Desc") },
+    { icon: BarChart3, title: t("feature4Title"), desc: t("feature4Desc") },
+    { icon: Clock,    title: t("feature5Title"), desc: t("feature5Desc") },
+    { icon: Star,     title: t("feature6Title"), desc: t("feature6Desc") },
+  ];
+
+  const stats = [
+    { value: t("statsValue1"), label: t("statsLabel1") },
+    { value: t("statsValue2"), label: t("statsLabel2") },
+    { value: t("statsValue3"), label: t("statsLabel3") },
+  ];
+
+  const steps = [
+    { num: "01", label: t("step1Label"), title: t("step1Title"), desc: t("step1Desc") },
+    { num: "02", label: t("step2Label"), title: t("step2Title"), desc: t("step2Desc") },
+    { num: "03", label: t("step3Label"), title: t("step3Title"), desc: t("step3Desc") },
+  ];
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-950)] text-[var(--color-text-primary)]">
-      <LandingNav locale={locale} />
+      <LandingNav locale={locale} isLoggedIn={isLoggedIn} />
 
       {/* ── Hero ────────────────────────────────────────────────────── */}
       <section className="relative pt-32 pb-24 px-6 overflow-hidden">
-        {/* Background orbs */}
         <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full"
             style={{ background: "radial-gradient(ellipse at center, rgba(79,70,229,0.12) 0%, transparent 65%)" }}
@@ -204,7 +226,6 @@ export function LandingPage({ locale }: LandingPageProps) {
           <div className="absolute top-20 right-0 w-[500px] h-[500px] rounded-full"
             style={{ background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 65%)" }}
           />
-          {/* Grid overlay */}
           <div className="absolute inset-0 opacity-[0.015]"
             style={{
               backgroundImage: "linear-gradient(var(--color-surface-500) 1px, transparent 1px), linear-gradient(90deg, var(--color-surface-500) 1px, transparent 1px)",
@@ -214,34 +235,45 @@ export function LandingPage({ locale }: LandingPageProps) {
         </div>
 
         <div className="max-w-4xl mx-auto text-center relative">
-          {/* Label badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5 mb-6">
             <Zap className="w-3 h-3 text-indigo-400" />
-            <span className="text-xs font-medium text-indigo-300">{c.hero_label}</span>
+            <span className="text-xs font-medium text-indigo-300">{t("heroLabel")}</span>
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-[var(--color-text-primary)] leading-tight mb-6">
-            {c.hero_title}
+            {t("heroTitle")}
           </h1>
 
           <p className="text-lg text-[var(--color-text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed">
-            {c.hero_sub}
+            {t("heroSub")}
           </p>
 
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            <Link
-              href={signupHref}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5"
-            >
-              {c.cta_primary}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href={loginHref}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-surface-500)] transition-all"
-            >
-              {c.cta_secondary}
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href={`${prefix}/dashboard`}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5"
+              >
+                {t("ctaDashboard")}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            ) : (
+              <>
+                <a
+                  href="mailto:htcpacoxo31@gmail.com?subject=HelpDesk AI Demo"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5"
+                >
+                  {t("ctaPrimary")}
+                  <ArrowRight className="w-4 h-4" />
+                </a>
+                <Link
+                  href={loginHref}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-surface-500)] transition-all"
+                >
+                  {t("ctaSecondary")}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -249,8 +281,8 @@ export function LandingPage({ locale }: LandingPageProps) {
       {/* ── Stats bar ───────────────────────────────────────────────── */}
       <section className="border-y border-[var(--color-surface-600)] bg-[var(--color-surface-900)]">
         <div className="max-w-4xl mx-auto px-6 py-8 grid grid-cols-3 divide-x divide-[var(--color-surface-600)]">
-          {c.stats.map((stat, i) => (
-            <div key={i} className="text-center px-6">
+          {stats.map((stat) => (
+            <div key={stat.label} className="text-center px-6">
               <div className="text-2xl font-bold text-indigo-400 mb-1">{stat.value}</div>
               <div className="text-xs text-[var(--color-text-muted)]">{stat.label}</div>
             </div>
@@ -263,19 +295,19 @@ export function LandingPage({ locale }: LandingPageProps) {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <p className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-3">
-              {c.features_label}
+              {t("featuresLabel")}
             </p>
             <h2 className="text-3xl font-bold text-[var(--color-text-primary)]">
-              {c.features_title}
+              {t("featuresTitle")}
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {c.features.map((feature, i) => {
+            {features.map((feature) => {
               const Icon = feature.icon;
               return (
                 <div
-                  key={i}
+                  key={feature.title}
                   className="group p-6 rounded-2xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] hover:border-indigo-500/30 hover:bg-[var(--color-surface-800)] transition-all duration-300"
                 >
                   <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-600/20 transition-colors">
@@ -294,6 +326,38 @@ export function LandingPage({ locale }: LandingPageProps) {
         </div>
       </section>
 
+      {/* ── How it works ────────────────────────────────────────────── */}
+      <section className="py-24 px-6 bg-[var(--color-surface-900)]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-[var(--color-text-primary)]">
+              {t("howTitle")}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {steps.map((step) => (
+              <div
+                key={step.num}
+                className="login-glass-card rounded-2xl p-8 border border-[var(--color-surface-600)] text-center"
+              >
+                <div className="w-12 h-12 rounded-full border-2 border-indigo-500/40 bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-sm mx-auto mb-5">
+                  {step.num}
+                </div>
+                <span className="text-xs text-indigo-400 font-medium uppercase tracking-wider">
+                  {step.label}
+                </span>
+                <h3 className="text-base font-semibold text-[var(--color-text-primary)] mt-2 mb-3">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Comparison table ────────────────────────────────────────── */}
       <ComparisonTable locale={locale} />
 
@@ -307,17 +371,17 @@ export function LandingPage({ locale }: LandingPageProps) {
               ))}
             </div>
             <blockquote className="text-lg text-[var(--color-text-secondary)] leading-relaxed mb-6 italic">
-              &ldquo;{c.testimonial_quote}&rdquo;
+              &ldquo;{t("testimonialQuote")}&rdquo;
             </blockquote>
             <div className="flex items-center justify-center gap-3">
               <div className="w-9 h-9 rounded-full bg-indigo-600/30 flex items-center justify-center text-sm font-semibold text-indigo-300">
-                {c.testimonial_name.charAt(0)}
+                {t("testimonialName").charAt(0)}
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {c.testimonial_name}
+                  {t("testimonialName")}
                 </p>
-                <p className="text-xs text-[var(--color-text-muted)]">{c.testimonial_role}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">{t("testimonialRole")}</p>
               </div>
             </div>
           </div>
@@ -334,29 +398,46 @@ export function LandingPage({ locale }: LandingPageProps) {
             <Zap className="w-7 h-7 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-[var(--color-text-primary)] mb-4">
-            {c.footer_cta_title}
+            {t("footerCtaTitle")}
           </h2>
-          <p className="text-[var(--color-text-secondary)] mb-8">{c.footer_cta_sub}</p>
-          <Link
-            href={signupHref}
+          <p className="text-[var(--color-text-secondary)] mb-8">{t("footerCtaSub")}</p>
+          <a
+            href="mailto:htcpacoxo31@gmail.com?subject=HelpDesk AI Demo"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-xl shadow-indigo-500/20 hover:-translate-y-0.5"
           >
-            {c.footer_cta_btn}
+            {t("footerCtaBtn")}
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </a>
         </div>
 
-        {/* Footer links */}
-        <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-[var(--color-surface-600)] flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
-              <Zap className="w-2.5 h-2.5 text-white" />
+        {/* Footer */}
+        <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-[var(--color-surface-600)]">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+              <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
+                <Zap className="w-2.5 h-2.5 text-white" />
+              </div>
+              <span>{t("footerCopy")}</span>
             </div>
-            <span>© 2026 Vidal Ecosystem. All rights reserved.</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span>Basel, Switzerland 🇨🇭</span>
-            <span>DSG/nDSG Compliant</span>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+              <Link href={loginHref} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+                {t("footerLogin")}
+              </Link>
+              <a href="https://github.com/vidal-renao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+                {t("footerGitHub")}
+              </a>
+              <a href="https://vidal-pro-portfolio.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+                {t("footerPortfolio")}
+              </a>
+              <a href="https://linkedin.com/in/vidalrenao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+                {t("footerLinkedIn")}
+              </a>
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                <Shield className="w-3 h-3" />
+                {t("footerDsg")}
+              </span>
+            </div>
           </div>
         </div>
       </section>

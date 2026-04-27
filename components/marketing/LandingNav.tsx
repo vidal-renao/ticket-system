@@ -1,23 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useLocale } from "next-intl";
-import { routing } from "@/i18n/routing";
-import { usePathname, useRouter } from "@/i18n/navigation";
-import { Zap } from "lucide-react";
+import { Zap, ChevronRight } from "lucide-react";
 
-const LOCALE_LABELS: Record<string, string> = { de: "DE", en: "EN", es: "ES" };
+const LOCALE_HREFS: Record<string, string> = { de: "/", en: "/en", es: "/es" };
+const LOGIN_LABELS: Record<string, string> = { de: "Anmelden", en: "Sign in", es: "Iniciar sesión" };
+const CTA_LABELS: Record<string, string> = { de: "Demo anfordern", en: "Request demo", es: "Solicitar demo" };
+const DASHBOARD_LABELS: Record<string, string> = { de: "Zum Dashboard", en: "Go to Dashboard", es: "Ir al Panel" };
 
 interface LandingNavProps {
   locale: string;
+  isLoggedIn?: boolean;
 }
 
-export function LandingNav({ locale }: LandingNavProps) {
-  const currentLocale = useLocale();
-  const pathname = usePathname();
-  const router = useRouter();
-
+export function LandingNav({ locale, isLoggedIn = false }: LandingNavProps) {
   const loginHref = locale === "de" ? "/login" : `/${locale}/login`;
+  const dashboardHref = locale === "de" ? "/dashboard" : `/${locale}/dashboard`;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 backdrop-blur-md bg-[#080b12]/80">
@@ -34,19 +32,19 @@ export function LandingNav({ locale }: LandingNavProps) {
         <div className="flex items-center gap-4">
           {/* Locale switcher */}
           <div className="flex items-center gap-1">
-            {routing.locales.map((l) => (
-              <button
+            {(["de", "en", "es"] as const).map((l) => (
+              <Link
                 key={l}
-                onClick={() => router.replace(pathname, { locale: l })}
+                href={LOCALE_HREFS[l]}
                 className={[
                   "px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors",
-                  l === currentLocale
+                  l === locale
                     ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
                     : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
                 ].join(" ")}
               >
-                {LOCALE_LABELS[l]}
-              </button>
+                {l.toUpperCase()}
+              </Link>
             ))}
           </div>
 
@@ -55,16 +53,26 @@ export function LandingNav({ locale }: LandingNavProps) {
             href={loginHref}
             className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
           >
-            {locale === "de" ? "Anmelden" : locale === "es" ? "Iniciar sesión" : "Sign in"}
+            {LOGIN_LABELS[locale] ?? "Sign in"}
           </Link>
 
           {/* CTA */}
-          <a
-            href="#pricing"
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-lg shadow-indigo-500/20"
-          >
-            {locale === "de" ? "Kostenlos testen" : locale === "es" ? "Prueba gratis" : "Start free trial"}
-          </a>
+          {isLoggedIn ? (
+            <Link
+              href={dashboardHref}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-lg shadow-indigo-500/20"
+            >
+              {DASHBOARD_LABELS[locale] ?? "Dashboard"}
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          ) : (
+            <a
+              href="mailto:htcpacoxo31@gmail.com?subject=HelpDesk AI Demo"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-lg shadow-indigo-500/20"
+            >
+              {CTA_LABELS[locale] ?? "Request demo"}
+            </a>
+          )}
         </div>
       </div>
     </header>

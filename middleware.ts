@@ -56,7 +56,8 @@ export async function middleware(request: NextRequest) {
   });
 
   const isPublicPath = AUTH_PATHS.some((publicPath) => path.endsWith(publicPath));
-  const isRoot = path === "/";
+  const isRoot =
+    path === "/" || routing.locales.some((locale) => path === `/${locale}`);
 
   if (!user && !isPublicPath && !isRoot) {
     const locale =
