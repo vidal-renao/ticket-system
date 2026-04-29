@@ -19,7 +19,7 @@ export function PIIScrubbingToggle({ enabled: initial }: PIIScrubbingToggleProps
     setLoading(true);
     const result = await setPiiScrubbing(next);
     if ("error" in result) {
-      toast.error(t("saveError"));
+      toast.error(result.error || t("saveError"));
     } else {
       setEnabled(next);
       toast.success(t("saved"));

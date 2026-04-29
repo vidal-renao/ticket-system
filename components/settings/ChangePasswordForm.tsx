@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
 
 const inputClass =
   "w-full px-3 py-2 rounded-lg text-sm bg-[var(--color-surface-800)] border border-[var(--color-surface-600)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-colors";
@@ -17,8 +19,9 @@ export function ChangePasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters");
+    const validation = passwordSchema.safeParse(newPassword);
+    if (!validation.success) {
+      toast.error(validation.error.issues[0]?.message ?? "Password does not meet policy");
       return;
     }
     if (newPassword !== confirm) {
@@ -29,7 +32,7 @@ export function ChangePasswordForm() {
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
-      toast.error(error.message);
+      toast.error(normalizeSupabaseErrorMessage(error));
     } else {
       toast.success("Password updated successfully");
       setNewPassword("");
@@ -49,8 +52,8 @@ export function ChangePasswordForm() {
             type={show ? "text" : "password"}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Min. 8 characters"
-            minLength={8}
+            placeholder="Min. 12 chars, upper/lower/number/symbol"
+            minLength={12}
             required
             className={`${inputClass} pr-10`}
           />
@@ -63,6 +66,7 @@ export function ChangePasswordForm() {
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
+        <PasswordStrengthMeter password={newPassword} className="mt-2" />
       </div>
       <div>
         <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">

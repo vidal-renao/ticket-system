@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { X, UserPlus, Building2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
+import { passwordSchema } from "@/lib/validation/security";
 
 export interface Team {
   id: string;
@@ -52,6 +54,11 @@ export function CreateUserModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const validation = passwordSchema.safeParse(password);
+    if (!validation.success) {
+      setError(validation.error.issues[0]?.message ?? "Password does not meet policy");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/admin/users", {
@@ -160,8 +167,8 @@ export function CreateUserModal({
                 type={showPwd ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 6 characters"
-                minLength={6}
+                placeholder="Min. 12 chars, upper/lower/number/symbol"
+                minLength={12}
                 className={`${input} pr-10`}
               />
               <button
@@ -173,6 +180,7 @@ export function CreateUserModal({
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <PasswordStrengthMeter password={password} className="mt-2" />
           </div>
 
           {type === "agent" && (

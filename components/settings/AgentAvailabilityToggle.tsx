@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 
 type Status = "online" | "offline" | "busy";
 
@@ -30,7 +31,7 @@ export function AgentAvailabilityToggle({ userId, initial }: AgentAvailabilityTo
       .eq("id", userId);
 
     if (error) {
-      toast.error("Could not update availability", { duration: 4000 });
+      toast.error(normalizeSupabaseErrorMessage(error), { duration: 4000 });
     } else {
       setStatus(next);
       toast.success(`Status set to ${next}`, { duration: 2500 });

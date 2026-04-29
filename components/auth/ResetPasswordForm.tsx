@@ -3,25 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
+import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-function getPasswordStrength(password: string): 0 | 1 | 2 | 3 {
-  if (password.length < 8) return 0;
-  let score = 0;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-  return Math.min(3, score) as 0 | 1 | 2 | 3;
-}
-
-const STRENGTH_COLORS = [
-  "bg-red-500",
-  "bg-orange-500",
-  "bg-yellow-500",
-  "bg-emerald-500",
-] as const;
+import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
 
 export function ResetPasswordForm() {
   const t = useTranslations("auth");
@@ -30,14 +16,6 @@ export function ResetPasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const strength = getPasswordStrength(password);
-  const strengthLabels = [
-    t("strengthWeak"),
-    t("strengthFair"),
-    t("strengthGood"),
-    t("strengthStrong"),
-  ] as const;
 
   const inputClass = [
     "w-full px-3 py-2.5 rounded-lg text-sm",
@@ -50,8 +28,9 @@ export function ResetPasswordForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (password.length < 8) {
-      toast.error(t("passwordTooShort"), { duration: 5000 });
+    const validation = passwordSchema.safeParse(password);
+    if (!validation.success) {
+      toast.error(validation.error.issues[0]?.message ?? t("passwordTooShort"), { duration: 5000 });
       return;
     }
     if (password !== confirm) {
@@ -65,7 +44,7 @@ export function ResetPasswordForm() {
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
-        toast.error(error.message || t("resetPasswordError"), { duration: 6000 });
+        toast.error(normalizeSupabaseErrorMessage(error), { duration: 6000 });
       } else {
         toast.success(t("resetPasswordSuccess"), { duration: 4000 });
         setTimeout(() => {
@@ -107,24 +86,7 @@ export function ResetPasswordForm() {
             </button>
           </div>
 
-          {/* Strength indicator */}
-          {password.length > 0 && (
-            <div className="mt-2">
-              <div className="flex gap-1 mb-1">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-all ${
-                      i <= strength ? STRENGTH_COLORS[strength] : "bg-[var(--color-surface-600)]"
-                    }`}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {strengthLabels[strength]}
-              </p>
-            </div>
-          )}
+          <PasswordStrengthMeter password={password} className="mt-2" />
         </div>
 
         {/* Confirm password */}

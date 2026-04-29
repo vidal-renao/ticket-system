@@ -2,6 +2,7 @@
 
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { customerProfileSchema, normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 
 export interface CustomerProfileInput {
   company_name: string;
@@ -13,7 +14,10 @@ export interface CustomerProfileInput {
 export async function saveCustomerProfile(
   data: CustomerProfileInput
 ): Promise<{ ok: true } | { error: string }> {
-  if (!data.company_name?.trim()) return { error: "Company name is required" };
+  const validation = customerProfileSchema.safeParse(data);
+  if (!validation.success) {
+    return { error: validation.error.issues[0]?.message ?? "Company profile is invalid" };
+  }
 
   const supabase = await createClient();
   const {
@@ -42,7 +46,7 @@ export async function saveCustomerProfile(
     { onConflict: "id" }
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: normalizeSupabaseErrorMessage(error) };
 
   revalidatePath("/settings");
   return { ok: true };

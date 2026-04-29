@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 
 interface AvatarUploadProps {
   userId: string;
@@ -39,7 +40,7 @@ export function AvatarUpload({ userId, name, currentUrl }: AvatarUploadProps) {
       .upload(path, file, { upsert: true, contentType: file.type });
 
     if (uploadError) {
-      toast.error(`Upload failed: ${uploadError.message}`);
+      toast.error(normalizeSupabaseErrorMessage(uploadError));
       setLoading(false);
       return;
     }
@@ -52,7 +53,7 @@ export function AvatarUpload({ userId, name, currentUrl }: AvatarUploadProps) {
       .eq("id", userId);
 
     if (profileError) {
-      toast.error("Failed to update profile");
+      toast.error(normalizeSupabaseErrorMessage(profileError));
     } else {
       setUrl(publicUrl + `?t=${Date.now()}`);
       toast.success("Avatar updated");

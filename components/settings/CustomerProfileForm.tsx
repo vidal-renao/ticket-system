@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { saveCustomerProfile } from "@/app/actions/customer-actions";
 import { toast } from "sonner";
+import { customerProfileSchema } from "@/lib/validation/security";
 
 interface CustomerProfileFormProps {
   initial: {
@@ -40,6 +41,11 @@ export function CustomerProfileForm({ initial }: CustomerProfileFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const validation = customerProfileSchema.safeParse(form);
+    if (!validation.success) {
+      toast.error(validation.error.issues[0]?.message ?? t("saveError"));
+      return;
+    }
     setPending(true);
     const result = await saveCustomerProfile(form);
     setPending(false);

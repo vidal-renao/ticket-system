@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
+import { normalizeSupabaseErrorMessage, registerSchema } from "@/lib/validation/security";
 
 interface RegisterBody {
   name?: string;
@@ -27,11 +28,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, email, password, org_code, role } = body;
-
-  if (!name?.trim() || !email?.trim() || !password || !org_code?.trim()) {
-    return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+  const validation = registerSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: validation.error.issues[0]?.message ?? "Invalid registration payload" },
+      { status: 400 }
+    );
   }
+  const { name, email, password, org_code, role, team_id, specialty, company_name, industry, business_details, tax_id } =
+    validation.data;
 
   const assignedRole = role === "customer" ? "customer" : "agent";
 
@@ -51,11 +56,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate team_id belongs to this org if provided
-  if (assignedRole === "agent" && body.team_id) {
+  if (assignedRole === "agent" && team_id) {
     const { data: team } = await svc
       .from("teams")
       .select("id")
-      .eq("id", body.team_id)
+      .eq("id", team_id)
       .eq("organization_id", org.id)
       .single();
     if (!team) {
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (signUpError) {
-    return NextResponse.json({ error: signUpError.message }, { status: 400 });
+    return NextResponse.json({ error: normalizeSupabaseErrorMessage(signUpError) }, { status: 400 });
   }
 
   const userId = signUpData.user?.id;
@@ -104,17 +109,17 @@ export async function POST(request: NextRequest) {
   };
 
   // Persist team assignment + derive specialty from team name
-  if (assignedRole === "agent" && body.team_id) {
-    profileData.team_id = body.team_id;
+  if (assignedRole === "agent" && team_id) {
+    profileData.team_id = team_id;
     // Use explicit specialty if provided, otherwise fall back to team name
-    if (body.specialty?.trim()) {
-      profileData.specialty = body.specialty.trim();
+    if (specialty?.trim()) {
+      profileData.specialty = specialty.trim();
     } else {
       // team was already validated above — org.name is available there but we re-fetch name
       const { data: teamForSpecialty } = await svc
         .from("teams")
         .select("name")
-        .eq("id", body.team_id)
+        .eq("id", team_id)
         .single();
       if (teamForSpecialty?.name) profileData.specialty = teamForSpecialty.name;
     }
@@ -129,14 +134,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Insert company info if customer
-  if (assignedRole === "customer" && body.company_name?.trim()) {
+  if (assignedRole === "customer" && company_name?.trim()) {
     const { error: customerError } = await svc.from("customers_info").upsert(
       {
         id: userId,
-        company_name: body.company_name.trim(),
-        industry: body.industry?.trim() ?? "",
-        business_details: body.business_details?.trim() ?? "",
-        tax_id: body.tax_id?.trim() ?? "",
+        company_name: company_name.trim(),
+        industry: industry?.trim() ?? "",
+        business_details: business_details?.trim() ?? "",
+        tax_id: tax_id?.trim() ?? "",
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" }

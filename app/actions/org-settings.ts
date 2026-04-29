@@ -2,6 +2,7 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 
 interface OrgSettings {
   pii_scrubbing_enabled: boolean;
@@ -73,14 +74,14 @@ export async function setPiiScrubbing(
       .select("id")
       .single();
 
-    if (orgError || !newOrg) return { error: `Cannot create organization: ${orgError?.message}` };
+    if (orgError || !newOrg) return { error: `Cannot create organization: ${normalizeSupabaseErrorMessage(orgError)}` };
 
     const { error: profileError } = await svc
       .from("profiles")
       .update({ organization_id: newOrg.id })
       .eq("id", user.id);
 
-    if (profileError) return { error: `Cannot link organization: ${profileError.message}` };
+    if (profileError) return { error: `Cannot link organization: ${normalizeSupabaseErrorMessage(profileError)}` };
 
     orgId = newOrg.id;
   }
@@ -104,7 +105,7 @@ export async function setPiiScrubbing(
     .update({ settings: { ...current, pii_scrubbing_enabled: enabled } })
     .eq("id", orgId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: normalizeSupabaseErrorMessage(error) };
 
   revalidatePath("/settings");
   return { ok: true };

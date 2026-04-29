@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/Button";
+import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import { registerSchema } from "@/lib/validation/security";
 
 interface Team {
   id: string;
@@ -25,6 +27,7 @@ export function RegisterForm() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamsLoading, setTeamsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
 
   const inputClass = [
     "w-full px-3 py-2.5 rounded-lg text-sm",
@@ -74,6 +77,13 @@ export function RegisterForm() {
       payload.industry         = (fd.get("industry") as string)?.trim() ?? "";
       payload.business_details = (fd.get("business_details") as string)?.trim() ?? "";
       payload.tax_id           = (fd.get("tax_id") as string)?.trim() ?? "";
+    }
+
+    const parsed = registerSchema.safeParse(payload);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? t("errorGeneric"));
+      setPending(false);
+      return;
     }
 
     try {
@@ -154,9 +164,11 @@ export function RegisterForm() {
             <input
               name="password"
               type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder={t("passwordPlaceholder")}
               required
-              minLength={8}
+              minLength={12}
               autoComplete="new-password"
               className={`${inputClass} pr-10`}
             />
@@ -169,6 +181,7 @@ export function RegisterForm() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          <PasswordStrengthMeter password={password} className="mt-2" />
         </div>
 
         {/* Org code — controlled so teams can be fetched */}

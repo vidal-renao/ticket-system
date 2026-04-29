@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -42,6 +43,13 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  const passwordValidation = passwordSchema.safeParse(password);
+  if (!passwordValidation.success) {
+    return NextResponse.json(
+      { error: passwordValidation.error.issues[0]?.message ?? "Password does not meet policy" },
+      { status: 400 }
+    );
+  }
 
   // admin.createUser() does NOT affect the current admin session
   const { data: newUserData, error: createError } = await svc.auth.admin.createUser({
@@ -53,7 +61,7 @@ export async function POST(request: Request) {
 
   if (createError || !newUserData?.user) {
     return NextResponse.json(
-      { error: createError?.message ?? "Failed to create user" },
+      { error: normalizeSupabaseErrorMessage(createError) },
       { status: 400 }
     );
   }

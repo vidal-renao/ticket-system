@@ -120,6 +120,15 @@ Any ticket description or comment can be translated to the agent's active UI loc
 
 ---
 
+## Security & Infrastructure (Hardened)
+
+- **PostgreSQL Hardening:** Fixed Search Path on all functions (`SET search_path = public`).
+- **Access Control:** Restricted `EXECUTE` permissions on RPCs to authenticated users only.
+- **Auth Policy:** 12-character high-entropy password requirement.
+- **Compliance:** Swiss DSG compliant via strict Row Level Security (RLS).
+
+---
+
 ## Feature Matrix
 
 | Feature | Customer | Agent | Manager | Admin |
