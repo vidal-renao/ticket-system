@@ -4,6 +4,9 @@ import { getTranslations } from "next-intl/server";
 import { LandingNav } from "./LandingNav";
 import { ComparisonTable } from "./ComparisonTable";
 import { PricingSection } from "./PricingSection";
+import { AnimatedSection } from "./AnimatedSection";
+import { AnimatedFeatureGrid } from "./AnimatedFeatureGrid";
+import { PillarsSection } from "./PillarsSection";
 
 interface LandingPageProps {
   locale: string;
@@ -192,13 +195,13 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
   const loginHref   = `${prefix}/login`;
   const registerHref = `${prefix}/register`;
 
-  const features: { icon: React.ElementType; title: string; desc: string }[] = [
-    { icon: Zap,      title: t("feature1Title"), desc: t("feature1Desc") },
-    { icon: Shield,   title: t("feature2Title"), desc: t("feature2Desc") },
-    { icon: Globe,    title: t("feature3Title"), desc: t("feature3Desc") },
-    { icon: BarChart3, title: t("feature4Title"), desc: t("feature4Desc") },
-    { icon: Clock,    title: t("feature5Title"), desc: t("feature5Desc") },
-    { icon: Star,     title: t("feature6Title"), desc: t("feature6Desc") },
+  const features = [
+    { iconName: "Zap"      as const, title: t("feature1Title"), desc: t("feature1Desc") },
+    { iconName: "Shield"   as const, title: t("feature2Title"), desc: t("feature2Desc") },
+    { iconName: "Globe"    as const, title: t("feature3Title"), desc: t("feature3Desc") },
+    { iconName: "BarChart3" as const, title: t("feature4Title"), desc: t("feature4Desc") },
+    { iconName: "Clock"    as const, title: t("feature5Title"), desc: t("feature5Desc") },
+    { iconName: "Star"     as const, title: t("feature6Title"), desc: t("feature6Desc") },
   ];
 
   const stats = [
@@ -234,7 +237,7 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
           />
         </div>
 
-        <div className="max-w-4xl mx-auto text-center relative">
+        <AnimatedSection className="max-w-4xl mx-auto text-center relative">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5 mb-6">
             <Zap className="w-3 h-3 text-indigo-400" />
             <span className="text-xs font-medium text-indigo-300">{t("heroLabel")}</span>
@@ -275,7 +278,7 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
               </>
             )}
           </div>
-        </div>
+        </AnimatedSection>
       </section>
 
       {/* ── Stats bar ───────────────────────────────────────────────── */}
@@ -302,57 +305,39 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div
-                  key={feature.title}
-                  className="group p-6 rounded-2xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] hover:border-indigo-500/30 hover:bg-[var(--color-surface-800)] transition-all duration-300"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-600/20 transition-colors">
-                    <Icon className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
-                    {feature.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          <AnimatedFeatureGrid features={features} />
         </div>
       </section>
+
+      {/* ── Pillars ─────────────────────────────────────────────────── */}
+      <PillarsSection />
 
       {/* ── How it works ────────────────────────────────────────────── */}
       <section className="py-24 px-6 bg-[var(--color-surface-900)]">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <AnimatedSection className="text-center mb-16">
             <h2 className="text-3xl font-bold text-[var(--color-text-primary)]">
               {t("howTitle")}
             </h2>
-          </div>
+          </AnimatedSection>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {steps.map((step) => (
-              <div
-                key={step.num}
-                className="login-glass-card rounded-2xl p-8 border border-[var(--color-surface-600)] text-center"
-              >
-                <div className="w-12 h-12 rounded-full border-2 border-indigo-500/40 bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-sm mx-auto mb-5">
-                  {step.num}
+            {steps.map((step, i) => (
+              <AnimatedSection key={step.num} delay={i * 0.1}>
+                <div className="login-glass-card rounded-2xl p-8 border border-[var(--color-surface-600)] text-center hover:border-indigo-500/30 hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/8 transition-all duration-300">
+                  <div className="w-12 h-12 rounded-full border-2 border-indigo-500/40 bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-sm mx-auto mb-5">
+                    {step.num}
+                  </div>
+                  <span className="text-xs text-indigo-400 font-medium uppercase tracking-wider">
+                    {step.label}
+                  </span>
+                  <h3 className="text-base font-semibold text-[var(--color-text-primary)] mt-2 mb-3">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                    {step.desc}
+                  </p>
                 </div>
-                <span className="text-xs text-indigo-400 font-medium uppercase tracking-wider">
-                  {step.label}
-                </span>
-                <h3 className="text-base font-semibold text-[var(--color-text-primary)] mt-2 mb-3">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                  {step.desc}
-                </p>
-              </div>
+              </AnimatedSection>
             ))}
           </div>
         </div>
@@ -413,24 +398,29 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
         {/* Footer */}
         <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-[var(--color-surface-600)]">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-              <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
-                <Zap className="w-2.5 h-2.5 text-white" />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+                <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center">
+                  <Zap className="w-2.5 h-2.5 text-white" />
+                </div>
+                <span>{t("footerCopy")}</span>
               </div>
-              <span>{t("footerCopy")}</span>
+              <p className="text-[10px] text-[var(--color-text-muted)] pl-7">
+                Built by Vidal Renao · IT Infrastructure &amp; AI Solutions Engineer
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
-              <Link href={loginHref} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+              <Link href={loginHref} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:underline underline-offset-2 transition-all">
                 {t("footerLogin")}
               </Link>
-              <a href="https://github.com/vidal-renao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+              <a href="https://github.com/vidal-renao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:underline underline-offset-2 transition-all">
                 {t("footerGitHub")}
               </a>
-              <a href="https://vidal-pro-portfolio.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+              <a href="https://vidal-pro-portfolio.vercel.app" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:underline underline-offset-2 transition-all">
                 {t("footerPortfolio")}
               </a>
-              <a href="https://linkedin.com/in/vidalrenao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors">
+              <a href="https://linkedin.com/in/vidalrenao" target="_blank" rel="noopener noreferrer" className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:underline underline-offset-2 transition-all">
                 {t("footerLinkedIn")}
               </a>
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
