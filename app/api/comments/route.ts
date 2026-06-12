@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
+import {
+  canViewCustomerMessages,
+  canViewInternalMessages,
+  getCurrentUserContext,
+} from "@/lib/auth/permissions";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // Service client bypasses RLS — identity already verified via getUser()
-  const svc = createServiceClientStatic();
-
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { ticket_id?: string; content?: string; is_internal?: boolean };
   try {
@@ -34,30 +25,30 @@ export async function POST(request: Request) {
     );
   }
 
-  const isStaff = ["agent", "manager", "admin"].includes(profile.role);
-
-  // Verify ticket exists and belongs to org (multi-tenant isolation)
+  const svc = createServiceClientStatic();
   const { data: ticket } = await svc
     .from("tickets")
-    .select("id, created_by, organization_id")
+    .select("id, created_by, organization_id, assigned_to")
     .eq("id", ticket_id)
-    .eq("organization_id", profile.organization_id ?? "00000000-0000-0000-0000-000000000000")
+    .eq("organization_id", ctx.organizationId ?? "00000000-0000-0000-0000-000000000000")
     .single();
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
-  // Customers can only comment on their own tickets
-  if (profile.role === "customer" && ticket.created_by !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const wantsInternal = is_internal === true;
+  const allowed = wantsInternal
+    ? canViewInternalMessages(ctx, ticket)
+    : canViewCustomerMessages(ctx, ticket);
+
+  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data: comment, error } = await svc
     .from("ticket_comments")
     .insert({
       ticket_id,
-      author_id: user.id,
+      author_id: ctx.userId,
       content: content.trim(),
-      is_internal: isStaff && is_internal,
+      is_internal: wantsInternal,
     })
     .select("*, profiles(full_name, avatar_url)")
     .single();

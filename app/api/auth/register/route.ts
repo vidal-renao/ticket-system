@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "All fields are required" }, { status: 400 });
   }
 
-  const assignedRole = role === "customer" ? "customer" : "agent";
+  const assignedRole = role === "customer" ? "customer" : "employee";
 
   // Validate org exists
   const svc = createServiceClientStatic();
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate team_id belongs to this org if provided
-  if (assignedRole === "agent" && body.team_id) {
+  if (assignedRole === "employee" && body.team_id) {
     const { data: team } = await svc
       .from("teams")
       .select("id")
@@ -101,10 +101,12 @@ export async function POST(request: NextRequest) {
     organization_id: org.id,
     role: assignedRole,
     is_active: true,
+    customer_status: assignedRole === "customer" ? "pending" : "active",
+    approved_at: assignedRole === "customer" ? null : new Date().toISOString(),
   };
 
   // Persist team assignment + derive specialty from team name
-  if (assignedRole === "agent" && body.team_id) {
+  if (assignedRole === "employee" && body.team_id) {
     profileData.team_id = body.team_id;
     // Use explicit specialty if provided, otherwise fall back to team name
     if (body.specialty?.trim()) {
@@ -149,7 +151,7 @@ export async function POST(request: NextRequest) {
   const hasSession = !!signUpData.session;
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";
   const prefix = locale === "de" ? "" : `/${locale}`;
-  const dest = assignedRole === "customer" ? `${prefix}/tickets` : `${prefix}/queue`;
+  const dest = assignedRole === "customer" ? `${prefix}/settings` : `${prefix}/queue`;
 
   if (hasSession) {
     const response = NextResponse.json({ redirectTo: dest });

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin } from "@/lib/auth/permissions";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Users, UserCheck, Building2, Wrench } from "lucide-react";
 import type { UserRole } from "@/lib/supabase/types";
@@ -14,7 +15,8 @@ export async function generateMetadata() {
 
 const ROLE_BADGE: Record<UserRole, { label: string; cls: string }> = {
   admin:    { label: "Admin",    cls: "text-red-400    bg-red-500/10    border-red-500/20" },
-  manager:  { label: "Manager",  cls: "text-amber-400  bg-amber-500/10  border-amber-500/20" },
+  manager:  { label: "Admin",    cls: "text-amber-400  bg-amber-500/10  border-amber-500/20" },
+  employee: { label: "Employee", cls: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
   agent:    { label: "Employee", cls: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20" },
   customer: { label: "Company",  cls: "text-slate-400  bg-slate-500/10  border-slate-500/20" },
 };
@@ -43,19 +45,14 @@ export default async function TeamPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const ctx = await getCurrentUserContext();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
-  if (!profile || !["manager", "admin"].includes(profile.role)) {
+  if (!isAdmin(ctx)) {
     redirect(queuePath);
   }
 
-  if (!profile.organization_id) {
+  if (!ctx?.organizationId) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
@@ -64,7 +61,8 @@ export default async function TeamPage({
     );
   }
 
-  const orgId = profile.organization_id;
+  const svc = createServiceClientStatic();
+  const orgId = ctx.organizationId;
 
   // Fetch members with specialty + team_id (safely — may not exist pre-migration)
   const { data: membersRaw } = await svc
@@ -115,7 +113,7 @@ export default async function TeamPage({
   );
 
   // Stats
-  const agents    = members.filter((m) => m.role === "agent" || m.role === "manager");
+  const agents    = members.filter((m) => m.role === "employee" || m.role === "agent");
   const customers = members.filter((m) => m.role === "customer");
   const active    = members.filter((m) => m.is_active);
 

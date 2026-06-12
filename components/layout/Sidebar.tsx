@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     labelKey: "dashboard",
     icon: LayoutDashboard,
-    roles: ["manager", "admin"],
+    roles: ["admin"],
   },
   {
     href: "/tickets",
@@ -63,31 +63,31 @@ const NAV_ITEMS: NavItem[] = [
     href: "/queue",
     labelKey: "queue",
     icon: Zap,
-    roles: ["agent", "manager", "admin"],
+    roles: ["employee", "admin"],
   },
   {
     href: "/tickets",
     labelKey: "allTickets",
     icon: TicketIcon,
-    roles: ["agent", "manager", "admin"],
+    roles: ["employee", "admin"],
   },
   {
     href: "/analytics",
     labelKey: "analytics",
     icon: BarChart3,
-    roles: ["manager", "admin"],
+    roles: ["admin"],
   },
   {
     href: "/analytics/predictive",
     labelKey: "predictive",
     icon: TrendingUp,
-    roles: ["manager", "admin"],
+    roles: ["admin"],
   },
   {
     href: "/team",
     labelKey: "team",
     icon: Users,
-    roles: ["manager", "admin"],
+    roles: ["admin"],
   },
   {
     href: "/admin",
@@ -99,13 +99,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/inbox",
     labelKey: "inbox",
     icon: MessageSquare,
-    roles: ["admin", "manager", "agent", "customer"],
+    roles: ["admin", "employee", "customer"],
   },
   {
     href: "/settings",
     labelKey: "settings",
     icon: Settings,
-    roles: ["admin", "manager", "agent", "customer"],
+    roles: ["admin", "employee", "customer"],
   },
 ];
 
@@ -119,6 +119,7 @@ interface SidebarProps {
 
 const ROLE_HOME: Record<UserRole, string> = {
   customer: "/tickets",
+  employee: "/queue",
   agent:    "/queue",
   manager:  "/dashboard",
   admin:    "/dashboard",

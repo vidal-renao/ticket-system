@@ -1,6 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import {
+  canViewInternalMessages,
+  canViewTicket,
+  getCurrentUserContext,
+  isAdmin,
+  isEmployee,
+} from "@/lib/auth/permissions";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
@@ -24,11 +31,10 @@ export default async function TicketDetailPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
+  const ctx = await getCurrentUserContext();
+  if (!ctx) redirect(loginPath);
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles").select("role").eq("id", user.id).single();
-
-  const isStaff = ["agent", "manager", "admin"].includes(profile?.role ?? "");
+  const isStaff = isAdmin(ctx) || isEmployee(ctx);
 
   // Flat ticket query — no embedded joins to avoid FK name mismatch errors.
   // PostgREST returns data=null (silently) when a join hint like
@@ -41,8 +47,7 @@ export default async function TicketDetailPage({
 
   if (ticketError || !ticket) notFound();
 
-  // Manual access check: customers can only see their own tickets
-  if (!isStaff && ticket.created_by !== user.id) notFound();
+  if (!canViewTicket(ctx, ticket)) notFound();
 
   // Fetch related data as separate flat queries
   const [
@@ -63,6 +68,9 @@ export default async function TicketDetailPage({
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
   ]);
+  const visibleComments = canViewInternalMessages(ctx, ticket)
+    ? (comments ?? [])
+    : (comments ?? []).filter((comment) => !comment.is_internal);
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -117,8 +125,8 @@ export default async function TicketDetailPage({
 
           <TicketComments
             ticketId={ticket.id}
-            comments={comments ?? []}
-            currentUserId={user.id}
+            comments={visibleComments}
+            currentUserId={ctx.userId}
             isStaff={isStaff}
             targetLocale={locale}
           />

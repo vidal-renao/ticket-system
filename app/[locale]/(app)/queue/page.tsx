@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin, isEmployee } from "@/lib/auth/permissions";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight } from "lucide-react";
@@ -36,32 +37,26 @@ export default async function QueuePage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
+  const ctx = await getCurrentUserContext();
   const svc = createServiceClientStatic();
 
-  // Auth-safe query (columns that always exist)
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
-
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
-  if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
+  if (!isAdmin(ctx) && !isEmployee(ctx)) {
     redirect(ticketsPath);
   }
 
-  const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  const orgId = ctx?.organizationId ?? "00000000-0000-0000-0000-000000000000";
 
   // Safely fetch specialty — column may not exist until migration runs
   const { data: agentExtras } = await svc
     .from("profiles")
     .select("specialty")
-    .eq("id", user.id)
+    .eq("id", ctx!.userId)
     .single();
   const agentSpecialty: string | null =
     (agentExtras as { specialty?: string | null } | null)?.specialty ?? null;
 
-  const { data: ticketsRaw, error: ticketsError } = await svc
+  let ticketQuery = svc
     .from("tickets")
     .select(
       "id, ticket_number, title, status, priority, created_at, sla_breached, sla_resolution_due, contains_pii, assigned_to"
@@ -69,6 +64,10 @@ export default async function QueuePage({
     .eq("organization_id", orgId)
     .in("status", ["open", "in_progress"])
     .order("created_at", { ascending: false });
+  if (isEmployee(ctx)) {
+    ticketQuery = ticketQuery.or(`assigned_to.eq.${ctx!.userId},created_by.eq.${ctx!.userId}`);
+  }
+  const { data: ticketsRaw, error: ticketsError } = await ticketQuery;
 
   if (ticketsError) console.error("[QueuePage] tickets query error:", ticketsError.message);
 
@@ -122,8 +121,8 @@ export default async function QueuePage({
   const sorted = [...tickets].sort((a, b) => {
     if (a.sla_breached && !b.sla_breached) return -1;
     if (!a.sla_breached && b.sla_breached) return 1;
-    const aMe = a.assigned_to === user.id;
-    const bMe = b.assigned_to === user.id;
+    const aMe = a.assigned_to === ctx!.userId;
+    const bMe = b.assigned_to === ctx!.userId;
     if (aMe && !bMe) return -1;
     if (!aMe && bMe) return 1;
     return (
@@ -134,14 +133,14 @@ export default async function QueuePage({
 
   const critical  = sorted.filter((t) => t.priority === "critical" || t.sla_breached);
   const myTickets = sorted.filter(
-    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === user.id
+    (t) => !t.sla_breached && t.priority !== "critical" && t.assigned_to === ctx!.userId
   );
   const mySpecialty = agentSpecialty
     ? sorted.filter(
         (t) =>
           !t.sla_breached &&
           t.priority !== "critical" &&
-          t.assigned_to !== user.id &&
+          t.assigned_to !== ctx!.userId &&
           t.ai?.suggested_category?.toLowerCase() === agentSpecialty.toLowerCase()
       )
     : [];
@@ -150,7 +149,7 @@ export default async function QueuePage({
     (t) =>
       !t.sla_breached &&
       t.priority !== "critical" &&
-      t.assigned_to !== user.id &&
+      t.assigned_to !== ctx!.userId &&
       !mySpecialtyIds.has(t.id)
   );
 

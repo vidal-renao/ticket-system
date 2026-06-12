@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
+import { canManageUsers, getCurrentUserContext } from "@/lib/auth/permissions";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const svc = createServiceClientStatic();
-  const { data: adminProfile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!adminProfile || adminProfile.role !== "admin") {
+  if (!canManageUsers(ctx)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -23,7 +15,7 @@ export async function POST(request: Request) {
     name?: string;
     email?: string;
     password?: string;
-    type?: "agent" | "customer";
+    type?: "employee" | "agent" | "customer";
     team_id?: string;
     specialty?: string;
     company_name?: string;
@@ -59,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   const userId = newUserData.user.id;
-  const role = type === "customer" ? "customer" : "agent";
+  const role = type === "customer" ? "customer" : "employee";
 
   // Step 1: save base profile (columns that always exist)
   const { error: profileError } = await svc
@@ -68,9 +60,12 @@ export async function POST(request: Request) {
       {
         id: userId,
         full_name: name.trim(),
-        organization_id: adminProfile.organization_id,
+        organization_id: ctx.organizationId,
         role,
         is_active: true,
+        customer_status: "active",
+        approved_at: new Date().toISOString(),
+        approved_by: ctx.userId,
       },
       { onConflict: "id" }
     );
@@ -81,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   // Step 2: try to set team_id / specialty — may fail if migration hasn't run yet
-  if (role === "agent" && (body.team_id?.trim() || body.specialty?.trim())) {
+  if (role === "employee" && (body.team_id?.trim() || body.specialty?.trim())) {
     const extended: Record<string, unknown> = {};
     if (body.team_id?.trim()) {
       extended.team_id = body.team_id.trim();

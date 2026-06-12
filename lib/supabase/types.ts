@@ -18,7 +18,8 @@ export type TicketStatus =
   | "closed";
 
 export type TicketPriority = "low" | "medium" | "high" | "critical";
-export type UserRole = "customer" | "agent" | "manager" | "admin";
+export type UserRole = "customer" | "employee" | "admin" | "agent" | "manager";
+export type CustomerStatus = "pending" | "active" | "blocked" | "archived";
 export type TicketSource = "portal" | "email" | "api" | "phone";
 export type SentimentType = "calm" | "neutral" | "frustrated" | "urgent" | "angry";
 
@@ -51,6 +52,10 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           role: UserRole;
+          customer_status: CustomerStatus;
+          disabled_at: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
           department: string | null;
           phone: string | null;
           locale: string;

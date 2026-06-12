@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin, isEmployee } from "@/lib/auth/permissions";
 import { Card } from "@/components/ui/Card";
 import { MessageSquare, Lock, Building2, UserCircle2 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
@@ -56,17 +57,12 @@ export default async function InboxPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
+  const ctx = await getCurrentUserContext();
+  if (!ctx) redirect(loginPath);
+
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) redirect(loginPath);
-
-  const isStaff = ["agent", "manager", "admin"].includes(profile.role);
-  const orgId = profile.organization_id as string | null;
+  const isStaff = isAdmin(ctx) || isEmployee(ctx);
+  const orgId = ctx.organizationId;
 
   // ── Fetch recent comments ──────────────────────────────────────────────────
   // For customers: only their own tickets
@@ -75,10 +71,14 @@ export default async function InboxPage({
 
   if (isStaff && orgId) {
     // Fetch all tickets in org first (need ticket IDs for comment filter)
-    const { data: orgTickets } = await svc
+    let ticketQuery = svc
       .from("tickets")
       .select("id")
       .eq("organization_id", orgId);
+    if (isEmployee(ctx)) {
+      ticketQuery = ticketQuery.or(`assigned_to.eq.${ctx.userId},created_by.eq.${ctx.userId}`);
+    }
+    const { data: orgTickets } = await ticketQuery;
 
     const ticketIds = (orgTickets ?? []).map((t: { id: string }) => t.id);
 
@@ -96,7 +96,7 @@ export default async function InboxPage({
     const { data: myTickets } = await svc
       .from("tickets")
       .select("id")
-      .eq("created_by", user.id);
+      .eq("created_by", ctx.userId);
 
     const ticketIds = (myTickets ?? []).map((t: { id: string }) => t.id);
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin, isCustomer, isEmployee } from "@/lib/auth/permissions";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -31,16 +32,13 @@ export default async function TicketsPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const ctx = await getCurrentUserContext();
+  if (!ctx) redirect(loginPath);
 
-  const isStaff    = ["agent", "manager", "admin"].includes(profile?.role ?? "");
-  const isCustomer = profile?.role === "customer";
-  const orgId      = profile?.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  const svc = createServiceClientStatic();
+  const isStaff = isAdmin(ctx) || isEmployee(ctx);
+  const customer = isCustomer(ctx);
+  const orgId = ctx.organizationId ?? "00000000-0000-0000-0000-000000000000";
 
   // ── Customer query: full columns ─────────────────────────────────────────
   type CustomerTicket = {
@@ -64,19 +62,27 @@ export default async function TicketsPage({
     updated_at: string;
   };
 
-  const { data: tickets, error } = isStaff
+  const { data: tickets, error } = isAdmin(ctx)
     ? await svc
         .from("tickets")
         .select("id, ticket_number, title, status, priority, created_at, updated_at")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false })
         .limit(100)
-    : await svc
-        .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, resolved_at")
-        .eq("created_by", user.id)
-        .order("created_at", { ascending: false })
-        .limit(100);
+    : isEmployee(ctx)
+      ? await svc
+          .from("tickets")
+          .select("id, ticket_number, title, status, priority, created_at, updated_at")
+          .eq("organization_id", orgId)
+          .or(`assigned_to.eq.${ctx.userId},created_by.eq.${ctx.userId}`)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      : await svc
+          .from("tickets")
+          .select("id, ticket_number, title, status, priority, created_at, resolved_at")
+          .eq("created_by", ctx.userId)
+          .order("created_at", { ascending: false })
+          .limit(100);
 
   if (error) console.error("[TicketsPage] query error:", error.message);
 
@@ -110,13 +116,13 @@ export default async function TicketsPage({
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-            {isCustomer ? t("myTickets") : t("allTickets")}
+            {customer ? t("myTickets") : t("allTickets")}
           </h1>
           <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
             {t("totalCount", { count: tickets?.length ?? 0 })}
           </p>
         </div>
-        {isCustomer && (
+        {customer && (
           <Link href={newTicketPath}>
             <Button size="sm">
               <PlusCircle className="w-4 h-4" />
@@ -131,9 +137,9 @@ export default async function TicketsPage({
           <TicketIcon className="w-10 h-10 text-[var(--color-text-muted)] mb-3" />
           <p className="text-[var(--color-text-secondary)] font-medium">{t("noTickets")}</p>
           <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            {isCustomer ? t("noTicketsCustomer") : t("noTicketsStaff")}
+            {customer ? t("noTicketsCustomer") : t("noTicketsStaff")}
           </p>
-          {isCustomer && (
+          {customer && (
             <Link href={newTicketPath} className="mt-4">
               <Button size="sm">
                 <PlusCircle className="w-4 h-4" /> {t("newTicket")}
@@ -141,7 +147,7 @@ export default async function TicketsPage({
             </Link>
           )}
         </Card>
-      ) : isCustomer ? (
+      ) : customer ? (
         /* ── Customer: detailed timeline table ─────────────────────────────── */
         <div className="rounded-xl border border-[var(--color-surface-600)] overflow-hidden">
           <table className="w-full text-sm">

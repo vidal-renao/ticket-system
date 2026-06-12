@@ -12,7 +12,7 @@ export interface Team {
 
 interface CreateUserModalProps {
   open: boolean;
-  defaultType?: "agent" | "customer";
+  defaultType?: "employee" | "customer";
   teams: Team[];
   onClose: () => void;
   onSuccess: () => void;
@@ -24,12 +24,12 @@ const label = "block text-xs font-medium text-[var(--color-text-secondary)] mb-1
 
 export function CreateUserModal({
   open,
-  defaultType = "agent",
+  defaultType = "employee",
   teams,
   onClose,
   onSuccess,
 }: CreateUserModalProps) {
-  const [type, setType]               = useState<"agent" | "customer">(defaultType);
+  const [type, setType]               = useState<"employee" | "customer">(defaultType);
   const [name, setName]               = useState("");
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
@@ -59,7 +59,7 @@ export function CreateUserModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name, email, password, type,
-          ...(type === "agent" && {
+          ...(type === "employee" && {
             team_id: teamId || undefined,
             specialty: specialty || undefined,
           }),
@@ -71,7 +71,7 @@ export function CreateUserModal({
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to create user"); return; }
-      toast.success(`${type === "agent" ? "Employee" : "Company"} created successfully`);
+      toast.success(`${type === "employee" ? "Employee" : "Company"} created successfully`);
       onSuccess();
       onClose();
     } catch {
@@ -95,7 +95,7 @@ export function CreateUserModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-surface-700)]">
           <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {type === "agent" ? "New Employee" : "New Company"}
+            {type === "employee" ? "New Employee" : "New Company"}
           </h2>
           <button
             type="button"
@@ -108,7 +108,7 @@ export function CreateUserModal({
 
         {/* Type toggle */}
         <div className="flex gap-1 mx-5 mt-4 p-1 bg-[var(--color-surface-800)] rounded-lg border border-[var(--color-surface-700)]">
-          {(["agent", "customer"] as const).map((t) => (
+          {(["employee", "customer"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -119,7 +119,7 @@ export function CreateUserModal({
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
-              {t === "agent"
+              {t === "employee"
                 ? <><UserPlus className="w-3.5 h-3.5" /> Employee</>
                 : <><Building2 className="w-3.5 h-3.5" /> Company</>
               }
@@ -175,7 +175,7 @@ export function CreateUserModal({
             </div>
           </div>
 
-          {type === "agent" && (
+          {type === "employee" && (
             <>
               <div>
                 <label className={label}>Team</label>
@@ -263,7 +263,7 @@ export function CreateUserModal({
             <Button type="submit" size="sm" className="flex-1" disabled={loading}>
               {loading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : type === "agent" ? "Create Employee" : "Create Company"
+                : type === "employee" ? "Create Employee" : "Create Company"
               }
             </Button>
           </div>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin } from "@/lib/auth/permissions";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/PriorityBadge";
@@ -46,17 +47,13 @@ export default async function AdminPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role, organization_id")
-    .eq("id", user.id)
-    .single();
+  const ctx = await getCurrentUserContext();
 
   const ticketsPath = locale === "de" ? "/tickets" : `/${locale}/tickets`;
-  if (!profile || profile.role !== "admin") redirect(ticketsPath);
+  if (!isAdmin(ctx)) redirect(ticketsPath);
 
-  const orgId = profile.organization_id ?? "00000000-0000-0000-0000-000000000000";
+  const svc = createServiceClientStatic();
+  const orgId = ctx?.organizationId ?? "00000000-0000-0000-0000-000000000000";
 
   // ── Parallel fetches ───────────────────────────────────────────────────────
   type RawTicket = {
@@ -172,7 +169,7 @@ export default async function AdminPage({
   const agents = Array.from(agentMap.entries()).map(([id, name]) => ({ id, name }));
 
   const allAgents = profiles
-    .filter((p) => p.role === "agent")
+    .filter((p) => p.role === "employee" || p.role === "agent")
     .map((p) => ({ id: p.id, name: p.full_name ?? p.id }));
 
   const categoryNames = [

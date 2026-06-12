@@ -13,9 +13,9 @@ interface AdminPageControlsProps {
 export function AdminPageControls({ teams }: AdminPageControlsProps) {
   const router = useRouter();
   const [open, setOpen]                   = useState(false);
-  const [defaultType, setDefaultType]     = useState<"agent" | "customer">("agent");
+  const [defaultType, setDefaultType]     = useState<"employee" | "customer">("employee");
 
-  function openModal(type: "agent" | "customer") {
+  function openModal(type: "employee" | "customer") {
     setDefaultType(type);
     setOpen(true);
   }
@@ -30,7 +30,7 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => openModal("agent")}
+          onClick={() => openModal("employee")}
         >
           <UserPlus className="w-3.5 h-3.5" />
           New Employee

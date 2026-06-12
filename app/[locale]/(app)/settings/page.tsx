@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin, isCustomer, isEmployee } from "@/lib/auth/permissions";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Shield, ShieldAlert, Key, Users, Building2 } from "lucide-react";
 import { getOrgSettings } from "@/app/actions/org-settings";
@@ -30,6 +31,9 @@ export default async function SettingsPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
+  const ctx = await getCurrentUserContext();
+  if (!ctx) redirect(loginPath);
+
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
@@ -39,13 +43,13 @@ export default async function SettingsPage({
 
   if (!profile) redirect(loginPath);
 
-  const isAdmin    = profile.role === "admin";
-  const isCustomer = profile.role === "customer";
-  const isAgent    = profile.role === "agent" || profile.role === "manager";
+  const admin = isAdmin(ctx);
+  const customer = isCustomer(ctx);
+  const employee = isEmployee(ctx);
 
   // Agent-specific fields fetched separately to avoid schema-cache failures
   let agentProfile: { team_id: string | null; specialty: string | null } | null = null;
-  if (isAgent) {
+  if (employee) {
     const { data } = await svc
       .from("profiles")
       .select("team_id, specialty")
@@ -58,7 +62,7 @@ export default async function SettingsPage({
   let pii_scrubbing_enabled = false;
   let orgId: string | null = null;
   let orgName: string | null = null;
-  if (isAdmin) {
+  if (admin) {
     const orgSettings = await getOrgSettings();
     pii_scrubbing_enabled = orgSettings.pii_scrubbing_enabled;
     orgId = profile.organization_id ?? null;
@@ -75,7 +79,7 @@ export default async function SettingsPage({
     business_details: string;
     tax_id: string;
   } | null = null;
-  if (isCustomer) {
+  if (customer) {
     const { data } = await svc
       .from("customers_info")
       .select("company_name, industry, business_details, tax_id")
@@ -86,7 +90,7 @@ export default async function SettingsPage({
 
   // Agent/Manager: fetch team name
   let agentTeamName: string | null = null;
-  if (isAgent && agentProfile?.team_id) {
+  if (employee && agentProfile?.team_id) {
     const { data: team } = await svc
       .from("teams")
       .select("name")
@@ -103,7 +107,7 @@ export default async function SettingsPage({
       </div>
 
       {/* ── ADMIN: Org Code + Compliance ── */}
-      {isAdmin && (
+      {admin && (
         <>
           <Card className="mb-5">
             <CardHeader>
@@ -167,7 +171,7 @@ export default async function SettingsPage({
       )}
 
       {/* ── CUSTOMER: Company Profile ── */}
-      {isCustomer && (
+      {customer && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -187,7 +191,7 @@ export default async function SettingsPage({
       )}
 
       {/* ── AGENT / MANAGER: Team info ── */}
-      {isAgent && (
+      {employee && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">

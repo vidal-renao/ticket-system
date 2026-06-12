@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
 import { triageTicket } from "@/lib/ai/triage";
 import { scrubPII } from "@/lib/ai/pii-scrubber";
 import { retrieveRelevantKnowledge, buildRAGContext } from "@/lib/ai/rag";
+import { canCreateTicket, getCurrentUserContext } from "@/lib/auth/permissions";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const ctx = await getCurrentUserContext();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canCreateTicket(ctx)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let body: { title?: string; description?: string; team_id?: string; priority?: string };
@@ -35,26 +35,20 @@ export async function POST(request: Request) {
   }
 
   const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.organization_id) {
+  if (!ctx.organizationId) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
   // Smart auto-assignment based on selected team
-  const assignment = await autoAssign(svc, profile.organization_id, team_id ?? null);
+  const assignment = await autoAssign(svc, ctx.organizationId, team_id ?? null);
 
   const { data: ticket, error } = await svc
     .from("tickets")
     .insert({
       title: title.trim(),
       description: description.trim(),
-      organization_id: profile.organization_id,
-      created_by: user.id,
+      organization_id: ctx.organizationId,
+      created_by: ctx.userId,
       status: "open",
       priority,
       source: "portal",
@@ -69,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   scheduleBackground(
-    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
+    runAITriage(ticket.id, title.trim(), description.trim(), ctx.organizationId)
   );
 
   return NextResponse.json({ ticket }, { status: 201 });
@@ -96,13 +90,13 @@ async function autoAssign(
 
   if (!team) return { assigned_to: null };
 
-  // Find agents assigned to this team
+  // Find employees assigned to this team. Legacy agent is included during migration.
   const { data: teamAgents } = await svc
     .from("profiles")
     .select("id")
     .eq("organization_id", orgId)
     .eq("team_id", teamId)
-    .eq("role", "agent")
+    .in("role", ["employee", "agent"])
     .eq("is_active", true);
 
   const teamAgentIds = (teamAgents ?? []).map((a: { id: string }) => a.id);
@@ -119,7 +113,7 @@ async function autoAssign(
     .from("profiles")
     .select("id")
     .eq("organization_id", orgId)
-    .eq("role", "agent")
+    .in("role", ["employee", "agent"])
     .eq("is_active", true);
 
   const allAgentIds = (allAgents ?? []).map((a: { id: string }) => a.id);

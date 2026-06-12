@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { PredictiveEngine } from "@/components/analytics/PredictiveEngine";
+import { getCurrentUserContext, isAdmin } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +21,10 @@ export default async function PredictivePage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles").select("role").eq("id", user.id).single();
+  const ctx = await getCurrentUserContext();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
-  if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);
+  if (!isAdmin(ctx)) redirect(queuePath);
 
   return <PredictiveEngine />;
 }

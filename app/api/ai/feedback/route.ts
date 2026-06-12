@@ -1,20 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
+import { canViewTicket, getCurrentUserContext, isAdmin, isEmployee } from "@/lib/auth/permissions";
 
 /** Agents can submit feedback on AI suggestions for continuous improvement */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["agent", "manager", "admin"].includes(profile.role)) {
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdmin(ctx) && !isEmployee(ctx)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -23,7 +15,19 @@ export async function POST(request: Request) {
 
   if (!ticket_id) return NextResponse.json({ error: "ticket_id required" }, { status: 400 });
 
-  const { error } = await supabase
+  const svc = createServiceClientStatic();
+  const { data: ticket } = await svc
+    .from("tickets")
+    .select("id, organization_id, created_by, assigned_to")
+    .eq("id", ticket_id)
+    .single();
+
+  if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+  if (!canViewTicket(ctx, ticket)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { error } = await svc
     .from("ai_analysis")
     .update({
       category_accepted,

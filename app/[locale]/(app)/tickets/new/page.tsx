@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { canCreateTicket, getCurrentUserContext } from "@/lib/auth/permissions";
 import { NewTicketForm } from "@/components/tickets/NewTicketForm";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +25,11 @@ export default async function NewTicketPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(locale === "de" ? "/login" : `/${locale}/login`);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
+  const ctx = await getCurrentUserContext();
+  if (!canCreateTicket(ctx)) redirect(locale === "de" ? "/settings" : `/${locale}/settings`);
 
-  const orgId = profile?.organization_id ?? null;
+  const svc = createServiceClientStatic();
+  const orgId = ctx?.organizationId ?? null;
   let teams: Array<{ id: string; name: string }> = [];
 
   if (orgId) {

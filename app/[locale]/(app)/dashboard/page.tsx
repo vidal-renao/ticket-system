@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { getCurrentUserContext, isAdmin } from "@/lib/auth/permissions";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { TicketIcon, AlertCircle, CheckCircle2, Clock, Zap, TrendingUp, ShieldAlert } from "lucide-react";
 import { formatTicketRef } from "@/lib/utils";
@@ -26,14 +27,12 @@ export default async function DashboardPage({
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
   if (!user) redirect(loginPath);
 
-  const svc = createServiceClientStatic();
-  const { data: profile } = await svc
-    .from("profiles").select("role, organization_id").eq("id", user.id).single();
+  const ctx = await getCurrentUserContext();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
-  if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);
+  if (!isAdmin(ctx)) redirect(queuePath);
 
-  if (!profile.organization_id) {
+  if (!ctx?.organizationId) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
@@ -42,7 +41,8 @@ export default async function DashboardPage({
     );
   }
 
-  const orgId = profile.organization_id;
+  const svc = createServiceClientStatic();
+  const orgId = ctx.organizationId;
   const prefix = locale === "de" ? "" : `/${locale}`;
 
   // All queries are flat — no embedded joins (categories/ai_analysis RLS

@@ -1,7 +1,8 @@
 "use server";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { createServiceClientStatic } from "@/lib/supabase/server";
+import { canViewTicket, getCurrentUserContext, isAdmin, isEmployee } from "@/lib/auth/permissions";
 
 const LANG_NAMES: Record<string, string> = {
   de: "German",
@@ -13,32 +14,24 @@ const LANG_NAMES: Record<string, string> = {
 export async function suggestReply(
   ticketId: string
 ): Promise<{ suggestion: string } | { error: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Unauthorized" };
+  const ctx = await getCurrentUserContext();
+  if (!ctx) return { error: "Unauthorized" };
 
   // Service client bypasses RLS — identity already verified via getUser()
   const svc = createServiceClientStatic();
 
-  const { data: profile } = await svc
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!["agent", "manager", "admin"].includes(profile?.role ?? "")) {
+  if (!isAdmin(ctx) && !isEmployee(ctx)) {
     return { error: "Forbidden" };
   }
 
   const { data: ticket } = await svc
     .from("tickets")
-    .select("id, title, description, category_id")
+    .select("id, title, description, category_id, organization_id, created_by, assigned_to")
     .eq("id", ticketId)
     .single();
 
   if (!ticket) return { error: "Ticket not found" };
+  if (!canViewTicket(ctx, ticket)) return { error: "Forbidden" };
 
   // Flat queries — avoid nested join direction issues with PostgREST
   const [{ data: categoryRow }, { data: aiRow }] = await Promise.all([

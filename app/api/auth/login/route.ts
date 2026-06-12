@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
+import { normalizeRole } from "@/lib/auth/permissions";
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -47,18 +48,25 @@ export async function POST(request: NextRequest) {
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
     .from("profiles")
-    .select("role")
+    .select("role, customer_status, disabled_at")
     .eq("id", user.id)
     .single();
+
+  if (profile?.disabled_at) {
+    return NextResponse.json({ error: "Account disabled" }, { status: 403 });
+  }
 
   // Detect locale from cookie (set by next-intl middleware)
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";
   const prefix = locale === "de" ? "" : `/${locale}`;
 
-  const role = profile?.role ?? "customer";
+  const role = normalizeRole(profile?.role);
+  if (role === "customer" && profile?.customer_status !== "active") {
+    return NextResponse.json({ error: "Customer account pending approval" }, { status: 403 });
+  }
   const dest =
     role === "customer" ? `${prefix}/tickets` :
-    role === "agent"    ? `${prefix}/queue`   :
+    role === "employee" ? `${prefix}/queue`   :
     `${prefix}/dashboard`;
 
   // Return JSON with redirect destination — cookies attached explicitly.
