@@ -17,6 +17,7 @@ import { AssignToMeButton } from "@/components/tickets/AssignToMeButton";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight, Gauge, Layers3 } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon, formatRelativeTime } from "@/lib/utils";
+import { getTicketPresentation } from "@/lib/ticket-presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ type RawTicket = {
   first_agent_response_at?: string | null;
   contains_pii?: boolean;
   assigned_to?: string | null;
+  metadata?: unknown;
 };
 
 type AiRow = {
@@ -99,7 +101,7 @@ export default async function QueuePage({
   let ticketsQuery = getTicketsByRole(
     svc,
     profile,
-    "id, ticket_number, title, created_by, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to"
+    "id, ticket_number, title, created_by, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to, metadata"
   ).in("status", ["open", "in_progress", "pending_customer"]);
 
   if (filters.status && ["open", "in_progress", "pending_customer"].includes(filters.status)) {
@@ -151,7 +153,7 @@ export default async function QueuePage({
   }
 
   const [{ data: organization }, { data: customerCompanyRows }, { data: assigneeRows }] = await Promise.all([
-    svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
+    svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", profile.organization_id).single(),
     creatorIds.length
       ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
       : Promise.resolve({ data: [] as { id: string; company_name: string; industry: string }[] }),
@@ -247,6 +249,11 @@ export default async function QueuePage({
     const assigneeProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
     const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assigneeProfile) : "Unassigned";
     const assigneeName = assigneeProfile?.full_name?.trim() || assigneeLabel;
+    const presentation = getTicketPresentation({
+      priority: ticket.priority,
+      metadata: ticket.metadata,
+      organization: organization ?? null,
+    });
 
     return (
       <Card hover className="p-4">
@@ -304,7 +311,12 @@ export default async function QueuePage({
                 </span>
               )}
               <Badge className={slaState.className}>{slaState.label}</Badge>
-              <Badge className={priorityColor(ticket.priority)}>{tp(ticket.priority)}</Badge>
+              <Badge className={priorityColor(presentation.priorityTone)}>
+                {presentation.priorityLabel === "emergency" ? "Emergency" : tp(ticket.priority)}
+              </Badge>
+              {presentation.isVip && (
+                <Badge className="border-fuchsia-400/25 bg-fuchsia-500/10 text-fuchsia-200">VIP</Badge>
+              )}
               <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                 <Clock className="h-3 w-3" />
                 {formatRelativeTime(ticket.created_at)}

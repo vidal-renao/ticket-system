@@ -4,8 +4,9 @@ import { priorityColor } from "@/lib/utils";
 interface PriorityBadgeProps {
   priority: string;
   label: string;
+  accentPriority?: string;
 }
 
-export function PriorityBadge({ priority, label }: PriorityBadgeProps) {
-  return <Badge className={priorityColor(priority)}>{label}</Badge>;
+export function PriorityBadge({ priority, label, accentPriority }: PriorityBadgeProps) {
+  return <Badge className={priorityColor(accentPriority ?? priority)}>{label}</Badge>;
 }

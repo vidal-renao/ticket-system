@@ -12,6 +12,7 @@ export function formatTicketRef(ticketNumber: number | null | undefined): string
 
 export function priorityColor(priority: string): string {
   const map: Record<string, string> = {
+    "vip-critical": "text-rose-100 bg-gradient-to-r from-rose-600/30 to-amber-500/25 border-rose-400/40 shadow-[0_0_0_1px_rgba(251,113,133,0.15)]",
     critical: "text-red-400 bg-red-400/10 border-red-400/20",
     high: "text-orange-400 bg-orange-400/10 border-orange-400/20",
     medium: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",

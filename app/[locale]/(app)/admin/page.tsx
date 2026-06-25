@@ -12,6 +12,7 @@ import { AdminPageControls } from "@/components/admin/AdminPageControls";
 import { AdminTicketActions } from "@/components/admin/AdminTicketActions";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { formatAgentIdentity } from "@/lib/ticket-visibility";
+import { getTicketPresentation } from "@/lib/ticket-presentation";
 import {
   Building2,
   TicketIcon,
@@ -45,6 +46,7 @@ type RawTicket = {
   assigned_to: string | null;
   sla_breached: boolean | null;
   category_id: string | null;
+  metadata?: unknown;
 };
 
 type ProfileRow = {
@@ -100,11 +102,11 @@ export default async function AdminPage({
 
   const orgId = profile.organization_id;
 
-  const [{ data: ticketsRaw }, { data: allProfiles }, { data: categoriesRaw }, { data: teamsRaw }] = await Promise.all([
+  const [{ data: ticketsRaw }, { data: allProfiles }, { data: categoriesRaw }, { data: teamsRaw }, { data: organization }] = await Promise.all([
     (() => {
       let query = svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id")
+        .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id, metadata")
         .eq("organization_id", orgId)
         .limit(500);
 
@@ -131,6 +133,7 @@ export default async function AdminPage({
     svc.from("profiles").select("id, full_name, role, specialty, availability_status").eq("organization_id", orgId),
     svc.from("categories").select("id, name").eq("organization_id", orgId).order("name"),
     svc.from("teams").select("id, name").eq("organization_id", orgId).order("name"),
+    svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", orgId).single(),
   ]);
 
   const tickets = (ticketsRaw ?? []) as RawTicket[];
@@ -163,12 +166,18 @@ export default async function AdminPage({
     creator_name: profileById[ticket.created_by]?.full_name ?? null,
     agent_name: ticket.assigned_to ? formatAgentIdentity(profileById[ticket.assigned_to]) : null,
     category_name: ticket.category_id ? categoryById[ticket.category_id] ?? null : aiByTicket[ticket.id] ?? null,
+    presentation: getTicketPresentation({
+      priority: ticket.priority,
+      metadata: ticket.metadata,
+      organization: organization ?? null,
+    }),
   }));
 
   // Build company list: include all org customers (even those with no tickets yet)
   const allCompanyNames = new Set<string>();
   enriched.forEach((t) => { if (t.company_name) allCompanyNames.add(t.company_name); });
   ((customerInfosRaw ?? []) as CustomerInfo[]).forEach((c) => { if (c.company_name?.trim()) allCompanyNames.add(c.company_name.trim()); });
+  if (organization?.name?.trim()) allCompanyNames.add(organization.name.trim());
   const companies = [...allCompanyNames].sort();
   const allAgents = profiles
     .filter((entry) => ["agent", "manager", "admin"].includes(entry.role))
@@ -397,7 +406,14 @@ export default async function AdminPage({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
+                        <PriorityBadge
+                          priority={ticket.priority}
+                          accentPriority={ticket.presentation.priorityTone}
+                          label={ticket.presentation.priorityLabel === "emergency" ? "Emergency" : tp(ticket.priority)}
+                        />
+                        {ticket.presentation.isVip && (
+                          <Badge className="border-fuchsia-400/25 bg-fuchsia-500/10 text-[10px] text-fuchsia-200">VIP</Badge>
+                        )}
                         {ticket.sla_breached && (
                           <Badge className="border-red-400/20 bg-red-400/10 text-[10px] text-red-300">SLA</Badge>
                         )}

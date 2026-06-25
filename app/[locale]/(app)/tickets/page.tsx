@@ -32,6 +32,7 @@ import {
   formatDateTime,
   formatDuration,
 } from "@/lib/utils";
+import { getTicketPresentation } from "@/lib/ticket-presentation";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ type StaffTicket = {
   sla_resolution_due: string | null;
   first_response_at: string | null;
   first_agent_response_at: string | null;
+  metadata?: unknown;
 };
 
 export async function generateMetadata() {
@@ -112,7 +114,7 @@ export default async function TicketsPage({
   let staffTicketsQuery = getTicketsByRole(
     svc,
     profile,
-    "id, ticket_number, title, created_by, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at",
+    "id, ticket_number, title, created_by, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, metadata",
     staffQueryOptions
   );
 
@@ -174,7 +176,7 @@ export default async function TicketsPage({
   const assigneeIds = [...new Set(staffTickets.map((ticket) => ticket.assigned_to).filter((value): value is string => Boolean(value)))];
 
   const [{ data: organization }, { data: customerCompanyRows }, { data: staffProfileRows }, { count: assignedCount }] = await Promise.all([
-    svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
+    svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", profile.organization_id).single(),
     creatorIds.length
       ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
       : Promise.resolve({ data: [] as { id: string; company_name: string; industry: string }[] }),
@@ -508,6 +510,11 @@ export default async function TicketsPage({
             const assignedProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
             const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assignedProfile) : "Unassigned";
             const assigneeName = assignedProfile?.full_name?.trim() || assigneeLabel;
+            const presentation = getTicketPresentation({
+              priority: ticket.priority,
+              metadata: (ticket as StaffTicket).metadata,
+              organization: organization ?? null,
+            });
 
             return (
               <li key={ticket.id} role="listitem">
@@ -541,7 +548,14 @@ export default async function TicketsPage({
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                        <PriorityBadge priority={ticket.priority} label={tp(ticket.priority)} />
+                        <PriorityBadge
+                          priority={ticket.priority}
+                          accentPriority={presentation.priorityTone}
+                          label={presentation.priorityLabel === "emergency" ? "Emergency" : tp(ticket.priority)}
+                        />
+                        {presentation.isVip && (
+                          <Badge className="border-fuchsia-400/25 bg-fuchsia-500/10 text-fuchsia-200">VIP</Badge>
+                        )}
                         <Badge className={`${slaState.className} text-[10px]`}>{slaState.label}</Badge>
                         <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
                         <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">

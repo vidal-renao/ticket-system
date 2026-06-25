@@ -32,6 +32,7 @@ export interface Database {
           name: string;
           slug: string;
           plan: "starter" | "pro" | "enterprise" | null;
+          tier: string | null;
           logo_url: string | null;
           primary_color: string;
           support_email: string | null;
@@ -244,6 +245,19 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+      };
+      audit_runs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          fingerprint: string;
+          overall_severity: string;
+          findings_count: number;
+          payload: Json;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["audit_runs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["audit_runs"]["Insert"]>;
       };
     };
     Views: {};
