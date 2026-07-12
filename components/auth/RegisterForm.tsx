@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/Button";
@@ -8,11 +8,6 @@ import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import { registerSchema } from "@/lib/validation/security";
-
-interface Team {
-  id: string;
-  name: string;
-}
 
 const INDUSTRIES = [
   "real_estate", "healthcare", "finance", "manufacturing",
@@ -22,10 +17,7 @@ const INDUSTRIES = [
 export function RegisterForm() {
   const t = useTranslations("auth");
   const [pending, setPending] = useState(false);
-  const [role, setRole] = useState<"employee" | "customer">("employee");
   const [orgCode, setOrgCode] = useState("");
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
 
@@ -37,25 +29,6 @@ export function RegisterForm() {
     "transition-colors",
   ].join(" ");
 
-  // Auto-fetch teams when a valid UUID org_code is entered and role is employee
-  useEffect(() => {
-    const uuid = orgCode.trim();
-    if (uuid.length !== 36 || role !== "employee") {
-      setTeams([]);
-      return;
-    }
-    let cancelled = false;
-    setTeamsLoading(true);
-    fetch(`/api/teams?org_code=${encodeURIComponent(uuid)}`)
-      .then((r) => r.json())
-      .then(({ teams: t }: { teams: Team[] }) => {
-        if (!cancelled) setTeams(t ?? []);
-      })
-      .catch(() => { if (!cancelled) setTeams([]); })
-      .finally(() => { if (!cancelled) setTeamsLoading(false); });
-    return () => { cancelled = true; };
-  }, [orgCode, role]);
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
@@ -66,18 +39,13 @@ export function RegisterForm() {
       email:    (fd.get("email") as string)?.trim() ?? "",
       password: (fd.get("password") as string) ?? "",
       org_code: orgCode.trim(),
-      role,
+      role: "customer",
     };
-
-    if (role === "employee") {
-      payload.team_id  = (fd.get("team_id") as string) ?? "";
-      payload.specialty = (fd.get("specialty") as string)?.trim() ?? "";
-    } else {
-      payload.company_name     = (fd.get("company_name") as string)?.trim() ?? "";
-      payload.industry         = (fd.get("industry") as string)?.trim() ?? "";
-      payload.business_details = (fd.get("business_details") as string)?.trim() ?? "";
-      payload.tax_id           = (fd.get("tax_id") as string)?.trim() ?? "";
-    }
+    payload.company_name = (fd.get("company_name") as string)?.trim() ?? "";
+    payload.industry = (fd.get("industry") as string)?.trim() ?? "";
+    payload.business_details =
+      (fd.get("business_details") as string)?.trim() ?? "";
+    payload.tax_id = (fd.get("tax_id") as string)?.trim() ?? "";
 
     const parsed = registerSchema.safeParse(payload);
     if (!parsed.success) {
@@ -184,7 +152,7 @@ export function RegisterForm() {
           <PasswordStrengthMeter password={password} className="mt-2" />
         </div>
 
-        {/* Org code — controlled so teams can be fetched */}
+        {/* Organization code */}
         <div>
           <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
             {t("orgCode")}
@@ -201,64 +169,7 @@ export function RegisterForm() {
           <p className="text-[10px] text-[var(--color-text-muted)] mt-1">{t("orgCodeHint")}</p>
         </div>
 
-        {/* Role selector */}
-        <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-2">
-            {t("selectRole")}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["employee", "customer"] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-[background-color,border-color,color] duration-150 ${
-                  role === r
-                    ? "bg-indigo-600/15 text-indigo-400 border-indigo-500/30"
-                    : "bg-[var(--color-surface-800)] text-[var(--color-text-secondary)] border-[var(--color-surface-600)] hover:bg-[var(--color-surface-700)]"
-                }`}
-              >
-                {r === "employee" ? t("roleEmployee") : t("roleCustomer")}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ── EMPLOYEE: specialty selector ── */}
-        {role === "employee" && (
-          <div className="pt-3 border-t border-[var(--color-surface-700)] space-y-3">
-            <p className="text-[11px] text-[var(--color-text-muted)]">{t("specialtyHint")}</p>
-            <div>
-              <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-                {t("specialty")} <span className="text-red-400">*</span>
-              </label>
-              <select
-                name="team_id"
-                required
-                disabled={teams.length === 0}
-                aria-label={t("specialty")}
-                className={`${inputClass} disabled:opacity-40 cursor-pointer`}
-              >
-                <option value="">
-                  {teamsLoading
-                    ? t("loadingTeams")
-                    : teams.length === 0
-                    ? t("enterOrgCodeFirst")
-                    : t("selectSpecialty")}
-                </option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* ── CUSTOMER: company profile fields ── */}
-        {role === "customer" && (
-          <div className="pt-3 border-t border-[var(--color-surface-700)] space-y-3">
+        <div className="pt-3 border-t border-[var(--color-surface-700)] space-y-3">
             <p className="text-[11px] text-[var(--color-text-muted)]">{t("companyHint")}</p>
 
             <div>
@@ -311,8 +222,7 @@ export function RegisterForm() {
                 className={inputClass}
               />
             </div>
-          </div>
-        )}
+        </div>
       </div>
 
       <Button type="submit" loading={pending} className="w-full">

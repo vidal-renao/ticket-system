@@ -8,18 +8,33 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
+const requiredSeedVariables = [
+  "SEED_ORG_ID",
+  "SEED_AGENT_ID",
+  "SEED_AGENT_EMAIL",
+  "SEED_AGENT_PASSWORD",
+  "SEED_CUSTOMER_ID",
+  "SEED_CUSTOMER_EMAIL",
+  "SEED_CUSTOMER_PASSWORD",
+];
+const missingSeedVariables = requiredSeedVariables.filter((name) => !process.env[name]);
+if (missingSeedVariables.length > 0) {
+  console.error(`Missing seed variables: ${missingSeedVariables.join(", ")}`);
+  process.exit(1);
+}
+
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const ORG_ID = "921f56a8-b2fe-4f24-bae9-fdf4863d4240";
+const ORG_ID = process.env.SEED_ORG_ID;
 const TEAM_NAME = "Hardware";
 
 const seedUsers = [
   {
-    id: "0dfadf30-2c7f-4b99-a8d8-c8086efd26d5",
-    email: "empleado1@gmail.com",
-    password: "Vidal2026!",
+    id: process.env.SEED_AGENT_ID,
+    email: process.env.SEED_AGENT_EMAIL,
+    password: process.env.SEED_AGENT_PASSWORD,
     full_name: "Empleado Hardware",
     role: "agent",
     specialty: "Hardware",
@@ -27,9 +42,9 @@ const seedUsers = [
     company_name: null,
   },
   {
-    id: "a7c2c8ae-fbdd-4cb0-8b0d-1d1d4ba08f05",
-    email: "empresa1@gmail.com",
-    password: "Vidal2026!",
+    id: process.env.SEED_CUSTOMER_ID,
+    email: process.env.SEED_CUSTOMER_EMAIL,
+    password: process.env.SEED_CUSTOMER_PASSWORD,
     full_name: "Vidal Real Estate Client",
     role: "customer",
     specialty: null,

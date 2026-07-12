@@ -260,8 +260,8 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["audit_runs"]["Insert"]>;
       };
     };
-    Views: {};
-    Functions: {};
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
     Enums: {
       ticket_status: TicketStatus;
       ticket_priority: TicketPriority;

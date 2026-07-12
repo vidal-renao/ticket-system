@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
+import { verifyBearerSecret } from "@/lib/security/bearer-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,15 @@ interface InboundEmailPayload {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.EMAIL_INGEST_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = verifyBearerSecret(
+    request,
+    process.env.EMAIL_INGEST_SECRET
+  );
+  if (!authorization.ok) {
+    return NextResponse.json(
+      { error: authorization.error },
+      { status: authorization.status }
+    );
   }
 
   let body: InboundEmailPayload;

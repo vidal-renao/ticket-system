@@ -1,27 +1,13 @@
-import { createServerClient } from "@supabase/ssr";
-import type { CookieOptions } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
-import { normalizeSupabaseErrorMessage, registerSchema } from "@/lib/validation/security";
-
-interface RegisterBody {
-  name?: string;
-  email?: string;
-  password?: string;
-  org_code?: string;
-  role?: string;
-  // Agent fields
-  team_id?: string;
-  specialty?: string;
-  // Customer fields
-  company_name?: string;
-  industry?: string;
-  business_details?: string;
-  tax_id?: string;
-}
+import {
+  normalizeSupabaseErrorMessage,
+  registerSchema,
+} from "@/lib/validation/security";
 
 export async function POST(request: NextRequest) {
-  let body: RegisterBody;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -35,49 +21,44 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const { name, email, password, org_code, role, team_id, specialty, company_name, industry, business_details, tax_id } =
-    validation.data;
 
-  const assignedRole = role === "customer" ? "customer" : "agent";
-
-  // Validate org exists
+  const {
+    name,
+    email,
+    password,
+    org_code: organizationId,
+    company_name,
+    industry,
+    business_details,
+    tax_id,
+  } = validation.data;
   const svc = createServiceClientStatic();
-  const { data: org, error: orgError } = await svc
+  const { data: organization } = await svc
     .from("organizations")
-    .select("id, name")
-    .eq("id", org_code.trim())
+    .select("id")
+    .eq("id", organizationId)
+    .eq("is_active", true)
     .single();
 
-  if (orgError || !org) {
+  if (!organization) {
     return NextResponse.json(
       { error: "Organization not found. Check your organization code." },
       { status: 404 }
     );
   }
 
-  // Validate team_id belongs to this org if provided
-  if (assignedRole === "agent" && team_id) {
-    const { data: team } = await svc
-      .from("teams")
-      .select("id")
-      .eq("id", team_id)
-      .eq("organization_id", org.id)
-      .single();
-    if (!team) {
-      return NextResponse.json({ error: "Invalid specialty selection" }, { status: 400 });
-    }
-  }
-
-  // Create auth user — capture session cookies for immediate login
-  const cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }> = [];
-
+  const cookiesToSet: Array<{
+    name: string;
+    value: string;
+    options?: CookieOptions;
+  }> = [];
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookies: Array<{ name: string; value: string; options?: CookieOptions }>) => {
+        setAll: (cookies) => {
           cookiesToSet.push(...cookies);
         },
       },
@@ -85,13 +66,16 @@ export async function POST(request: NextRequest) {
   );
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email: email.trim(),
+    email,
     password,
-    options: { data: { full_name: name.trim() } },
+    options: { data: { full_name: name } },
   });
 
   if (signUpError) {
-    return NextResponse.json({ error: normalizeSupabaseErrorMessage(signUpError) }, { status: 400 });
+    return NextResponse.json(
+      { error: normalizeSupabaseErrorMessage(signUpError) },
+      { status: 400 }
+    );
   }
 
   const userId = signUpData.user?.id;
@@ -99,67 +83,50 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 
-  // Upsert profile with team assignment if agent
-  const profileData: Record<string, unknown> = {
-    id: userId,
-    full_name: name.trim(),
-    organization_id: org.id,
-    role: assignedRole,
-    is_active: true,
-  };
-
-  // Persist team assignment + derive specialty from team name
-  if (assignedRole === "agent" && team_id) {
-    profileData.team_id = team_id;
-    // Use explicit specialty if provided, otherwise fall back to team name
-    if (specialty?.trim()) {
-      profileData.specialty = specialty.trim();
-    } else {
-      // team was already validated above — org.name is available there but we re-fetch name
-      const { data: teamForSpecialty } = await svc
-        .from("teams")
-        .select("name")
-        .eq("id", team_id)
-        .single();
-      if (teamForSpecialty?.name) profileData.specialty = teamForSpecialty.name;
-    }
-  }
-
-  const { error: profileError } = await svc
-    .from("profiles")
-    .upsert(profileData, { onConflict: "id" });
+  const { error: profileError } = await svc.from("profiles").upsert(
+    {
+      id: userId,
+      full_name: name,
+      organization_id: organization.id,
+      role: "customer",
+      is_active: true,
+    },
+    { onConflict: "id" }
+  );
 
   if (profileError) {
-    console.error("[register] profile upsert error:", profileError.message);
+    await svc.auth.admin.deleteUser(userId);
+    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 
-  // Insert company info if customer
-  if (assignedRole === "customer" && company_name?.trim()) {
+  if (company_name) {
     const { error: customerError } = await svc.from("customers_info").upsert(
       {
         id: userId,
-        company_name: company_name.trim(),
-        industry: industry?.trim() ?? "",
-        business_details: business_details?.trim() ?? "",
-        tax_id: tax_id?.trim() ?? "",
+        company_name,
+        industry: industry ?? "",
+        business_details: business_details ?? "",
+        tax_id: tax_id ?? "",
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" }
     );
+
     if (customerError) {
-      console.error("[register] customers_info upsert error:", customerError.message);
+      await svc.from("profiles").delete().eq("id", userId);
+      await svc.auth.admin.deleteUser(userId);
+      return NextResponse.json({ error: "Registration failed" }, { status: 500 });
     }
   }
 
-  const hasSession = !!signUpData.session;
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";
   const prefix = locale === "de" ? "" : `/${locale}`;
-  const dest = assignedRole === "customer" ? `${prefix}/tickets` : `${prefix}/queue`;
+  const redirectTo = `${prefix}/tickets`;
 
-  if (hasSession) {
-    const response = NextResponse.json({ redirectTo: dest });
-    for (const { name: n, value, options } of cookiesToSet) {
-      response.cookies.set(n, value, { path: "/", ...options });
+  if (signUpData.session) {
+    const response = NextResponse.json({ redirectTo });
+    for (const { name: cookieName, value, options } of cookiesToSet) {
+      response.cookies.set(cookieName, value, { path: "/", ...options });
     }
     return response;
   }

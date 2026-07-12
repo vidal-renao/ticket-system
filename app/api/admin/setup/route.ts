@@ -1,95 +1,116 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { verifyBearerSecret } from "@/lib/security/bearer-auth";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 
-const ADMIN_UUID = "ee677b39-906f-4027-a01c-69024c8c23f5";
-const ORG_UUID = "921f56a8-b2fe-4f24-bae9-fdf4863d4240";
-const SETUP_SECRET = process.env.SETUP_SECRET;
+const setupConfigSchema = z.object({
+  adminUserId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+});
 
-/**
- * POST /api/admin/setup
- * Idempotent: ensures the admin profile exists with correct org + role.
- * Protected by SETUP_SECRET env var — call with Authorization: Bearer <secret>
- */
+function authorizeSetup(request: Request) {
+  return verifyBearerSecret(request, process.env.SETUP_SECRET);
+}
+
+function getSetupConfig() {
+  return setupConfigSchema.safeParse({
+    adminUserId: process.env.SETUP_ADMIN_USER_ID,
+    organizationId: process.env.SETUP_ORGANIZATION_ID,
+  });
+}
+
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (SETUP_SECRET && authHeader !== `Bearer ${SETUP_SECRET}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const authorization = authorizeSetup(request);
+  if (!authorization.ok) {
+    return NextResponse.json(
+      { error: authorization.error },
+      { status: authorization.status }
+    );
   }
 
-  const svc = createServiceClientStatic();
+  const config = getSetupConfig();
+  if (!config.success) {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  }
 
-  // Ensure the organization exists
-  const { data: org, error: orgError } = await svc
+  const { adminUserId, organizationId } = config.data;
+  const svc = createServiceClientStatic();
+  const { data: organization, error: organizationError } = await svc
     .from("organizations")
     .select("id, name")
-    .eq("id", ORG_UUID)
+    .eq("id", organizationId)
     .single();
 
-  if (orgError || !org) {
-    return NextResponse.json(
-      { error: "Organization not found", orgId: ORG_UUID, detail: orgError?.message },
-      { status: 404 }
-    );
+  if (organizationError || !organization) {
+    return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   }
 
-  // Upsert the admin profile
-  const { error: profileError } = await svc
-    .from("profiles")
-    .upsert(
-      {
-        id: ADMIN_UUID,
-        organization_id: ORG_UUID,
-        role: "admin",
-        full_name: "Vidal Reñao",
-        is_active: true,
-        locale: "de",
-        timezone: "Europe/Zurich",
-        data_processing_consent: true,
-      },
-      { onConflict: "id" }
-    );
+  const { error: profileError } = await svc.from("profiles").upsert(
+    {
+      id: adminUserId,
+      organization_id: organizationId,
+      role: "admin",
+      is_active: true,
+      locale: "de",
+      timezone: "Europe/Zurich",
+      data_processing_consent: true,
+    },
+    { onConflict: "id" }
+  );
 
   if (profileError) {
-    return NextResponse.json(
-      { error: "Profile upsert failed", detail: profileError.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Profile upsert failed" }, { status: 500 });
   }
 
-  // Verify the result
   const { data: profile } = await svc
     .from("profiles")
     .select("id, role, organization_id, is_active")
-    .eq("id", ADMIN_UUID)
+    .eq("id", adminUserId)
     .single();
 
   return NextResponse.json({
     ok: true,
-    organization: { id: org.id, name: org.name },
+    organization: { id: organization.id, name: organization.name },
     profile,
-    message: "Admin profile ensured. Admin can now log in.",
   });
 }
 
-/** GET /api/admin/setup — diagnostic check */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (SETUP_SECRET && authHeader !== `Bearer ${SETUP_SECRET}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const authorization = authorizeSetup(request);
+  if (!authorization.ok) {
+    return NextResponse.json(
+      { error: authorization.error },
+      { status: authorization.status }
+    );
   }
 
-  const svc = createServiceClientStatic();
+  const config = getSetupConfig();
+  if (!config.success) {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  }
 
-  const [{ data: org }, { data: profile }] = await Promise.all([
-    svc.from("organizations").select("id, name, is_active").eq("id", ORG_UUID).single(),
-    svc.from("profiles").select("id, role, organization_id, is_active, full_name").eq("id", ADMIN_UUID).single(),
+  const { adminUserId, organizationId } = config.data;
+  const svc = createServiceClientStatic();
+  const [{ data: organization }, { data: profile }] = await Promise.all([
+    svc
+      .from("organizations")
+      .select("id, name, is_active")
+      .eq("id", organizationId)
+      .single(),
+    svc
+      .from("profiles")
+      .select("id, role, organization_id, is_active")
+      .eq("id", adminUserId)
+      .single(),
   ]);
 
   return NextResponse.json({
-    organization: org ?? null,
-    profile: profile ?? null,
-    adminUuid: ADMIN_UUID,
-    orgUuid: ORG_UUID,
-    ready: Boolean(org && profile && profile.organization_id === ORG_UUID && profile.role === "admin"),
+    ready: Boolean(
+      organization &&
+        profile &&
+        profile.organization_id === organizationId &&
+        profile.role === "admin" &&
+        profile.is_active
+    ),
   });
 }

@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "HelpDesk AI",
+    "type": "multi-tenant SaaS ticketing platform",
+    "status": "development-ready"
+  },
+  "stack": {
+    "frontend": {
+      "framework": "Next.js 15 App Router",
+      "language": "TypeScript",
+      "styles": "Tailwind CSS 4",
+      "i18n": "next-intl"
+    },
+    "backend": {
+      "runtime": "Node.js 20 on Vercel Functions",
+      "api": "Next.js Route Handlers and Server Actions"
+    },
+    "database": {
+      "provider": "Supabase",
+      "engine": "PostgreSQL",
+      "schema": "public",
+      "authorization": "RLS plus server authorization"
+    },
+    "infrastructure": {
+      "hosting": "Vercel",
+      "ci": "GitHub Actions"
+    }
+  },
+  "commands": {
+    "dev": "npm run dev",
+    "build": "npm run build",
+    "lint": "npm run lint",
+    "typecheck": "npm run typecheck",
+    "test": "npm test"
+  },
+  "architecture": {
+    "pattern": "App Router with domain libraries and PostgreSQL RLS",
+    "sourceRoots": ["app", "components", "lib"],
+    "testsRoot": "tests"
+  },
+  "guardrails": {
+    "agentGuide": "AGENTS.md",
+    "security": "SECURITY.md",
+    "definitionOfDone": "AGENTS.md#definition-of-done"
+  }
+}

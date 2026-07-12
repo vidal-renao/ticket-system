@@ -1,265 +1,124 @@
-# HelpDesk AI — Swiss SME IT Support Platform
+# HelpDesk AI
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)
-![Claude API](https://img.shields.io/badge/Claude-Sonnet_4.6-D97706?logo=anthropic&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-Deployed-000000?logo=vercel&logoColor=white)
-![DSG/LPD](https://img.shields.io/badge/Compliance-DSG%2FnDSG-DC2626?logo=shield&logoColor=white)
-![i18n](https://img.shields.io/badge/i18n-DE%20%7C%20EN%20%7C%20ES-6366F1)
+![Next.js](https://img.shields.io/badge/Next.js-15.5.20-000000?logo=nextdotjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-4-6E9F18?logo=vitest&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 
-> AI-powered IT helpdesk SaaS designed for Swiss SMEs. Intelligent ticket triage, multilingual support (DE/EN/ES), SLA tracking, and full DSG/nDSG compliance.
+HelpDesk AI es una plataforma SaaS de soporte IT para pymes suizas. Centraliza tickets, asignacion de agentes, comentarios, SLA, notificaciones y analitica, con triage y asistencia de respuesta mediante IA en una interfaz DE/EN/ES.
 
----
+El producto aplica principios de privacidad por diseno: aislamiento por organizacion, RLS, minimizacion antes de enviar contenido a proveedores de IA y trazabilidad de cambios. Estos controles son una base tecnica para DSG/nDSG y GDPR; no constituyen por si solos una certificacion legal.
 
-## Business Context
+## Capacidades
 
-Swiss SMEs face a unique challenge: IT support requests arrive in multiple languages, span multiple time zones, and must comply with the Federal Act on Data Protection (DSG/nDSG, effective September 2023). Traditional helpdesk tools are either too heavyweight for teams under 50 or lack the compliance controls required for Swiss data residency.
+- Portal de cliente para alta, seguimiento, reapertura y comentarios de tickets.
+- Cola operativa para agentes, managers y administradores.
+- Estados, prioridades, categorias, asignacion automatica y politicas SLA.
+- Triage, traduccion y respuestas sugeridas mediante Anthropic.
+- Base de conocimiento RAG opcional mediante embeddings de OpenAI y pgvector.
+- Notificaciones, correo entrante y cron diario de evaluacion SLA.
+- Administracion de usuarios y configuracion de privacidad por organizacion.
 
-**HelpDesk AI** closes this gap with:
-- **Claude Sonnet 4.6 triage** — automatic priority, category, and sentiment classification in under 3 seconds
-- **Multilingual-native** — interface and AI responses in DE/EN/ES; ticket language auto-detected
-- **SLA enforcement** — configurable SLA policies with breach prediction and real-time alerting
-- **Privacy-first architecture** — PII scrubbing, per-org data retention, and DSG Art. 6 compliance built into the data pipeline, not bolted on
+El checkout existe como stub y no procesa pagos. Las capacidades futuras se mantienen en [ROADMAP.md](./ROADMAP.md).
 
----
+## Arquitectura
 
-## Architecture
+| Ruta | Responsabilidad |
+| --- | --- |
+| `app/[locale]/` | Rutas publicas, autenticacion y aplicacion internacionalizada |
+| `app/api/` | Route Handlers HTTP, cron, correo e integraciones |
+| `app/actions/` | Server Actions autenticadas |
+| `components/` | UI por dominio y componentes base |
+| `lib/` | Autorizacion, datos, SLA, IA, email y validacion |
+| `docs/` | Esquema y migraciones SQL |
+| `tests/` | Tests de seguridad y logica critica |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Next.js 15 App Router (Vercel Edge)                           │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
-│  │  [locale]/(auth)  │  │  [locale]/(app)  │  │  /api        │  │
-│  │  · /login         │  │  · /dashboard    │  │  · /tickets  │  │
-│  └──────────────────┘  │  · /queue         │  │  · /tickets  │  │
-│                         │  · /tickets/[id] │  │    /[id]     │  │
-│                         │  · /analytics    │  │  · /ai/      │  │
-│                         │  · /settings     │  │    feedback  │  │
-│                         └──────────────────┘  └──────────────┘  │
-├─────────────────────────────────────────────────────────────────┤
-│  Server Actions                                                 │
-│  · suggest-reply.ts   AI auto-reply generation                 │
-│  · translate-text.ts  Real-time ticket translation             │
-│  · org-settings.ts    PII scrubbing toggle (admin)             │
-├─────────────────────────────────────────────────────────────────┤
-│  AI Layer (lib/ai/)                                             │
-│  · triage.ts          Ticket classification + smart response   │
-│  · pii-scrubber.ts    Regex PII redaction (email/phone/IP)     │
-├─────────────────────────────────────────────────────────────────┤
-│  Supabase (PostgreSQL + RLS)                                   │
-│  organizations → profiles → tickets → ai_analysis             │
-│                          → ticket_comments                     │
-│                          → categories                          │
-└─────────────────────────────────────────────────────────────────┘
-```
+Consulta [ARCHITECTURE.md](./ARCHITECTURE.md), [DOMAIN.md](./DOMAIN.md) y [SECURITY.md](./SECURITY.md) antes de modificar flujos de datos o permisos.
 
-### Multi-tenant Isolation
+## Requisitos
 
-Every query is scoped by `organization_id`. Row Level Security (RLS) policies enforce:
-- **Customers** — read/write only their own tickets
-- **Agents/Managers** — read/write all tickets within their org
-- **Admins** — full org control including settings
+- Node.js 20 o superior.
+- Proyecto Supabase con PostgreSQL y Auth.
+- Proyecto Vercel para despliegue y cron.
+- Clave Anthropic para funciones de IA.
+- Clave OpenAI solo si se activa RAG.
+- Resend solo si se activa correo saliente.
 
----
-
-## AI Pipeline
-
-```
-Customer submits ticket
-       │
-       ▼
-POST /api/tickets  →  Insert ticket (status: open, priority: medium)
-       │
-       ▼  [async, fire-and-forget, 30s timeout]
-runAITriage()
-       │
-       ├─ pii_scrubbing_enabled? → scrubPII(title, description)
-       │
-       ▼
-Claude Sonnet 4.6
-       │
-       ├─ suggested_category     (Networking/Hardware/Software/Security/Billing)
-       ├─ suggested_priority     (low/medium/high/critical)
-       ├─ confidence_score       (0–100)
-       ├─ sentiment              (calm/neutral/frustrated/urgent/angry)
-       ├─ detected_language      (de/fr/it/en)
-       ├─ smart_response         (draft reply in detected language)
-       ├─ contains_pii           (boolean — DSG compliance flag)
-       └─ estimated_resolution_hours
-       │
-       ▼
-ai_analysis table  →  Auto-update ticket priority (if confidence ≥ 60%)
-```
-
-### Smart Auto-reply
-
-Agents trigger on-demand via `✨ AI Suggest Response`:
-- Claude generates a contextual reply in the ticket's **detected language**
-- Tone adapts: **conciliatory** for `frustrated`/`angry` sentiment; **professional** otherwise
-- Response populates the textarea for agent review — never auto-sent
-
-### Real-time Translation
-
-Any ticket description or comment can be translated to the agent's active UI locale (DE/EN/ES) with a single click. Translation is cached client-side — no repeat API calls on toggle.
-
----
-
-## DSG/nDSG Compliance
-
-| Control | Implementation |
-|---|---|
-| PII Detection | Claude flags `contains_pii` in every triage; displayed as amber badge |
-| PII Scrubbing | Org-level toggle: regex redacts emails, phones, IPs before sending to Anthropic |
-| Data Retention | `retention_delete_at` per ticket; `data_retention_days` per org |
-| Consent Tracking | `data_processing_consent` + `consent_given_at` in profiles |
-| Audit Trail | `ai_analysis` is INSERT-only (immutable); ticket mutations tracked via `updated_at` |
-| Access Control | RLS on all tables; multi-tenant isolation by `organization_id` |
-| DPA | `dpa_signed_at` field on organizations |
-
----
-
-## Security & Infrastructure (Hardened)
-
-- **PostgreSQL Hardening:** Fixed Search Path on all functions (`SET search_path = public`).
-- **Access Control:** Restricted `EXECUTE` permissions on RPCs to authenticated users only.
-- **Auth Policy:** 12-character high-entropy password requirement.
-- **Compliance:** Swiss DSG compliant via strict Row Level Security (RLS).
-
----
-
-## Feature Matrix
-
-| Feature | Customer | Agent | Manager | Admin |
-|---|:---:|:---:|:---:|:---:|
-| Submit tickets | ✓ | | | |
-| View own tickets | ✓ | | | |
-| View all org tickets | | ✓ | ✓ | ✓ |
-| Queue view | | ✓ | ✓ | ✓ |
-| AI triage panel | | ✓ | ✓ | ✓ |
-| AI suggest reply | | ✓ | ✓ | ✓ |
-| Translate ticket | ✓ | ✓ | ✓ | ✓ |
-| Analytics dashboard | | | ✓ | ✓ |
-| Settings / PII toggle | | | | ✓ |
-
----
-
-## Tech Stack
-
-| Layer | Technology | Version |
-|---|---|---|
-| Framework | Next.js App Router (RSC + Server Actions) | 15 |
-| Language | TypeScript strict mode | 5 |
-| Database | Supabase (PostgreSQL + RLS) | — |
-| Auth | Supabase Auth | — |
-| AI | Anthropic Claude Sonnet 4.6 | — |
-| Styling | Tailwind CSS v4 | 4 |
-| i18n | next-intl (DE/EN/ES, `localePrefix: as-needed`) | 3 |
-| Deployment | Vercel (Edge-compatible) | — |
-| Notifications | Sonner | — |
-| Icons | Lucide React | — |
-
----
-
-## Local Development
-
-### Prerequisites
-
-- Node.js 20+
-- Supabase project (or local `supabase start`)
-- Anthropic API key
-
-### Setup
+## Configuracion local
 
 ```bash
-git clone <repo>
-cd "Ticket System"
-npm install
+npm ci
+cp .env.local.example .env.local
+npm run dev
 ```
 
-Create `.env.local`:
+Completa `.env.local` sin reutilizar secretos entre entornos. Los secretos de `CRON_SECRET`, `EMAIL_INGEST_SECRET` y `SETUP_SECRET` deben ser aleatorios y tener al menos 32 caracteres.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
-ANTHROPIC_API_KEY=sk-ant-...
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-CRON_SECRET=<shared-secret-for-vercel-cron>
-RESEND_API_KEY=re_...
-EMAIL_FROM="HelpDesk AI <support@your-domain.com>"
-EMAIL_INGEST_SECRET=<shared-secret-for-email-webhook>
-```
+Variables esenciales:
 
-### Database
+| Variable | Uso |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL publica del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anonima protegida por RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Operaciones servidor; nunca exponer al cliente |
+| `ANTHROPIC_API_KEY` | Triage, traduccion y respuestas sugeridas |
+| `OPENAI_API_KEY` | Embeddings RAG opcionales |
+| `CRON_SECRET` | Autenticacion fail-closed de `/api/cron/sla` |
+| `EMAIL_INGEST_SECRET` | Autenticacion fail-closed de `/api/email/inbound` |
+| `SETUP_SECRET` | Proteccion de la operacion excepcional de setup |
+| `SETUP_ADMIN_USER_ID` | UUID del usuario para setup controlado |
+| `SETUP_ORGANIZATION_ID` | UUID de organizacion para setup controlado |
 
-Run `docs/migration_differential.sql` in the Supabase SQL editor. This creates:
-- `organizations`, `profiles`, `tickets`, `categories`, `ai_analysis`, `ticket_comments`, `notifications`
-- RLS policies for multi-tenant isolation
-- Auto-profile trigger on user signup
-- `ticket_number` auto-increment per org
-- `ticket_ref()` computed column (`TK-0001` format)
+## Base de datos
+
+El estado de produccion debe verificarse con el historial del proyecto Supabase. Para un entorno nuevo, revisa y aplica de forma controlada:
+
+1. `docs/migration_v1_final.sql`
+2. `docs/migration_schema_consistency.sql`
+3. `docs/migration_phase1_routing.sql`
+4. `docs/migration_rls_profiles_fix.sql`
+5. `docs/migration_security_hardening.sql`
+6. `docs/rag_migration.sql` solo si RAG esta habilitado
+
+No ejecutes migraciones directamente en produccion sin backup, revision del diff y prueba en staging. La migracion de hardening revoca la capacidad del usuario de cambiar `role`, `organization_id` e `is_active`, y corrige el alcance tenant de comentarios, adjuntos y analisis IA.
+
+## Comandos
 
 ```bash
-npm run dev        # http://localhost:3000
-npm run build      # Production build
+npm run dev
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm audit --audit-level=high
 ```
 
----
+`npm run seed:full` es destructivo y solo funciona si se establece deliberadamente `ALLOW_DESTRUCTIVE_SEED=I_UNDERSTAND` junto con todas las variables `SEED_*`.
 
-## Project Structure
+## Seguridad operativa
 
-```
-app/
-├── [locale]/
-│   ├── (auth)/login/         ← Public auth route
-│   └── (app)/
-│       ├── dashboard/        ← Executive KPIs (manager/admin)
-│       ├── queue/            ← Live ticket queue (staff)
-│       ├── tickets/          ← Ticket list + detail
-│       ├── analytics/        ← AI metrics, SLA prediction
-│       └── settings/         ← Org settings (admin)
-├── api/
-│   ├── tickets/              ← POST create, GET/PATCH detail
-│   └── ai/feedback/          ← AI triage feedback loop
-app/actions/
-├── suggest-reply.ts          ← Smart auto-reply
-├── translate-text.ts         ← Real-time translation
-└── org-settings.ts           ← PII scrubbing toggle
-components/
-├── ai/AITriagePanel.tsx      ← AI analysis display + feedback
-├── layout/
-│   ├── Sidebar.tsx           ← Navigation + locale switcher (ARIA)
-│   └── LocaleSwitcher.tsx    ← Keyboard-accessible DE/EN/ES switcher
-├── settings/
-│   └── PIIScrubbingToggle.tsx
-├── tickets/
-│   ├── NewTicketForm.tsx     ← ARIA-compliant form (label/id)
-│   ├── TicketComments.tsx    ← Comments + AI suggest + translate
-│   └── TranslateButton.tsx
-lib/
-├── ai/
-│   ├── triage.ts             ← Claude Sonnet 4.6 triage engine
-│   └── pii-scrubber.ts       ← Regex PII redaction
-├── supabase/                 ← client / server / types
-└── utils.ts
-messages/
-├── de.json                   ← German (default locale)
-├── en.json
-└── es.json
-```
+- El registro publico crea unicamente usuarios `customer`.
+- Agentes y managers se crean desde administracion autenticada.
+- Los endpoints privilegiados devuelven `503` si falta su secreto y `401` si el token no coincide.
+- `service_role` se limita a codigo servidor y exige filtros tenant explicitos.
+- Las credenciales demo no se versionan ni se imprimen en logs.
+- Rota inmediatamente cualquier credencial que haya existido en el historial Git.
 
----
+Consulta [SECURITY.md](./SECURITY.md) para amenazas, respuesta y disclosure.
 
-## Roadmap
+## CI y despliegue
 
-- [ ] Phase 1 — Swiss High-End UI: skeleton loaders, glassmorphism hero, Framer Motion transitions
-- [ ] Email ingestion via webhook → auto ticket creation
-- [ ] Slack / Teams notifications for SLA breach
-- [ ] Custom SLA policy editor
-- [ ] Microsoft Entra ID (SSO) integration
+GitHub Actions ejecuta instalacion determinista, lint, typecheck, tests, build y auditoria de vulnerabilidades high. Vercel debe desplegar solo despues de superar CI y disponer de todas las variables del entorno objetivo.
 
----
+Antes de promover a produccion:
 
-*Built by [Vidal Reñao](https://vidalrenao.ch) · Basel, Switzerland · Powered by Claude Sonnet 4.6*
+1. Aplicar y verificar migraciones en staging.
+2. Probar aislamiento entre dos organizaciones con usuarios reales de test.
+3. Verificar cron y webhooks con secretos distintos a desarrollo.
+4. Confirmar politicas de retencion, proveedores, DPA y residencia de datos.
+5. Medir Lighthouse y accesibilidad; no publicar puntuaciones no verificadas.
+
+## Estado
+
+El estado previo y los riesgos encontrados estan documentados en [CURRENT_TRUTH.md](./CURRENT_TRUTH.md). Los cambios relevantes se registran en [CHANGELOG.md](./CHANGELOG.md).

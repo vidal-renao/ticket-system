@@ -148,7 +148,7 @@ export default async function TicketsPage({
 
   if (error) console.error("[TicketsPage] query error:", error.message);
 
-  let aiCategoryMap: Record<string, string | null> = {};
+  const aiCategoryMap: Record<string, string | null> = {};
   if (tickets && tickets.length > 0) {
     const ticketIds = (tickets as { id: string }[]).map((ticket) => ticket.id);
     const { data: aiRows, error: aiError } = await svc

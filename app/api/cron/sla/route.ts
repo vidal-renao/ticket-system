@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
+import { verifyBearerSecret } from "@/lib/security/bearer-auth";
 
 export const dynamic = "force-dynamic";
 
 const ACTIVE_STATUSES = ["open", "in_progress", "pending_customer", "pending_third_party"];
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-
-  if (secret && auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authorization = verifyBearerSecret(request, process.env.CRON_SECRET);
+  if (!authorization.ok) {
+    return NextResponse.json(
+      { error: authorization.error },
+      { status: authorization.status }
+    );
   }
 
   const svc = createServiceClientStatic();

@@ -15,6 +15,13 @@ export default async function LocaleRootPage({
 }) {
   const { locale } = await params;
 
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return <LandingPage locale={locale} />;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

@@ -39,37 +39,64 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
+if (process.env.ALLOW_DESTRUCTIVE_SEED !== "I_UNDERSTAND") {
+  console.error("Refusing destructive seed. Set ALLOW_DESTRUCTIVE_SEED=I_UNDERSTAND explicitly.");
+  process.exit(1);
+}
+
+const requiredSeedVariables = [
+  "SEED_ORG_ID",
+  "SEED_ADMIN_ID",
+  "SEED_ADMIN_EMAIL",
+  "SEED_ADMIN_PASSWORD",
+  "SEED_AGENT_HARDWARE_ID",
+  "SEED_AGENT_HARDWARE_EMAIL",
+  "SEED_AGENT_HARDWARE_PASSWORD",
+  "SEED_AGENT_SOFTWARE_ID",
+  "SEED_AGENT_SOFTWARE_EMAIL",
+  "SEED_AGENT_SOFTWARE_PASSWORD",
+  "SEED_CUSTOMER_ID",
+  "SEED_CUSTOMER_EMAIL",
+  "SEED_CUSTOMER_PASSWORD",
+];
+
+const missingSeedVariables = requiredSeedVariables.filter((name) => !process.env[name]);
+if (missingSeedVariables.length > 0) {
+  console.error(`Missing seed variables: ${missingSeedVariables.join(", ")}`);
+  process.exit(1);
+}
+
 const svc = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const KEEP_ORG_ID     = "921f56a8-b2fe-4f24-bae9-fdf4863d4240";
-const KEEP_ADMIN_ID   = "ee677b39-906f-4027-a01c-69024c8c23f5";
-const ADMIN_EMAIL     = "vidalrenao.lab@outlook.com";
-const ADMIN_PASSWORD  = "Admin2026!";
+const KEEP_ORG_ID = process.env.SEED_ORG_ID;
+const KEEP_ADMIN_ID = process.env.SEED_ADMIN_ID;
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
 
 const AGENT_HARDWARE = {
-  id: "0dfadf30-2c7f-4b99-a8d8-c8086efd26d5",
-  email: "agent.hardware@vidallab.ch",
-  password: "Agent2026!",
+  id: process.env.SEED_AGENT_HARDWARE_ID,
+  email: process.env.SEED_AGENT_HARDWARE_EMAIL,
+  password: process.env.SEED_AGENT_HARDWARE_PASSWORD,
   full_name: "Markus Weber",
   role: "agent",
   specialty: "Hardware",
 };
 
 const AGENT_SOFTWARE = {
-  id: "b1c3d4e5-f6a7-8901-bcde-f01234567890",
-  email: "agent.software@vidallab.ch",
-  password: "Agent2026!",
+  id: process.env.SEED_AGENT_SOFTWARE_ID,
+  email: process.env.SEED_AGENT_SOFTWARE_EMAIL,
+  password: process.env.SEED_AGENT_SOFTWARE_PASSWORD,
   full_name: "Laura Keller",
   role: "agent",
   specialty: "Software",
 };
 
 const CUSTOMER = {
-  id: "c2d4e6f8-a1b2-3456-cdef-012345678901",
-  email: "contact@zurich-fintech.ch",
-  password: "Customer2026!",
+  id: process.env.SEED_CUSTOMER_ID,
+  email: process.env.SEED_CUSTOMER_EMAIL,
+  password: process.env.SEED_CUSTOMER_PASSWORD,
   full_name: "Daniel Meier",
   role: "customer",
   company_name: "Zürich FinTech AG",
@@ -377,12 +404,7 @@ async function main() {
   }
 
   console.log("\n✅ Seed complete!");
-  console.log("\nCredentials:");
-  console.log(`  Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  console.log(`  Agent HW: ${AGENT_HARDWARE.email} / ${AGENT_HARDWARE.password}`);
-  console.log(`  Agent SW: ${AGENT_SOFTWARE.email} / ${AGENT_SOFTWARE.password}`);
-  console.log(`  Customer: ${CUSTOMER.email} / ${CUSTOMER.password}`);
-  console.log(`\n  → Login: https://ticket-system-sigma-pink.vercel.app/login`);
+  console.log("Seed credentials were read from the environment and are not printed.");
 }
 
 main().catch(e => { console.error("❌ Seed failed:", e); process.exit(1); });

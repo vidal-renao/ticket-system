@@ -224,24 +224,3 @@ CREATE POLICY "managers_read_audit_logs" ON audit_logs
     organization_id = public.current_profile_org_id()
     AND public.current_profile_role() IN ('manager', 'admin')
   );
-
--- ============================================================
--- ADMIN ACCOUNT RECOVERY
--- Optional operational block for restoring the primary admin
--- account when credentials drift from the known environment seed.
--- ============================================================
-
-UPDATE auth.users
-SET
-  encrypted_password = crypt('Vidal2026!', gen_salt('bf')),
-  email_confirmed_at = NOW(),
-  updated_at = NOW(),
-  raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) ||
-    '{"provider":"email","providers":["email"]}'::jsonb
-WHERE email = 'vidalrenao.lab@outlook.com';
-
-UPDATE public.profiles
-SET
-  role = 'admin',
-  full_name = 'Vidal Admin'
-WHERE id = 'ee677b39-906f-4027-a01c-69024c8c23f5';

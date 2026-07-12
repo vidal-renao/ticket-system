@@ -8,6 +8,13 @@ import type { UserRole } from "@/lib/supabase/types";
  * Shows landing page for unauthenticated users; redirects authenticated users.
  */
 export default async function RootPage() {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return <LandingPage locale="de" />;
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

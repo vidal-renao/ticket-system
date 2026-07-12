@@ -27,9 +27,23 @@ export async function middleware(request: NextRequest) {
     return i18nResponse;
   }
 
+  const isPublicPath = AUTH_PATHS.some((publicPath) => path.endsWith(publicPath));
+  const isRoot =
+    path === "/" || routing.locales.some((locale) => path === `/${locale}`);
+
+  if (isPublicPath || isRoot) {
+    return i18nResponse;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return new NextResponse("Service unavailable", { status: 503 });
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
@@ -46,19 +60,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const requestCookieNames = request.cookies.getAll().map((cookie) => cookie.name);
-  console.log("[middleware] auth check", {
-    path,
-    method: request.method,
-    userId: user?.id ?? null,
-    requestCookieNames,
-    hasSbCookie: requestCookieNames.some((name) => name.includes("sb-")),
-  });
-
-  const isPublicPath = AUTH_PATHS.some((publicPath) => path.endsWith(publicPath));
-  const isRoot =
-    path === "/" || routing.locales.some((locale) => path === `/${locale}`);
-
   if (!user && !isPublicPath && !isRoot) {
     const locale =
       i18nResponse.headers.get("x-next-intl-locale") ??
@@ -67,13 +68,6 @@ export async function middleware(request: NextRequest) {
 
     const loginPath =
       locale === routing.defaultLocale ? "/login" : `/${locale}/login`;
-
-    console.log("[middleware] redirecting to login", {
-      path,
-      locale,
-      loginPath,
-      requestCookieNames,
-    });
 
     return NextResponse.redirect(new URL(loginPath, request.url));
   }
