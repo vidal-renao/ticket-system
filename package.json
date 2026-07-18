@@ -2,6 +2,9 @@
   "name": "ticket-system",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -36,7 +39,7 @@
     "@eslint/eslintrc": "^3.3.6",
     "@eslint/js": "9.39.4",
     "@tailwindcss/postcss": "^4.1.4",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
