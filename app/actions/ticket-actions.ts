@@ -2,6 +2,8 @@
 
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
+import { resolveTicketAccess } from "@/lib/ticket-visibility";
+import type { Database } from "@/lib/supabase/types";
 import { revalidatePath } from "next/cache";
 
 /** Set ticket urgency for a customer-visible organization ticket. */
@@ -18,14 +20,11 @@ export async function setTicketUrgency(
   if (!profile?.organization_id) return { error: "Forbidden" };
   if (profile.role !== "customer") return { error: "Forbidden" };
 
-  const { data: ticket } = await svc
-    .from("tickets")
-    .select("id, organization_id, priority")
-    .eq("id", ticketId)
-    .eq("organization_id", profile.organization_id)
-    .single();
-
-  if (!ticket) return { error: "Ticket not found" };
+  const access = await resolveTicketAccess<
+    Pick<Database["public"]["Tables"]["tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "priority">
+  >(svc, profile, ticketId, "id, organization_id, created_by, assigned_to, priority");
+  if (access.kind !== "allowed") return { error: "Ticket not found" };
+  const ticket = access.ticket;
 
   const newPriority = urgent ? "high" : "medium";
   // Only downgrade if currently medium or lower to avoid overriding agent-set critical
@@ -37,7 +36,9 @@ export async function setTicketUrgency(
   const { error } = await svc
     .from("tickets")
     .update({ priority: safePriority })
-    .eq("id", ticketId);
+    .eq("id", ticketId)
+    .eq("organization_id", profile.organization_id)
+    .eq("created_by", user.id);
 
   if (error) return { error: error.message };
 
@@ -61,14 +62,11 @@ export async function setTicketRating(
   if (!profile?.organization_id) return { error: "Forbidden" };
   if (profile.role !== "customer") return { error: "Forbidden" };
 
-  const { data: ticket } = await svc
-    .from("tickets")
-    .select("id, organization_id, metadata")
-    .eq("id", ticketId)
-    .eq("organization_id", profile.organization_id)
-    .single();
-
-  if (!ticket) return { error: "Ticket not found" };
+  const access = await resolveTicketAccess<
+    Pick<Database["public"]["Tables"]["tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "metadata">
+  >(svc, profile, ticketId, "id, organization_id, created_by, assigned_to, metadata");
+  if (access.kind !== "allowed") return { error: "Ticket not found" };
+  const ticket = access.ticket;
 
   const existingMeta =
     ticket.metadata && typeof ticket.metadata === "object" && !Array.isArray(ticket.metadata)
@@ -78,7 +76,9 @@ export async function setTicketRating(
   const { error } = await svc
     .from("tickets")
     .update({ metadata: { ...existingMeta, customer_rating: rating } })
-    .eq("id", ticketId);
+    .eq("id", ticketId)
+    .eq("organization_id", profile.organization_id)
+    .eq("created_by", user.id);
 
   if (error) return { error: error.message };
 

@@ -6,6 +6,7 @@ import { MessageSquare, Lock, Building2, UserCircle2, Send, Bell, Clock } from "
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { InboxMarkReadTrigger } from "./InboxMarkReadTrigger";
+import { WAITING_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -176,7 +177,7 @@ export default async function InboxPage({
     }
     if (tab === "pending") {
       const pending = isStaff
-        ? enriched.filter((e) => e.ticket.status === "pending_customer")
+        ? enriched.filter((e) => WAITING_TICKET_STATUSES.includes(e.ticket.status as (typeof WAITING_TICKET_STATUSES)[number]))
         : enriched.filter((e) => ["open", "in_progress"].includes(e.ticket.status));
       // de-dupe by ticket
       const seen = new Set<string>();

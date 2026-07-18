@@ -7,7 +7,6 @@ import {
   applyTicketSlaFilter,
   debugTicketFilters,
   formatAgentIdentity,
-  getInitials,
   getTicketIdsBySuggestedCategory,
   getTicketsByRole,
 } from "@/lib/ticket-visibility";
@@ -18,6 +17,7 @@ import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { AlertCircle, Clock, Zap, Shield, ChevronLeft, ChevronRight, Gauge, Layers3 } from "lucide-react";
 import { formatTicketRef, priorityColor, sentimentIcon, formatRelativeTime } from "@/lib/utils";
 import { getTicketPresentation } from "@/lib/ticket-presentation";
+import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -102,9 +102,9 @@ export default async function QueuePage({
     svc,
     profile,
     "id, ticket_number, title, created_by, status, priority, created_at, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, contains_pii, assigned_to, metadata"
-  ).in("status", ["open", "in_progress", "pending_customer"]);
+  ).in("status", ACTIVE_TICKET_STATUSES);
 
-  if (filters.status && ["open", "in_progress", "pending_customer"].includes(filters.status)) {
+  if (filters.status && ACTIVE_TICKET_STATUSES.includes(filters.status as (typeof ACTIVE_TICKET_STATUSES)[number])) {
     ticketsQuery = ticketsQuery.eq("status", filters.status);
   }
 
@@ -392,6 +392,7 @@ export default async function QueuePage({
           { key: "status", label: "Status", value: "open", text: "Open" },
           { key: "status", label: "Status", value: "in_progress", text: "In progress" },
           { key: "status", label: "Status", value: "pending_customer", text: "Waiting customer" },
+          { key: "status", label: "Status", value: "pending_third_party", text: "Waiting third party" },
           { key: "priority", label: "Priority", value: "critical", text: "Critical" },
           { key: "priority", label: "Priority", value: "high", text: "High" },
           { key: "sla", label: "SLA", value: "on_time", text: "On time" },

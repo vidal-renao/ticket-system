@@ -41,6 +41,8 @@ export function PresenceAvatar({
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       {avatarUrl ? (
+        // User avatars can come from tenant-configured storage hosts, so Next Image host allowlisting is not reliable here.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={avatarUrl}
           alt={name}
@@ -73,7 +75,7 @@ export function PresenceAvatar({
       {typeof queueCount === "number" && queueCount > 0 && (
         <span
           className={cn(
-            "absolute -right-1 -top-1 inline-flex items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-600 px-1.5 font-semibold text-white shadow-md shadow-indigo-950/30",
+            "absolute -right-1 -top-1 inline-flex items-center justify-center rounded-full border border-[var(--color-brand-400)]/30 bg-[var(--color-brand-500)] px-1.5 font-semibold text-white shadow-md shadow-blue-950/30",
             badgeClasses[size]
           )}
           title={`${queueCount} tasks in queue`}

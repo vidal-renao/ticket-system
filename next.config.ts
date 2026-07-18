@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import path from "path";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -26,7 +25,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, ".."),
+  reactStrictMode: true,
+  compress: true,
   poweredByHeader: false,
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];

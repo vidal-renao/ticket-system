@@ -20,7 +20,7 @@ The browser communicates with a Next.js App Router application on Vercel. Next.j
 
 ### Ticket creation
 
-Authenticated customer -> validated request -> profile-derived organization -> ticket and SLA deadlines -> notification -> deferred AI triage -> AI analysis and optional priority update.
+Authenticated customer -> validated request -> profile-derived organization -> ticket and SLA deadlines -> notification -> deferred AI triage -> AI analysis -> optional priority and SLA update when no human override exists.
 
 ### Ticket handling
 
@@ -28,7 +28,7 @@ Authenticated staff -> role and tenant check -> visibility policy -> assignment/
 
 ### Email ingestion
 
-Bearer-authenticated provider -> normalized sender -> existing Supabase user/profile -> tenant-scoped ticket lookup -> append comment or create ticket.
+Bearer-authenticated provider -> normalized sender -> existing Supabase user/profile -> tenant and owner/role-scoped ticket lookup -> append comment or create ticket.
 
 ### SLA cron
 

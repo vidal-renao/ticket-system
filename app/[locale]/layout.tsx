@@ -15,9 +15,9 @@ const OG_LOCALE: Record<string, string> = {
 };
 
 const JSON_LD_DESCRIPTIONS: Record<string, string> = {
-  de: "KI-gestützte IT-Helpdesk-SaaS für Schweizer KMU mit DSG/nDSG-Compliance, mehrsprachigem Support (DE/EN/ES) und Claude-gesteuertem Ticket-Triage.",
-  en: "AI-powered IT helpdesk SaaS for Swiss SMEs with DSG/nDSG compliance, multilingual support (DE/EN/ES) and Claude-powered ticket triage.",
-  es: "SaaS de helpdesk IT con IA para pymes suizas con cumplimiento DSG/nDSG, soporte multilingüe (DE/EN/ES) y triage de tickets con Claude.",
+  de: "Mehrsprachiger IT-Helpdesk für Schweizer KMU mit SLA-Workflows, Mandantentrennung und KI-gestützter Ticket-Triage.",
+  en: "Multilingual IT helpdesk for Swiss SMEs with SLA workflows, tenant isolation and AI-assisted ticket triage.",
+  es: "Helpdesk IT multilingüe para pymes suizas con flujos SLA, aislamiento por organización y triage asistido por IA.",
 };
 
 export function generateStaticParams() {
@@ -39,7 +39,7 @@ export async function generateMetadata({
       siteName: "HelpDesk AI",
       locale: OG_LOCALE[locale] ?? "de_CH",
     },
-    robots: { index: false, follow: false },
+    robots: { index: true, follow: true },
   };
 }
 
@@ -62,7 +62,6 @@ export default async function LocaleLayout({
     inLanguage: locale,
     description: JSON_LD_DESCRIPTIONS[locale] ?? JSON_LD_DESCRIPTIONS.en,
     author: { "@type": "Person", name: "Vidal Reñao", url: "https://vidalrenao.ch" },
-    offers: { "@type": "Offer", price: "0", priceCurrency: "CHF" },
   };
 
   return (

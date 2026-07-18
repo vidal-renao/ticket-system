@@ -5,14 +5,28 @@ export type CanonicalTicketStatus =
   | "assigned"
   | "in_progress"
   | "waiting_customer"
+  | "waiting_third_party"
   | "resolved"
   | "closed";
+
+export const ACTIVE_TICKET_STATUSES: TicketStatus[] = [
+  "open",
+  "in_progress",
+  "pending_customer",
+  "pending_third_party",
+];
+
+export const WAITING_TICKET_STATUSES: TicketStatus[] = [
+  "pending_customer",
+  "pending_third_party",
+];
 
 export const CANONICAL_STATUS_LABELS: Record<CanonicalTicketStatus, string> = {
   new: "NEW",
   assigned: "ASSIGNED",
   in_progress: "IN_PROGRESS",
   waiting_customer: "WAITING_CUSTOMER",
+  waiting_third_party: "WAITING_THIRD_PARTY",
   resolved: "RESOLVED",
   closed: "CLOSED",
 };
@@ -23,8 +37,9 @@ export const ALLOWED_CANONICAL_TRANSITIONS: Record<
 > = {
   new: ["assigned"],
   assigned: ["new", "in_progress"],
-  in_progress: ["waiting_customer", "resolved"],
+  in_progress: ["waiting_customer", "waiting_third_party", "resolved"],
   waiting_customer: ["in_progress"],
+  waiting_third_party: ["in_progress"],
   resolved: ["closed", "in_progress"],
   closed: ["in_progress"],
 };
@@ -34,12 +49,14 @@ const CANONICAL_INPUTS: Record<string, CanonicalTicketStatus> = {
   assigned: "assigned",
   in_progress: "in_progress",
   waiting_customer: "waiting_customer",
+  waiting_third_party: "waiting_third_party",
   resolved: "resolved",
   closed: "closed",
   NEW: "new",
   ASSIGNED: "assigned",
   IN_PROGRESS: "in_progress",
   WAITING_CUSTOMER: "waiting_customer",
+  WAITING_THIRD_PARTY: "waiting_third_party",
   RESOLVED: "resolved",
   CLOSED: "closed",
 };
@@ -63,8 +80,9 @@ export function legacyToCanonicalStatus(
     case "in_progress":
       return "in_progress";
     case "pending_customer":
-    case "pending_third_party":
       return "waiting_customer";
+    case "pending_third_party":
+      return "waiting_third_party";
     case "resolved":
       return "resolved";
     case "closed":
@@ -88,6 +106,8 @@ export function canonicalToLegacyStatus(status: CanonicalTicketStatus): TicketSt
       return "open";
     case "waiting_customer":
       return "pending_customer";
+    case "waiting_third_party":
+      return "pending_third_party";
     case "in_progress":
     case "resolved":
     case "closed":
@@ -121,7 +141,9 @@ export function getTicketWorkflowLabel(
     case "in_progress":
       return "In progress";
     case "waiting_customer":
-      return "Waiting for company review";
+      return "Waiting for customer";
+    case "waiting_third_party":
+      return "Waiting for third party";
     case "resolved":
       return "Resolved";
     case "closed":

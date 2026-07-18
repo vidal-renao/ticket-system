@@ -61,10 +61,9 @@ export function SlaCountdown({ dueAt, label, breached = false }: SlaCountdownPro
 interface ReopenButtonProps {
   ticketId: string;
   resolvedAt: string | null;
-  locale: string;
 }
 
-export function CustomerReopenButton({ ticketId, resolvedAt, locale }: ReopenButtonProps) {
+export function CustomerReopenButton({ ticketId, resolvedAt }: ReopenButtonProps) {
   const [loading, setLoading] = useState(false);
   const [reopened, setReopened] = useState(false);
 

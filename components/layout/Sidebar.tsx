@@ -112,7 +112,7 @@ export function Sidebar({
         onClick={onNavigate}
         className="flex items-center gap-2.5 border-b border-[var(--color-surface-600)] px-5 py-5 transition-colors hover:bg-[var(--color-surface-800)]"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-500/30">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-500)] shadow-lg shadow-blue-950/30">
           <Zap className="h-4 w-4 text-white" />
         </div>
         <div>
@@ -136,22 +136,22 @@ export function Sidebar({
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
                 isActive
-                  ? "border border-indigo-500/20 bg-indigo-600/15 text-indigo-400"
+                  ? "border border-[var(--color-brand-400)]/25 bg-[var(--color-brand-500)]/12 text-[var(--color-brand-200)]"
                   : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-primary)]"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {t(labelKey)}
               {item.href === "/inbox" && inboxUnreadCount > 0 && (
-                <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-brand-500)] text-white text-[10px] font-semibold flex items-center justify-center">
                   {inboxUnreadCount > 9 ? "9+" : inboxUnreadCount}
                 </span>
               )}
               {isActive && item.href !== "/inbox" && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
               )}
               {isActive && item.href === "/inbox" && inboxUnreadCount === 0 && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" aria-hidden="true" />
               )}
             </Link>
           );

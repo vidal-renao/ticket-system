@@ -129,7 +129,7 @@ export default async function SettingsPage({
           <AvatarUpload
             userId={user.id}
             name={profile.full_name ?? user.email?.split("@")[0] ?? "User"}
-            currentUrl={(profile as any).avatar_url ?? null}
+            currentUrl={profile.avatar_url ?? null}
           />
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-[var(--color-surface-700)]">
             <div>

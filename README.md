@@ -1,51 +1,58 @@
 # HelpDesk AI
 
-![Next.js](https://img.shields.io/badge/Next.js-15.5.20-000000?logo=nextdotjs)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)
-![Vitest](https://img.shields.io/badge/Vitest-4-6E9F18?logo=vitest&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+Enterprise-oriented, multilingual support operations for Swiss SMEs. HelpDesk AI combines ticket ownership, agent queues, SLA workflows, notifications and human-reviewed AI assistance in one Next.js application.
 
-HelpDesk AI es una plataforma SaaS de soporte IT para pymes suizas. Centraliza tickets, asignacion de agentes, comentarios, SLA, notificaciones y analitica, con triage y asistencia de respuesta mediante IA en una interfaz DE/EN/ES.
+> Status: portfolio-ready and suitable for controlled demos. Production promotion still requires staging migration verification, disposable-database RLS integration tests and authenticated E2E coverage.
 
-El producto aplica principios de privacidad por diseno: aislamiento por organizacion, RLS, minimizacion antes de enviar contenido a proveedores de IA y trazabilidad de cambios. Estos controles son una base tecnica para DSG/nDSG y GDPR; no constituyen por si solos una certificacion legal.
+## Product
 
-## Capacidades
+- Customer portal for ticket creation, progress, comments, ratings and controlled reopening.
+- Agent queue with assignment, priority, waiting reasons and SLA visibility.
+- Manager/admin analytics, user administration and organization privacy settings.
+- DE, EN and ES interface with translation assistance.
+- Anthropic-assisted triage and reply suggestions; optional OpenAI/pgvector RAG.
+- Inbound email, notifications and authenticated SLA cron processing.
 
-- Portal de cliente para alta, seguimiento, reapertura y comentarios de tickets.
-- Cola operativa para agentes, managers y administradores.
-- Estados, prioridades, categorias, asignacion automatica y politicas SLA.
-- Triage, traduccion y respuestas sugeridas mediante Anthropic.
-- Base de conocimiento RAG opcional mediante embeddings de OpenAI y pgvector.
-- Notificaciones, correo entrante y cron diario de evaluacion SLA.
-- Administracion de usuarios y configuracion de privacidad por organizacion.
+AI output is assistive. Customer-facing replies require human action. Tenant isolation, RLS, PII minimization and audit events are technical controls; they are not a legal certification.
 
-El checkout existe como stub y no procesa pagos. Las capacidades futuras se mantienen en [ROADMAP.md](./ROADMAP.md).
+## Trust boundaries
 
-## Arquitectura
-
-| Ruta | Responsabilidad |
+| Actor | Ticket scope |
 | --- | --- |
-| `app/[locale]/` | Rutas publicas, autenticacion y aplicacion internacionalizada |
-| `app/api/` | Route Handlers HTTP, cron, correo e integraciones |
-| `app/actions/` | Server Actions autenticadas |
-| `components/` | UI por dominio y componentes base |
-| `lib/` | Autorizacion, datos, SLA, IA, email y validacion |
-| `docs/` | Esquema y migraciones SQL |
-| `tests/` | Tests de seguridad y logica critica |
+| Customer | Own tickets only (`created_by`) |
+| Agent | Assigned tickets; explicitly enabled unassigned queue work |
+| Manager | Organization tickets |
+| Admin | Organization tickets and configuration |
 
-Consulta [ARCHITECTURE.md](./ARCHITECTURE.md), [DOMAIN.md](./DOMAIN.md) y [SECURITY.md](./SECURITY.md) antes de modificar flujos de datos o permisos.
+Identity, role and organization are derived server-side from Supabase Auth and `profiles`. Service-role operations include explicit tenant or owner predicates and never trust caller-provided tenant data.
 
-## Requisitos
+## Stack
 
-- Node.js 20 o superior.
-- Proyecto Supabase con PostgreSQL y Auth.
-- Proyecto Vercel para despliegue y cron.
-- Clave Anthropic para funciones de IA.
-- Clave OpenAI solo si se activa RAG.
-- Resend solo si se activa correo saliente.
+- Next.js 15 App Router, React 19 and strict TypeScript.
+- Tailwind CSS 4 with a semantic control-room design system.
+- Supabase Auth, PostgreSQL and RLS.
+- next-intl for DE/EN/ES.
+- Vitest, ESLint and GitHub Actions.
+- Vercel Functions/Cron, Anthropic, optional OpenAI and Resend.
 
-## Configuracion local
+## Repository
+
+| Path | Responsibility |
+| --- | --- |
+| `app/[locale]/` | Public, authentication and protected application routes |
+| `app/api/` | HTTP endpoints, cron and integrations |
+| `app/actions/` | Authenticated server mutations |
+| `components/` | Domain and shared UI |
+| `lib/` | Authorization, lifecycle, SLA, AI and infrastructure clients |
+| `tests/` | Security and domain regression tests |
+| `docs/` | Schema references and forward migrations |
+| `.agents/skills/` | Project-local agent skills, including frontend design |
+
+Read [ARCHITECTURE.md](./ARCHITECTURE.md), [DOMAIN.md](./DOMAIN.md), [SECURITY.md](./SECURITY.md) and [SDD.md](./SDD.md) before changing data or authorization flows.
+
+## Local setup
+
+Requirements: Node.js 20+, a Supabase project and the required provider credentials.
 
 ```bash
 npm ci
@@ -53,72 +60,53 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Completa `.env.local` sin reutilizar secretos entre entornos. Los secretos de `CRON_SECRET`, `EMAIL_INGEST_SECRET` y `SETUP_SECRET` deben ser aleatorios y tener al menos 32 caracteres.
+Key variables:
 
-Variables esenciales:
-
-| Variable | Uso |
+| Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | URL publica del proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave anonima protegida por RLS |
-| `SUPABASE_SERVICE_ROLE_KEY` | Operaciones servidor; nunca exponer al cliente |
-| `ANTHROPIC_API_KEY` | Triage, traduccion y respuestas sugeridas |
-| `OPENAI_API_KEY` | Embeddings RAG opcionales |
-| `CRON_SECRET` | Autenticacion fail-closed de `/api/cron/sla` |
-| `EMAIL_INGEST_SECRET` | Autenticacion fail-closed de `/api/email/inbound` |
-| `SETUP_SECRET` | Proteccion de la operacion excepcional de setup |
-| `SETUP_ADMIN_USER_ID` | UUID del usuario para setup controlado |
-| `SETUP_ORGANIZATION_ID` | UUID de organizacion para setup controlado |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser/session key protected by RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only privileged operations |
+| `NEXT_PUBLIC_APP_URL` | Canonical application URL |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Public demo/contact CTA |
+| `ANTHROPIC_API_KEY` | Triage, translation and reply suggestions |
+| `OPENAI_API_KEY` | Optional RAG embeddings |
+| `CRON_SECRET` | Fail-closed SLA cron authentication |
+| `EMAIL_INGEST_SECRET` | Fail-closed inbound-email authentication |
+| `SETUP_SECRET` | Exceptional setup endpoint authentication |
 
-## Base de datos
+Secrets for cron, email ingestion and setup must be distinct random values of at least 32 characters.
 
-El estado de produccion debe verificarse con el historial del proyecto Supabase. Para un entorno nuevo, revisa y aplica de forma controlada:
+## Quality gates
+
+```bash
+npm run check
+npm run build
+npm audit --audit-level=high
+```
+
+`npm run check` enforces zero-warning lint, strict typecheck and all unit tests. CI runs the same checks from a deterministic `npm ci` install.
+
+## Database
+
+Repository SQL files describe an ordered bootstrap/hardening path but do not prove the deployed schema. Verify the Supabase migration history before promotion:
 
 1. `docs/migration_v1_final.sql`
 2. `docs/migration_schema_consistency.sql`
 3. `docs/migration_phase1_routing.sql`
 4. `docs/migration_rls_profiles_fix.sql`
 5. `docs/migration_security_hardening.sql`
-6. `docs/rag_migration.sql` solo si RAG esta habilitado
+6. `docs/rag_migration.sql` only when RAG is enabled
 
-No ejecutes migraciones directamente en produccion sin backup, revision del diff y prueba en staging. La migracion de hardening revoca la capacidad del usuario de cambiar `role`, `organization_id` e `is_active`, y corrige el alcance tenant de comentarios, adjuntos y analisis IA.
+Never edit a historical migration to represent a production change. Add an idempotent forward migration with rollback notes and test it against two tenants.
 
-## Comandos
+## Release checklist
 
-```bash
-npm run dev
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npm audit --audit-level=high
-```
+1. Apply and verify migrations in staging.
+2. Test two organizations and all four roles against RLS.
+3. Run customer, agent and admin authenticated E2E flows.
+4. Verify cron/webhook secrets and provider failure behavior.
+5. Confirm retention, DPA, provider region and incident-response operations.
+6. Measure accessibility, Core Web Vitals and bundle budgets; publish only measured results.
 
-`npm run seed:full` es destructivo y solo funciona si se establece deliberadamente `ALLOW_DESTRUCTIVE_SEED=I_UNDERSTAND` junto con todas las variables `SEED_*`.
-
-## Seguridad operativa
-
-- El registro publico crea unicamente usuarios `customer`.
-- Agentes y managers se crean desde administracion autenticada.
-- Los endpoints privilegiados devuelven `503` si falta su secreto y `401` si el token no coincide.
-- `service_role` se limita a codigo servidor y exige filtros tenant explicitos.
-- Las credenciales demo no se versionan ni se imprimen en logs.
-- Rota inmediatamente cualquier credencial que haya existido en el historial Git.
-
-Consulta [SECURITY.md](./SECURITY.md) para amenazas, respuesta y disclosure.
-
-## CI y despliegue
-
-GitHub Actions ejecuta instalacion determinista, lint, typecheck, tests, build y auditoria de vulnerabilidades high. Vercel debe desplegar solo despues de superar CI y disponer de todas las variables del entorno objetivo.
-
-Antes de promover a produccion:
-
-1. Aplicar y verificar migraciones en staging.
-2. Probar aislamiento entre dos organizaciones con usuarios reales de test.
-3. Verificar cron y webhooks con secretos distintos a desarrollo.
-4. Confirmar politicas de retencion, proveedores, DPA y residencia de datos.
-5. Medir Lighthouse y accesibilidad; no publicar puntuaciones no verificadas.
-
-## Estado
-
-El estado previo y los riesgos encontrados estan documentados en [CURRENT_TRUTH.md](./CURRENT_TRUTH.md). Los cambios relevantes se registran en [CHANGELOG.md](./CHANGELOG.md).
+See [ROADMAP.md](./ROADMAP.md) for non-implemented work and [CHANGELOG.md](./CHANGELOG.md) for delivered changes.

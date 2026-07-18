@@ -38,7 +38,7 @@ export function AnimatedFeatureGrid({ features }: AnimatedFeatureGridProps) {
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, margin: "-60px" }}
-      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+      className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/8 bg-white/8 md:grid-cols-2 lg:grid-cols-3"
     >
       {features.map((feature) => {
         const Icon = ICON_MAP[feature.iconName];
@@ -46,10 +46,10 @@ export function AnimatedFeatureGrid({ features }: AnimatedFeatureGridProps) {
           <motion.div
             key={feature.title}
             variants={item}
-            className="group p-6 rounded-2xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] hover:border-indigo-500/40 hover:bg-[var(--color-surface-800)] hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 cursor-default"
+            className="group bg-[var(--color-surface-900)] p-6 transition-colors duration-300 hover:bg-[var(--color-surface-850)] cursor-default"
           >
-            <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:bg-indigo-600/25 group-hover:border-indigo-500/40 transition-colors">
-              <Icon className="w-5 h-5 text-indigo-400" />
+            <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--color-brand-400)]/20 bg-[var(--color-brand-500)]/8 transition-colors group-hover:bg-[var(--color-brand-500)]/16">
+              <Icon className="h-5 w-5 text-[var(--color-brand-300)]" />
             </div>
             <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-2">
               {feature.title}

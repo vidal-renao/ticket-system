@@ -57,6 +57,11 @@ export async function POST(request: Request) {
       .single();
 
     if (ticket) {
+      const senderIsStaff = ["agent", "manager", "admin"].includes(senderProfile.role);
+      if (!senderIsStaff && ticket.created_by !== senderProfile.id) {
+        return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      }
+
       const { data: comment, error } = await svc
         .from("ticket_comments")
         .insert({

@@ -14,6 +14,7 @@ type AgentIdentity = {
 type TicketAccessRow = {
   id: string;
   organization_id: string;
+  created_by: string;
   assigned_to: string | null;
 };
 
@@ -45,6 +46,10 @@ export function applyTicketVisibilityScope(
 ): any {
   const scoped = query.eq("organization_id", profile.organization_id);
 
+  if (profile.role === "customer") {
+    return scoped.eq("created_by", profile.id);
+  }
+
   if (profile.role !== "agent") {
     return scoped;
   }
@@ -54,6 +59,27 @@ export function applyTicketVisibilityScope(
   }
 
   return scoped.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
+}
+
+export function canProfileAccessTicket(
+  profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
+  ticket: Pick<TicketAccessRow, "organization_id" | "created_by" | "assigned_to">,
+  options?: { includeUnassignedForAgents?: boolean }
+): boolean {
+  if (!profile.organization_id || ticket.organization_id !== profile.organization_id) {
+    return false;
+  }
+
+  if (profile.role === "customer") {
+    return ticket.created_by === profile.id;
+  }
+
+  if (profile.role === "agent") {
+    if (ticket.assigned_to === profile.id) return true;
+    return options?.includeUnassignedForAgents !== false && ticket.assigned_to === null;
+  }
+
+  return profile.role === "manager" || profile.role === "admin";
 }
 
 export function getTicketsByRole(
@@ -141,7 +167,7 @@ export async function resolveTicketAccess<T>(
 ): Promise<TicketAccessResult<T>> {
   const { data: baseTicket, error: baseError } = await client
     .from("tickets")
-    .select("id, organization_id, assigned_to")
+    .select("id, organization_id, created_by, assigned_to")
     .eq("id", ticketId)
     .maybeSingle();
 
@@ -158,36 +184,11 @@ export async function resolveTicketAccess<T>(
     return { kind: "not_found" };
   }
 
-  if (baseTicket.organization_id !== profile.organization_id) {
-    debugWarn("[TicketAccess] organization mismatch", {
+  if (!canProfileAccessTicket(profile, baseTicket as TicketAccessRow, options)) {
+    debugWarn("[TicketAccess] policy denied access", {
       ticketId,
       userId: profile.id,
       role: profile.role,
-    });
-    return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
-  }
-
-  if (
-    profile.role === "agent" &&
-    baseTicket.assigned_to &&
-    baseTicket.assigned_to !== profile.id &&
-    options?.includeUnassignedForAgents !== false
-  ) {
-    debugWarn("[TicketAccess] agent attempted to access foreign assignment", {
-      ticketId,
-      userId: profile.id,
-    });
-    return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
-  }
-
-  if (
-    profile.role === "agent" &&
-    options?.includeUnassignedForAgents === false &&
-    baseTicket.assigned_to !== profile.id
-  ) {
-    debugWarn("[TicketAccess] agent attempted to access non-owned ticket", {
-      ticketId,
-      userId: profile.id,
     });
     return { kind: "forbidden", ticket: baseTicket as TicketAccessRow };
   }

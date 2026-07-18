@@ -53,12 +53,10 @@ export default async function DashboardPage({
     return (
       <AgentDashboard
         userId={user.id}
-        orgId={profile.organization_id ?? ""}
         availabilityStatus={
           (profile.availability_status as "online" | "offline" | "busy") ??
           "offline"
         }
-        locale={locale}
         prefix={prefix}
       />
     );
@@ -68,7 +66,6 @@ export default async function DashboardPage({
     return (
       <CustomerDashboard
         userId={user.id}
-        orgId={profile.organization_id ?? ""}
         locale={locale}
         prefix={prefix}
       />
@@ -82,7 +79,6 @@ export default async function DashboardPage({
   return (
     <AdminDashboard
       orgId={profile.organization_id ?? ""}
-      locale={locale}
       prefix={prefix}
     />
   );
@@ -92,11 +88,9 @@ export default async function DashboardPage({
 
 async function AdminDashboard({
   orgId,
-  locale,
   prefix,
 }: {
   orgId: string;
-  locale: string;
   prefix: string;
 }) {
   const t = await getTranslations("dashboard");
@@ -166,7 +160,7 @@ async function AdminDashboard({
 
   const priorityCounts: Record<string, number> = {};
   for (const row of priorityStats ?? []) {
-    const p = (row as any).priority as string;
+    const p = row.priority as string;
     priorityCounts[p] = (priorityCounts[p] ?? 0) + 1;
   }
   const topCategories = Object.entries(priorityCounts).sort(
@@ -229,7 +223,7 @@ async function AdminDashboard({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {recentTickets?.map((ticket: any, i: number) => {
+              {recentTickets?.map((ticket, i) => {
                 const ticketPath = `${prefix}/tickets/${ticket.id}`;
                 return (
                   <Link href={ticketPath} key={ticket.id}>
@@ -298,7 +292,7 @@ async function AdminDashboard({
                   {t("noData")}
                 </p>
               )}
-              {(teamMembers ?? []).map((member: any, i: number) => (
+              {(teamMembers ?? []).map((member, i) => (
                 <div
                   key={i}
                   className={`flex items-center gap-3 px-5 py-2.5 ${
@@ -428,15 +422,11 @@ async function AdminDashboard({
 
 async function AgentDashboard({
   userId,
-  orgId,
   availabilityStatus,
-  locale,
   prefix,
 }: {
   userId: string;
-  orgId: string;
   availabilityStatus: "online" | "offline" | "busy";
-  locale: string;
   prefix: string;
 }) {
   const t = await getTranslations("agentDashboard");
@@ -515,7 +505,7 @@ async function AgentDashboard({
                   </p>
                 </div>
               )}
-              {(assignedTickets ?? []).map((ticket: any, i: number) => {
+              {(assignedTickets ?? []).map((ticket, i) => {
                 const timeLeft = formatTimeRemaining(ticket.sla_resolution_due);
                 const breached = ticket.sla_breached;
                 const ticketPath = `${prefix}/tickets/${ticket.id}`;
@@ -594,12 +584,10 @@ async function AgentDashboard({
 
 async function CustomerDashboard({
   userId,
-  orgId,
   locale,
   prefix,
 }: {
   userId: string;
-  orgId: string;
   locale: string;
   prefix: string;
 }) {
@@ -683,7 +671,7 @@ async function CustomerDashboard({
               <p className="text-xs text-[var(--color-text-muted)] mt-1">{t("noTicketsHint")}</p>
             </div>
           )}
-          {(recentTickets ?? []).map((ticket: any, i: number) => {
+          {(recentTickets ?? []).map((ticket, i) => {
             const ticketPath = `${prefix}/tickets/${ticket.id}`;
             const updatedAt = new Date(ticket.updated_at).toLocaleDateString(
               locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB"

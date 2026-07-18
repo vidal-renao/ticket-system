@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
 import { verifyBearerSecret } from "@/lib/security/bearer-auth";
+import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
-
-const ACTIVE_STATUSES = ["open", "in_progress", "pending_customer", "pending_third_party"];
 
 export async function GET(request: Request) {
   const authorization = verifyBearerSecret(request, process.env.CRON_SECRET);
@@ -20,7 +19,7 @@ export async function GET(request: Request) {
   const { data: tickets, error } = await svc
     .from("tickets")
     .select("id, ticket_number, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
-    .in("status", ACTIVE_STATUSES)
+    .in("status", ACTIVE_TICKET_STATUSES)
     .limit(500);
 
   if (error) {

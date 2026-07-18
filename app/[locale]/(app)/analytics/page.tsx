@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { BarChart3, Zap, AlertCircle, ShieldAlert, Clock, Timer, CheckCircle2, Target } from "lucide-react";
-import { formatTicketRef, priorityColor, sentimentIcon } from "@/lib/utils";
+import { formatTicketRef, sentimentIcon } from "@/lib/utils";
 import type { SentimentType, TicketPriority } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function AnalyticsPage({
     .select("id, priority, status, created_at, resolved_at, sla_breached, first_response_at, first_agent_response_at")
     .eq("organization_id", orgId);
 
-  const ticketIds: string[] = (allTickets ?? []).map((t: any) => t.id);
+  const ticketIds: string[] = (allTickets ?? []).map((ticket) => ticket.id);
 
   // Step 2: parallel queries — ai_analysis scoped by ticket IDs (no org column)
   const [
@@ -111,10 +111,10 @@ export default async function AnalyticsPage({
   const maxSentiment    = Math.max(...Object.values(sentimentCounts), 1);
 
   // ITIL/ITSM metrics
-  const resolvedTickets = (allTickets ?? []).filter((t: any) => t.resolved_at && t.created_at);
+  const resolvedTickets = (allTickets ?? []).filter((ticket) => ticket.resolved_at && ticket.created_at);
   const mttrMs = resolvedTickets.length > 0
-    ? resolvedTickets.reduce((sum: number, t: any) => {
-        return sum + (new Date(t.resolved_at).getTime() - new Date(t.created_at).getTime());
+    ? resolvedTickets.reduce((sum, ticket) => {
+        return sum + (new Date(ticket.resolved_at!).getTime() - new Date(ticket.created_at).getTime());
       }, 0) / resolvedTickets.length
     : 0;
   const mttrHours = Math.round(mttrMs / (1000 * 60 * 60));
@@ -124,15 +124,15 @@ export default async function AnalyticsPage({
 
   // FCR: % of resolved tickets that were resolved without SLA breach (proxy for first-call resolution)
   const resolvedTotal = resolvedTickets.length;
-  const resolvedOnTime = resolvedTickets.filter((t: any) => !t.sla_breached).length;
+  const resolvedOnTime = resolvedTickets.filter((ticket) => !ticket.sla_breached).length;
   const fcrRate = resolvedTotal > 0 ? Math.round((resolvedOnTime / resolvedTotal) * 100) : 0;
 
   // First Response Time: average time from ticket creation to first agent response
-  const respondedTickets = (allTickets ?? []).filter((t: any) => (t.first_agent_response_at || t.first_response_at) && t.created_at);
+  const respondedTickets = (allTickets ?? []).filter((ticket) => (ticket.first_agent_response_at || ticket.first_response_at) && ticket.created_at);
   const avgFrtMs = respondedTickets.length > 0
-    ? respondedTickets.reduce((sum: number, t: any) => {
-        const firstResponse = t.first_agent_response_at ?? t.first_response_at;
-        return sum + (new Date(firstResponse).getTime() - new Date(t.created_at).getTime());
+    ? respondedTickets.reduce((sum, ticket) => {
+        const firstResponse = ticket.first_agent_response_at ?? ticket.first_response_at;
+        return sum + (new Date(firstResponse!).getTime() - new Date(ticket.created_at).getTime());
       }, 0) / respondedTickets.length
     : 0;
   const avgFrtMinutes = Math.round(avgFrtMs / (1000 * 60));
@@ -145,7 +145,7 @@ export default async function AnalyticsPage({
     critical: 0, high: 0, medium: 0, low: 0,
   };
   for (const row of openByPriority ?? []) {
-    const p = (row as any).priority as TicketPriority;
+    const p = row.priority as TicketPriority;
     if (p in priorityCounts) priorityCounts[p]++;
   }
   const totalOpen = Object.values(priorityCounts).reduce((a, b) => a + b, 0);
@@ -315,7 +315,7 @@ export default async function AnalyticsPage({
           </CardHeader>
           <CardContent className="p-0">
             {slaAtRisk && slaAtRisk.length > 0 ? (
-              slaAtRisk.map((ticket: any, i: number) => {
+              slaAtRisk.map((ticket, i) => {
                 const ticketPath   = locale === "de" ? `/tickets/${ticket.id}` : `/${locale}/tickets/${ticket.id}`;
                 const minutesLeft  = Math.round(
                   (new Date(ticket.sla_resolution_due).getTime() - Date.now()) / 60_000

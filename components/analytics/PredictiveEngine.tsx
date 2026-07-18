@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { TrendingUp, Activity, Zap, BarChart3, Target, ChevronDown, ChevronUp } from "lucide-react";
-import { runPredictor, reconstructAt, type PredictorOutput, type Harmonic } from "@/lib/math/predictor-engine";
+import { runPredictor, reconstructAt, type PredictorOutput } from "@/lib/math/predictor-engine";
 import { DATASETS, type DatasetKey } from "@/lib/math/mock-datasets";
 import { cn } from "@/lib/utils";
 

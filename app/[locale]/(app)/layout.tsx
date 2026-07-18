@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/AppShell";
+import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export default async function AppLayout({
   children,
@@ -61,7 +62,7 @@ export default async function AppLayout({
           .from("tickets")
           .select("id", { count: "exact", head: true })
           .eq("assigned_to", user.id)
-          .in("status", ["open", "in_progress", "pending_customer"])
+          .in("status", ACTIVE_TICKET_STATUSES)
       : Promise.resolve({ count: 0 }),
     svc
       .from("notifications")
@@ -77,7 +78,7 @@ export default async function AppLayout({
       userName={resolvedName}
       userSubtitle={resolvedSubtitle}
       userAvatar={resolvedProfile.avatar_url}
-      userStatus={(resolvedProfile as any).availability_status ?? null}
+      userStatus={profile?.availability_status ?? null}
       queueCount={assignedCountResult.count ?? 0}
       locale={locale}
       notifications={notifications ?? []}

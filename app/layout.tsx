@@ -1,7 +1,4 @@
-import { Inter } from "next/font/google";
 import type { Metadata } from "next";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
 
@@ -37,10 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de" suppressHydrationWarning>
-      <body
-        className={`${inter.variable} font-sans antialiased`}
-        suppressHydrationWarning
-      >
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

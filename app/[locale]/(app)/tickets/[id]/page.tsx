@@ -156,7 +156,7 @@ export default async function TicketDetailPage({
         <div className="lg:col-span-2 space-y-5">
           <Card>
             <CardHeader>
-              <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t("description" as any) ?? "Description"}</p>
+              <p className="text-sm font-medium text-[var(--color-text-secondary)]">{t("description")}</p>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-[var(--color-text-primary)] whitespace-pre-wrap leading-relaxed">
@@ -234,7 +234,7 @@ export default async function TicketDetailPage({
           )}
 
           {isStaff && aiAnalysis && (
-            <AITriagePanel analysis={aiAnalysis} ticketId={ticket.id} />
+            <AITriagePanel analysis={aiAnalysis} />
           )}
 
           {isStaff && !aiAnalysis && (
@@ -265,7 +265,6 @@ export default async function TicketDetailPage({
                 <CustomerReopenButton
                   ticketId={ticket.id}
                   resolvedAt={ticket.resolved_at}
-                  locale={locale}
                 />
               </CardContent>
             </Card>

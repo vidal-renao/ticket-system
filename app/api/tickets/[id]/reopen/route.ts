@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/authz";
+import { getCurrentProfile, isStaffRole } from "@/lib/authz";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { createTicketNotification } from "@/lib/notifications";
+import { legacyToCanonicalStatus, validateTicketTransition } from "@/lib/ticket-lifecycle";
+import { buildReopenedSlaPatch, getSlaPolicyForTicket } from "@/lib/sla";
 
 const REOPEN_WINDOW_HOURS = 48;
 
@@ -24,12 +26,24 @@ export async function POST(
 
   const { data: ticket } = await svc
     .from("tickets")
-    .select("id, ticket_number, organization_id, created_by, status, resolved_at, assigned_to")
+    .select("id, ticket_number, organization_id, created_by, priority, status, created_at, resolved_at, assigned_to, response_due_at, sla_first_response_due, sla_response_breached")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
     .single();
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+
+  if (profile.role !== "customer" && !isStaffRole(profile.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (profile.role === "agent" && ticket.assigned_to !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (ticket.status !== "resolved" && ticket.status !== "closed") {
+    return NextResponse.json({ error: "Ticket is not in a terminal state" }, { status: 409 });
+  }
 
   // Customers can only reopen their own tickets within the 48h window
   if (profile.role === "customer") {
@@ -52,11 +66,22 @@ export async function POST(
   }
 
   const oldStatus = ticket.status;
+  const transition = validateTicketTransition(ticket, {
+    status: "in_progress",
+    assigned_to: ticket.assigned_to,
+  });
+  if (!transition.ok) {
+    return NextResponse.json({ error: transition.error }, { status: 422 });
+  }
+
+  const policy = await getSlaPolicyForTicket(svc, ticket.organization_id, ticket.priority);
+  const reopenPatch = buildReopenedSlaPatch(ticket, policy);
 
   const { error } = await svc
     .from("tickets")
-    .update({ status: "open", resolved_at: null, sla_breached: false })
-    .eq("id", id);
+    .update(reopenPatch)
+    .eq("id", id)
+    .eq("organization_id", profile.organization_id);
 
   if (error) {
     return NextResponse.json({ error: "Failed to reopen ticket" }, { status: 500 });
@@ -67,8 +92,8 @@ export async function POST(
     organizationId: ticket.organization_id,
     actorId: user.id,
     actorRole: profile.role,
-    oldStatus,
-    newStatus: "open",
+    oldStatus: legacyToCanonicalStatus(oldStatus, ticket.assigned_to),
+    newStatus: "in_progress",
     oldAssignee: ticket.assigned_to,
     newAssignee: ticket.assigned_to,
   });
@@ -78,7 +103,7 @@ export async function POST(
       userId: ticket.assigned_to,
       ticketId: id,
       type: "ticket.reopened",
-      title: "Ticket reopened by customer",
+      title: profile.role === "customer" ? "Ticket reopened by customer" : "Ticket reopened",
       message: `TK-${String(ticket.ticket_number).padStart(4, "0")} has been reopened.`,
     });
   }

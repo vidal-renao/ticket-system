@@ -13,6 +13,7 @@ import { AdminTicketActions } from "@/components/admin/AdminTicketActions";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { formatAgentIdentity } from "@/lib/ticket-visibility";
 import { getTicketPresentation } from "@/lib/ticket-presentation";
+import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 import {
   Building2,
   TicketIcon,
@@ -204,7 +205,7 @@ export default async function AdminPage({
       filtered.filter(
         (ticket) =>
           ticket.assigned_to === entry.id &&
-          ["open", "in_progress", "pending_customer"].includes(ticket.status)
+          ACTIVE_TICKET_STATUSES.includes(ticket.status as (typeof ACTIVE_TICKET_STATUSES)[number])
       ).length,
     ])
   );

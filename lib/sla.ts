@@ -75,6 +75,32 @@ export function buildSlaDeadlinePatch(
   };
 }
 
+export function buildReopenedSlaPatch(
+  ticket: Pick<SlaTicketState, "created_at" | "response_due_at" | "sla_first_response_due"> & {
+    sla_response_breached?: boolean;
+  },
+  policy: SlaPolicy | null,
+  reopenedAt = new Date()
+) {
+  const resolutionDue = policy
+    ? addHours(reopenedAt, policy.resolution_hours)
+    : null;
+
+  return {
+    status: "in_progress" as const,
+    resolved_at: null,
+    closed_at: null,
+    sla_policy_id: policy?.id ?? null,
+    resolution_due_at: resolutionDue,
+    sla_resolution_due: resolutionDue,
+    response_due_at: ticket.response_due_at ?? ticket.sla_first_response_due ?? null,
+    sla_response_breached: ticket.sla_response_breached ?? false,
+    sla_resolution_breached: false,
+    sla_resolution_met: null,
+    sla_breached: ticket.sla_response_breached ?? false,
+  };
+}
+
 export function assessSla(ticket: SlaTicketState, now = new Date()) {
   const firstResponseAt = ticket.first_agent_response_at ?? ticket.first_response_at ?? null;
   const responseDue = ticket.response_due_at ?? ticket.sla_first_response_due ?? null;
@@ -129,7 +155,11 @@ export async function applySlaAssessment(
     patch.sla_resolution_met = assessment.resolutionMet;
   }
 
-  await supabase.from("tickets").update(patch).eq("id", ticket.id);
+  await supabase
+    .from("tickets")
+    .update(patch)
+    .eq("id", ticket.id)
+    .eq("organization_id", ticket.organization_id);
 
   if (assessment.responseBreached) {
     await logSlaEventOnce(ticket, "ticket.sla_response_breached", actorId, actorRole);
@@ -163,6 +193,7 @@ export async function ensureSlaDeadlines(
     .from("tickets")
     .update(patch)
     .eq("id", ticket.id)
+    .eq("organization_id", ticket.organization_id)
     .select("id, ticket_number, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
     .single();
 

@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { UserManagementPanel } from "@/components/admin/UserManagementPanel";
 import { Users } from "lucide-react";
 
@@ -42,20 +40,20 @@ export default async function AdminUsersPage({
 
   // Fetch customer company names
   const customerIds = (profilesRaw ?? [])
-    .filter((p: any) => p.role === "customer")
-    .map((p: any) => p.id);
+    .filter((profileRow) => profileRow.role === "customer")
+    .map((profileRow) => profileRow.id);
 
   const { data: customerInfosRaw } = customerIds.length
     ? await svc.from("customers_info").select("id, company_name").in("id", customerIds)
     : { data: [] };
 
-  const companyById = Object.fromEntries(
-    ((customerInfosRaw ?? []) as any[]).map((c) => [c.id, c.company_name])
+  const companyById: Record<string, string | null> = Object.fromEntries(
+    (customerInfosRaw ?? []).map((customerInfo) => [customerInfo.id, customerInfo.company_name])
   );
 
-  const users = ((profilesRaw ?? []) as any[]).map((p) => ({
-    ...p,
-    company_name: companyById[p.id] ?? null,
+  const users = (profilesRaw ?? []).map((profileRow) => ({
+    ...profileRow,
+    company_name: companyById[profileRow.id] ?? null,
   }));
 
   return (

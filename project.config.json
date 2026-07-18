@@ -2,7 +2,7 @@
   "project": {
     "name": "HelpDesk AI",
     "type": "multi-tenant SaaS ticketing platform",
-    "status": "development-ready"
+    "status": "portfolio-ready, production-hardening required"
   },
   "stack": {
     "frontend": {
@@ -34,9 +34,21 @@
     "test": "npm test"
   },
   "architecture": {
-    "pattern": "App Router with domain libraries and PostgreSQL RLS",
+    "pattern": "App Router with tested domain policies and PostgreSQL RLS",
     "sourceRoots": ["app", "components", "lib"],
-    "testsRoot": "tests"
+    "testsRoot": "tests",
+    "skillsRoot": ".agents/skills"
+  },
+  "quality": {
+    "zeroWarningLint": true,
+    "strictTypeScript": true,
+    "requiredCommands": ["npm run check", "npm run build", "npm audit --audit-level=high"],
+    "externalReleaseGates": ["two-tenant RLS integration", "authenticated E2E", "staging migration verification"]
+  },
+  "design": {
+    "direction": "Swiss support operations control room",
+    "skill": ".agents/skills/frontend-design/SKILL.md",
+    "requirements": ["responsive", "keyboard accessible", "reduced motion", "no unverified claims"]
   },
   "guardrails": {
     "agentGuide": "AGENTS.md",

@@ -4,11 +4,12 @@ import { triageTicket } from "@/lib/ai/triage";
 import { scrubPII } from "@/lib/ai/pii-scrubber";
 import { retrieveRelevantKnowledge, buildRAGContext } from "@/lib/ai/rag";
 import { getCurrentProfile } from "@/lib/authz";
-import { legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
+import { ACTIVE_TICKET_STATUSES, legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { sendEmail, ticketEmailSubject } from "@/lib/email";
+import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
   });
 
   scheduleBackground(
-    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id)
+    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id, priority)
   );
 
   return NextResponse.json({ ticket }, { status: 201 });
@@ -202,7 +203,7 @@ async function findLeastBusyAgent(
     .from("tickets")
     .select("assigned_to")
     .in("assigned_to", agentIds)
-    .in("status", ["open", "in_progress", "pending_customer"]);
+    .in("status", ACTIVE_TICKET_STATUSES);
 
   // Build count map with 0 as default for every agent
   const counts: Record<string, number> = {};
@@ -245,7 +246,8 @@ async function runAITriage(
   ticketId: string,
   title: string,
   description: string,
-  orgId: string
+  orgId: string,
+  initialPriority: string
 ): Promise<void> {
   const svc = createServiceClientStatic();
 
@@ -333,10 +335,38 @@ async function runAITriage(
     contains_pii: result.contains_pii,
   };
 
+  const { data: currentTicket } = await svc
+    .from("tickets")
+    .select("id, organization_id, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due")
+    .eq("id", ticketId)
+    .eq("organization_id", orgId)
+    .single();
+
   if (result.confidence_score >= 60) {
-    patch.priority = result.suggested_priority;
     if (category?.id) patch.category_id = category.id;
   }
 
-  await svc.from("tickets").update(patch).eq("id", ticketId);
+  if (currentTicket && shouldApplyAiPriority({
+    confidence: result.confidence_score,
+    initialPriority,
+    currentPriority: currentTicket.priority,
+    suggestedPriority: result.suggested_priority,
+  })) {
+    const policy = await getSlaPolicyForTicket(svc, orgId, result.suggested_priority);
+    patch.priority = result.suggested_priority;
+    Object.assign(
+      patch,
+      buildSlaDeadlinePatch(
+        { ...currentTicket, priority: result.suggested_priority },
+        policy,
+        { preserveExisting: false }
+      )
+    );
+  }
+
+  await svc
+    .from("tickets")
+    .update(patch)
+    .eq("id", ticketId)
+    .eq("organization_id", orgId);
 }

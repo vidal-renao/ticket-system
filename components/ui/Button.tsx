@@ -14,12 +14,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200",
+          "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           // Variants
           variant === "primary" && [
-            "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20",
-            "hover:-translate-y-0.5 hover:bg-indigo-500 hover:shadow-xl hover:shadow-indigo-500/25 active:translate-y-0 active:bg-indigo-700",
+            "bg-[var(--color-brand-500)] text-white shadow-lg shadow-blue-950/25",
+            "hover:-translate-y-0.5 hover:bg-[var(--color-brand-400)] hover:shadow-xl hover:shadow-blue-950/30 active:translate-y-0 active:bg-[var(--color-brand-600)]",
           ],
           variant === "secondary" && [
             "border border-[var(--color-surface-600)] bg-[var(--color-surface-700)] text-[var(--color-text-primary)]",

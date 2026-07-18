@@ -7,7 +7,6 @@ import {
   applyTicketSlaFilter,
   debugTicketFilters,
   formatAgentIdentity,
-  getInitials,
   getTicketIdsBySuggestedCategory,
   getTicketsByRole,
 } from "@/lib/ticket-visibility";
@@ -33,6 +32,7 @@ import {
   formatDuration,
 } from "@/lib/utils";
 import { getTicketPresentation } from "@/lib/ticket-presentation";
+import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -184,7 +184,7 @@ export default async function TicketsPage({
       ? svc.from("profiles").select("id, full_name, specialty").in("id", assigneeIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null; specialty: string | null }[] }),
     isStaff
-      ? svc.from("tickets").select("id", { count: "exact", head: true }).eq("assigned_to", user.id).in("status", ["open", "in_progress", "pending_customer"])
+      ? svc.from("tickets").select("id", { count: "exact", head: true }).eq("assigned_to", user.id).in("status", ACTIVE_TICKET_STATUSES)
       : Promise.resolve({ count: 0 }),
   ]);
 
@@ -203,7 +203,6 @@ export default async function TicketsPage({
   );
 
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
-  const currentInitials = getInitials(profile.full_name);
   const availableCategories = [...new Set(Object.values(aiCategoryMap).filter((value): value is string => Boolean(value)))].sort();
   const visibleStaffTickets = staffTickets;
 
@@ -299,6 +298,7 @@ export default async function TicketsPage({
               { key: "status", label: "Status", value: "open", text: "Open" },
               { key: "status", label: "Status", value: "in_progress", text: "In progress" },
               { key: "status", label: "Status", value: "pending_customer", text: "Waiting customer" },
+              { key: "status", label: "Status", value: "pending_third_party", text: "Waiting third party" },
               { key: "priority", label: "Priority", value: "critical", text: "Critical" },
               { key: "priority", label: "Priority", value: "high", text: "High" },
               { key: "sla", label: "SLA", value: "on_time", text: "On time" },

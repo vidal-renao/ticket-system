@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
   { value: "open",              label: "Open" },
   { value: "in_progress",       label: "In Progress" },
   { value: "pending_customer",  label: "Pending Customer" },
+  { value: "pending_third_party", label: "Pending Third Party" },
   { value: "resolved",          label: "Resolved" },
   { value: "closed",            label: "Closed" },
 ];

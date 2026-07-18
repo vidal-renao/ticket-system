@@ -23,3 +23,19 @@ Status: accepted. Missing or weak webhook/cron/setup secrets disable the endpoin
 ## ADR-006: Forward-only security migrations
 
 Status: accepted. Production fixes are new idempotent migrations. Historical files are not treated as proof of applied database state.
+
+## ADR-007: One ticket access policy
+
+Status: accepted. Ticket access is derived from the authenticated profile and ticket row: customers are owner-scoped, agents are assignment-scoped, and managers/admins are organization-scoped. Query helpers and point mutations must reuse the same policy.
+
+## ADR-008: Reopening resumes active work
+
+Status: accepted. Reopening a terminal ticket transitions it to `in_progress`, clears terminal timestamps and starts a new resolution SLA window. It does not create a second first-response obligation.
+
+## ADR-009: Preserve waiting reasons
+
+Status: accepted. `pending_customer` and `pending_third_party` remain separate states in storage, domain mapping, operational filters and presentation. Neither state may silently disappear from active queues or SLA processing.
+
+## ADR-010: Swiss operations control-room design
+
+Status: accepted. The product uses semantic graphite, signal-blue, SLA-amber and mint tokens with a restrained pulse-line signature. Accessibility, responsive layout and reduced-motion behavior are release requirements.

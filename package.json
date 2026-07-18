@@ -6,12 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed:vidal": "node scripts/seed-vidal-real-estate.mjs",
-    "seed:full": "node scripts/seed-full.mjs"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "ci": "npm run check && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",

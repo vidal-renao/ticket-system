@@ -2,11 +2,11 @@
 
 ## Mission
 
-Maintain HelpDesk AI as a secure multi-tenant ticketing product. Preserve tenant isolation, ticket lifecycle semantics and operational reliability before adding features.
+Build HelpDesk AI as a secure, credible multi-tenant support product. Preserve tenant isolation, ticket lifecycle semantics, operational reliability and truthful product communication before adding features.
 
 ## Read First
 
-Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md` and the files involved in the requested flow. Do not infer database columns or API contracts from UI copy.
+Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md`, the active section of `SDD.md` and the files involved in the requested flow. For meaningful UI work, also read `.agents/skills/frontend-design/SKILL.md`. Do not infer database columns or API contracts from UI copy.
 
 ## Mandatory Rules
 
@@ -20,6 +20,10 @@ Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md` and the files in
 8. Do not invent APIs, tables, RLS behavior or compliance claims.
 9. Reuse existing domain helpers before creating an abstraction.
 10. Keep customer-visible errors generic and server logs free of sensitive values.
+11. Do not publish invented customers, benchmarks, prices, certifications, residency or competitor comparisons.
+12. Customer ticket access always requires `created_by = authenticated user`; organization membership alone is insufficient.
+13. Preserve `pending_customer` and `pending_third_party` as distinct operational states.
+14. Shared UI must remain keyboard accessible, responsive and usable with reduced motion.
 
 ## Sensitive Areas
 
@@ -36,7 +40,7 @@ Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md` and the files in
 3. Identify authorization, tenant, migration and failure-state effects.
 4. Implement the smallest coherent change.
 5. Add tests for critical logic, permissions or regressions.
-6. Run `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`.
+6. Run `npm run check` and `npm run build`.
 7. Update documentation and `CHANGELOG.md` when contracts change.
 
 ## Definition of Done
@@ -46,5 +50,6 @@ Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md` and the files in
 - Empty, loading, validation and error states remain coherent.
 - New environment variables appear in `.env.local.example` and documentation.
 - Tests cover the changed critical behavior.
-- Lint has no new warnings in touched files; typecheck, tests and build pass.
+- Lint has zero warnings; typecheck, tests and build pass.
 - No secrets, personal credentials or unverified claims are introduced.
+- Public UI states what is implemented and distinguishes technical controls from legal certification.

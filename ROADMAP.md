@@ -7,6 +7,9 @@
 - AI triage, translation, response suggestions and optional RAG.
 - Customer-only public registration and admin-managed staff accounts.
 - Security baseline, tests and CI.
+- Shared ticket access policy with customer ownership regression tests.
+- Distinct customer and third-party waiting states across active workflows.
+- Product-specific accessible design system and truthful commercial landing page.
 
 ## Immediate
 
@@ -15,7 +18,7 @@
 - Add distributed rate limiting for authentication, registration, webhooks and AI routes.
 - Add two-tenant RLS integration tests and core ticket E2E tests.
 - Consolidate SQL migrations into a forward-only managed history.
-- Eliminate remaining explicit `any` and unused code warnings by feature.
+- Add a non-destructive, tenant-scoped demo fixture strategy for disposable environments.
 
 ## Medium Term
 

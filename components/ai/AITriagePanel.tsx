@@ -12,10 +12,9 @@ import { TranslateButton } from "@/components/tickets/TranslateButton";
 
 interface AITriagePanelProps {
   analysis: AIAnalysis;
-  ticketId: string;
 }
 
-export function AITriagePanel({ analysis, ticketId }: AITriagePanelProps) {
+export function AITriagePanel({ analysis }: AITriagePanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
