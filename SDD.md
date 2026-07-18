@@ -84,6 +84,7 @@ The application also collapses two operational waiting reasons into one, contain
 
 ## Validation
 
+- Production role E2E exposed legacy schema drift: `tickets.metadata` was missing and PostgREST rejected the admin ticket list selection. `docs/migration_ticket_metadata_compat.sql` restores the documented JSONB compatibility column while workflow and authorization remain first-class fields.
 - Unit: customer owner/non-owner, agent assigned/unassigned/foreign, manager tenant boundary — passed.
 - Unit: valid and invalid lifecycle transitions and reopened SLA deadline calculation — passed.
 - Unit: explicit customer/third-party waiting-state round trips and AI priority/SLA rules — passed.
@@ -97,7 +98,7 @@ The application also collapses two operational waiting reasons into one, contain
 
 # Active Specification: Enterprise Ticket Chain of Custody
 
-Status: implemented; deployment E2E pending
+Status: deployed and production E2E verified; external tenant-isolation gate pending
 Owner: Senior Software Development
 Started: 2026-07-18
 Audit: `docs/ENTERPRISE_AUDIT_2026-07-18.md`
@@ -164,5 +165,8 @@ There is no enforceable chain of custody from customer intake through specialist
 - Unit: role-specific patch fields, review decisions and business-stage projection â€” passed.
 - Application: zero-warning ESLint, TypeScript and 29 Vitest tests â€” passed on 2026-07-18.
 - Database: forward migration applied; final RLS inventory contains only the intended enterprise ticket/comment/profile/AI policies â€” passed on 2026-07-18.
-- Build: a new Next.js `BUILD_ID` and route artifacts were generated twice; the Windows runner retained the npm wrapper until timeout, so CI/Vercel exit confirmation remains pending.
-- Remaining: authenticated post-deployment E2E with admin, agent and customer demo accounts and a two-tenant disposable-database suite.
+- Build and CI: clean `npm ci`, lint, TypeScript, 29 Vitest tests, Next.js production build and high-severity audit gate passed in GitHub Actions run `29659316815` on 2026-07-18.
+- Production schema compatibility: the authenticated admin E2E exposed a missing legacy `tickets.metadata` column; `docs/migration_ticket_metadata_compat.sql` was applied as an additive, idempotent migration and the admin inventory recovered.
+- Production role E2E: customer `TK-0068` creation was automatically classified as Software and assigned to the least-loaded matching `software` specialist; the agent saw only the assigned task, started it and submitted it for admin review; the admin approved it as resolved and moved the disposable test ticket to recoverable trash. Passed on 2026-07-18.
+- Production administration E2E: active/new/assigned/in-progress/waiting/ready/processed/trash views, single-ticket cleanup, team workload and the complete tenant user directory were exercised with authenticated demo roles.
+- Remaining external validation: automated two-tenant RLS integration suite against a disposable Supabase project.
