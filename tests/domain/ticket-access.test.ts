@@ -22,11 +22,10 @@ describe("canProfileAccessTicket", () => {
     expect(canProfileAccessTicket({ id: "agent-b", role: "agent", organization_id: "org-a" }, ticket)).toBe(false);
   });
 
-  it("allows unassigned work only when the caller opts in", () => {
+  it("always denies unassigned work to agents", () => {
     const unassigned = { ...ticket, assigned_to: null };
     const agent = { id: "agent-a", role: "agent" as const, organization_id: "org-a" };
-    expect(canProfileAccessTicket(agent, unassigned)).toBe(true);
-    expect(canProfileAccessTicket(agent, unassigned, { includeUnassignedForAgents: false })).toBe(false);
+    expect(canProfileAccessTicket(agent, unassigned)).toBe(false);
   });
 
   it("allows managers and admins within their organization", () => {

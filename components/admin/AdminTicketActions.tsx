@@ -3,7 +3,7 @@
 import type { MouseEvent } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Play, CheckCircle2, RotateCcw, XCircle, Loader2, UserPlus } from "lucide-react";
+import { Play, CheckCircle2, RotateCcw, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Agent {
@@ -18,6 +18,7 @@ interface AdminTicketActionsProps {
   currentUserId: string;
   canReassign: boolean;
   agents: Agent[];
+  reviewStatus: string;
 }
 
 export function AdminTicketActions({
@@ -27,13 +28,14 @@ export function AdminTicketActions({
   currentUserId,
   canReassign,
   agents,
+  reviewStatus,
 }: AdminTicketActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [assignee, setAssignee] = useState(currentAssignee ?? "");
 
   const isClosed = currentStatus === "closed";
-  const canAssignToMe = !isClosed && assignee !== currentUserId;
+  void currentUserId;
 
   function formatErrorMessage(message: string) {
     if (message.toLowerCase() === "not found") {
@@ -51,6 +53,18 @@ export function AdminTicketActions({
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(formatErrorMessage(data.error ?? "Request failed"));
+    }
+  }
+
+  async function review(action: "approve" | "changes") {
+    const res = await fetch(`/api/tickets/${ticketId}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(formatErrorMessage(data.error ?? "Review failed"));
     }
   }
 
@@ -76,6 +90,18 @@ export function AdminTicketActions({
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : `Failed to ${label}`);
+      }
+    });
+  }
+
+  function handleReview(action: "approve" | "changes") {
+    startTransition(async () => {
+      try {
+        await review(action);
+        toast.success(action === "approve" ? "Work approved" : "Changes requested");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Review failed");
       }
     });
   }
@@ -106,22 +132,6 @@ export function AdminTicketActions({
         ))}
       </select>
 
-      {canAssignToMe && (
-        <button
-          type="button"
-          onClick={(event: MouseEvent<HTMLButtonElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleAssign(currentUserId);
-          }}
-          disabled={isPending}
-          title="Assign to me"
-          className={`${buttonBase} border-indigo-500/20 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20`}
-        >
-          <UserPlus className="h-3 w-3" /> Me
-        </button>
-      )}
-
       {isPending ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-text-muted)]" />
       ) : currentStatus === "open" ? (
@@ -138,33 +148,35 @@ export function AdminTicketActions({
         >
           <Play className="h-3 w-3" /> Start
         </button>
-      ) : currentStatus === "in_progress" ? (
+      ) : reviewStatus === "pending" ? (
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+            onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              handleStatus("pending_customer", "sent for company review");
+              handleReview("approve");
             }}
-            title="Send for company review"
-            className={`${buttonBase} border-amber-500/20 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20`}
+            title="Approve completed work"
+            className={`${buttonBase} border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20`}
           >
-            <Clock className="h-3 w-3" /> Review
+            <CheckCircle2 className="h-3 w-3" /> OK
           </button>
           <button
             type="button"
-            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+            onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              handleStatus("resolved", "resolved");
+              handleReview("changes");
             }}
-            title="Mark as resolved"
-            className={`${buttonBase} border-violet-500/20 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20`}
+            title="Return to specialist"
+            className={`${buttonBase} border-amber-500/20 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20`}
           >
-            <CheckCircle2 className="h-3 w-3" /> Resolve
+            <RotateCcw className="h-3 w-3" /> Changes
           </button>
         </div>
+      ) : currentStatus === "in_progress" ? (
+        <span className="px-2 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">With agent</span>
       ) : currentStatus === "pending_customer" || currentStatus === "pending_third_party" ? (
         <button
           type="button"

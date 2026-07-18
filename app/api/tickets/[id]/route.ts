@@ -11,6 +11,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { applySlaAssessment, buildSlaDeadlinePatch, ensureSlaDeadlines, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
+import { canAgentSetExecutionStatus, getForbiddenTicketPatchFields } from "@/lib/ticket-workflow";
 
 export async function PATCH(
   request: Request,
@@ -27,12 +28,12 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const profile = await getCurrentProfile(svc, user.id);
-  if (!profile || !isStaffRole(profile.role) || !profile.organization_id) {
+  if (!profile || !isStaffRole(profile.role) || !profile.organization_id || profile.role === "manager") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const baseSelect =
-    "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at";
+    "id, ticket_number, title, created_by, organization_id, priority, status, assigned_to, review_status, routing_override, deleted_at, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at";
 
   let existing:
     | {
@@ -44,6 +45,9 @@ export async function PATCH(
         priority: string;
         status: string;
         assigned_to: string | null;
+        review_status: "not_requested" | "pending" | "approved" | "changes_requested";
+        routing_override: boolean;
+        deleted_at: string | null;
         created_at: string;
         resolved_at: string | null;
         first_response_at: string | null;
@@ -99,18 +103,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (profile.role === "agent" && existing.assigned_to && existing.assigned_to !== user.id) {
+  if (existing.deleted_at) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (profile.role === "agent" && existing.assigned_to !== user.id) {
     return NextResponse.json({ error: "Access restricted" }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const forbiddenFields = getForbiddenTicketPatchFields(profile.role, body);
+  if (forbiddenFields.length) {
+    return NextResponse.json({ error: `Fields not allowed for ${profile.role}: ${forbiddenFields.join(", ")}` }, { status: 403 });
+  }
 
   const requestedStatus = body.status === undefined ? null : normalizeStatusInput(body.status);
   if (body.status !== undefined && !requestedStatus) {
     return NextResponse.json({ error: "Invalid ticket status" }, { status: 400 });
   }
 
-  const allowed = ["status", "priority", "category_id", "assigned_to", "tags"];
+  const allowed = profile.role === "admin"
+    ? ["status", "priority", "category_id", "assigned_to", "tags"]
+    : ["status", "tags"];
   const patch: Record<string, unknown> = {};
 
   for (const key of allowed) {
@@ -121,24 +139,48 @@ export async function PATCH(
     patch.status = canonicalToLegacyStatus(requestedStatus);
   }
 
-  if (profile.role === "agent" && patch.assigned_to !== undefined) {
-    const requestedAssignee = (patch.assigned_to as string | null) || null;
-    if (requestedAssignee !== user.id) {
-      return NextResponse.json({ error: "Agents can only assign tickets to themselves" }, { status: 403 });
-    }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "No supported fields supplied" }, { status: 400 });
+  }
+
+  if (profile.role === "agent" && patch.status && !canAgentSetExecutionStatus(existing.status, patch.status as string)) {
+    return NextResponse.json({ error: "Agents cannot perform that status transition" }, { status: 403 });
+  }
+
+  if (profile.role === "agent" && existing.review_status === "pending") {
+    return NextResponse.json({ error: "Ticket is awaiting administrator review" }, { status: 409 });
+  }
+
+  if (profile.role === "admin" && patch.status === "resolved") {
+    return NextResponse.json({ error: "Approve the pending review to resolve this ticket" }, { status: 409 });
   }
 
   if (patch.assigned_to) {
     const { data: assignee } = await svc
       .from("profiles")
-      .select("id, role, organization_id")
+      .select("id, role, organization_id, is_active")
       .eq("id", patch.assigned_to as string)
       .eq("organization_id", profile.organization_id)
       .single();
 
-    if (!assignee || !isStaffRole(assignee.role)) {
+    if (!assignee || assignee.role !== "agent" || assignee.is_active === false) {
       return NextResponse.json({ error: "Invalid assignee" }, { status: 400 });
     }
+  }
+
+  if (patch.category_id) {
+    const { data: category } = await svc
+      .from("categories")
+      .select("id")
+      .eq("id", patch.category_id as string)
+      .eq("organization_id", profile.organization_id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!category) return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+  }
+
+  if (patch.priority && !["low", "medium", "high", "critical"].includes(patch.priority as string)) {
+    return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
   }
 
   if (patch.priority && patch.priority !== existing.priority) {
@@ -185,15 +227,20 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString();
-  if (patch.status === "resolved") patch.resolved_at = now;
   if (patch.status === "closed") patch.closed_at = now;
   if (patch.status === "in_progress") patch.closed_at = null;
+  if (profile.role === "admin" && (patch.assigned_to !== undefined || patch.category_id !== undefined)) {
+    patch.routing_override = true;
+    patch.assigned_by = user.id;
+    patch.assigned_at = patch.assigned_to ? now : null;
+  }
 
   const { data, error } = await svc
     .from("tickets")
     .update(patch)
     .eq("id", existing.id)
     .eq("organization_id", profile.organization_id)
+    .is("deleted_at", null)
     .select("*, response_due_at, resolution_due_at, first_agent_response_at, sla_response_breached, sla_resolution_breached")
     .single();
 

@@ -13,6 +13,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
+import { canAgentSetExecutionStatus } from "@/lib/ticket-workflow";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -78,6 +79,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const requestedLegacyStatus = requestedStatus ? canonicalToLegacyStatus(requestedStatus) : null;
+  if (requestedLegacyStatus && profile.role === "manager") {
+    return NextResponse.json({ error: "Managers have read-only workflow access" }, { status: 403 });
+  }
+  if (requestedLegacyStatus && profile.role === "agent" && !canAgentSetExecutionStatus(ticket.status, requestedLegacyStatus)) {
+    return NextResponse.json({ error: "Agents cannot perform that status transition" }, { status: 403 });
+  }
+  if (requestedLegacyStatus === "resolved") {
+    return NextResponse.json({ error: "Resolution requires administrator approval" }, { status: 409 });
+  }
+
   if (requestedStatus) {
     const transition = validateTicketTransition(ticket, {
       status: canonicalToLegacyStatus(requestedStatus),
@@ -134,6 +146,7 @@ export async function POST(request: Request) {
       })
       .eq("id", ticket_id)
       .eq("organization_id", profile.organization_id)
+      .is("deleted_at", null)
       .select("id, ticket_number, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
       .single();
 
@@ -148,6 +161,7 @@ export async function POST(request: Request) {
       .update({ status: nextLegacyStatus })
       .eq("id", ticket_id)
       .eq("organization_id", profile.organization_id)
+      .is("deleted_at", null)
       .select("id, ticket_number, created_by, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
       .single();
 

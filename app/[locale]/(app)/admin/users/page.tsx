@@ -28,7 +28,7 @@ export default async function AdminUsersPage({
   }
   const orgId = profile.organization_id!;
 
-  const [{ data: profilesRaw }, { data: teamsRaw }] = await Promise.all([
+  const [{ data: profilesRaw }, { data: teamsRaw }, { data: authUsers }] = await Promise.all([
     svc
       .from("profiles")
       .select("id, full_name, role, specialty, availability_status, is_active, avatar_url")
@@ -36,6 +36,9 @@ export default async function AdminUsersPage({
       .order("role")
       .order("full_name"),
     svc.from("teams").select("id, name").eq("organization_id", orgId).order("name"),
+    profile.role === "admin"
+      ? svc.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      : Promise.resolve({ data: { users: [] } }),
   ]);
 
   // Fetch customer company names
@@ -54,6 +57,7 @@ export default async function AdminUsersPage({
   const users = (profilesRaw ?? []).map((profileRow) => ({
     ...profileRow,
     company_name: companyById[profileRow.id] ?? null,
+    email: authUsers?.users.find((authUser) => authUser.id === profileRow.id)?.email ?? null,
   }));
 
   return (

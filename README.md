@@ -7,7 +7,7 @@ Enterprise-oriented, multilingual support operations for Swiss SMEs. HelpDesk AI
 ## Product
 
 - Customer portal for ticket creation, progress, comments, ratings and controlled reopening.
-- Agent queue with assignment, priority, waiting reasons and SLA visibility.
+- Personal agent workspace with assigned-only execution, waiting reasons, SLA visibility and administrator review handoff.
 - Manager/admin analytics, user administration and organization privacy settings.
 - DE, EN and ES interface with translation assistance.
 - Anthropic-assisted triage and reply suggestions; optional OpenAI/pgvector RAG.
@@ -20,11 +20,22 @@ AI output is assistive. Customer-facing replies require human action. Tenant iso
 | Actor | Ticket scope |
 | --- | --- |
 | Customer | Own tickets only (`created_by`) |
-| Agent | Assigned tickets; explicitly enabled unassigned queue work |
-| Manager | Organization tickets |
-| Admin | Organization tickets and configuration |
+| Agent | Assigned tickets only |
+| Manager | Read-only organization oversight |
+| Admin | Organization tickets, routing, approval, cleanup and configuration |
 
 Identity, role and organization are derived server-side from Supabase Auth and `profiles`. Service-role operations include explicit tenant or owner predicates and never trust caller-provided tenant data.
+
+## Enterprise ticket flow
+
+1. A customer creates a ticket in their tenant.
+2. Rules and AI classification route it only to an active matching specialist, load-balanced by active work.
+3. Unmatched work remains in the administrator intake queue; agents cannot claim tickets.
+4. The assigned agent starts work, records legitimate waiting states and submits completed work as **Ready for admin OK**.
+5. Only an administrator approves the ticket as resolved or returns it for changes.
+6. Cleanup moves tickets to an audited, recoverable trash; the dashboard never hard-deletes operational history.
+
+The administrator directory lists every profile and customer in the tenant, including the account email where Supabase Auth access is available.
 
 ## Stack
 

@@ -38,7 +38,8 @@ export async function setTicketUrgency(
     .update({ priority: safePriority })
     .eq("id", ticketId)
     .eq("organization_id", profile.organization_id)
-    .eq("created_by", user.id);
+    .eq("created_by", user.id)
+    .is("deleted_at", null);
 
   if (error) return { error: error.message };
 
@@ -78,7 +79,8 @@ export async function setTicketRating(
     .update({ metadata: { ...existingMeta, customer_rating: rating } })
     .eq("id", ticketId)
     .eq("organization_id", profile.organization_id)
-    .eq("created_by", user.id);
+    .eq("created_by", user.id)
+    .is("deleted_at", null);
 
   if (error) return { error: error.message };
 

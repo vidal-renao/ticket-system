@@ -53,7 +53,7 @@ The application also collapses two operational waiting reasons into one, contain
 ## Requirements
 
 1. A customer can read or mutate only tickets where `created_by` equals the authenticated profile ID.
-2. An agent can access their assigned tickets and, only where explicitly requested, unassigned tickets in the same organization.
+2. An agent can access only tickets assigned to their profile; the enterprise chain-of-custody specification below supersedes the former optional unassigned queue.
 3. Managers and admins can access tickets only in their organization.
 4. Every service-role mutation includes explicit organization and ownership/assignment predicates appropriate to the actor.
 5. Reopening is allowed only from `resolved` or `closed`; customers may reopen only their own resolved ticket within 48 hours.
@@ -92,3 +92,77 @@ The application also collapses two operational waiting reasons into one, contain
 - Visual: desktop and 384 px mobile landing review, no horizontal overflow or console errors — passed on 2026-07-18.
 - Dependency gate: no high or critical advisories; two moderate transitive PostCSS advisories remain upstream.
 - Remaining external validation: two-tenant RLS integration suite against disposable Supabase.
+
+---
+
+# Active Specification: Enterprise Ticket Chain of Custody
+
+Status: implemented; deployment E2E pending
+Owner: Senior Software Development
+Started: 2026-07-18
+Audit: `docs/ENTERPRISE_AUDIT_2026-07-18.md`
+
+## Context
+
+The product already stores tenant-scoped tickets, profiles, categories, teams, SLA state and audit events. Customers have an owner-scoped ticket list. Agents currently have optional access to unassigned work and may claim it. Ticket routing occurs before asynchronous AI classification, and the staff PATCH route exposes administrative fields to agents.
+
+## Problem
+
+There is no enforceable chain of custody from customer intake through specialist execution to administrator approval. UI labels, visibility helpers and mutation permissions disagree. “Waiting for customer” is incorrectly reused as an internal review state, and operational cleanup has no recoverable or audited design.
+
+## Requirements
+
+1. Customers create and access only their own tickets inside their organization.
+2. Agents access only tickets assigned to their profile and cannot self-assign.
+3. Automatic routing selects only an active specialist matching the ticket category/team; unmatched tickets remain unassigned for admin triage.
+4. Only administrators assign, reassign or unassign tickets and override category or priority.
+5. An administrator override prevents later automatic reassignment.
+6. Agents may start assigned work, enter/leave legitimate waiting states and request administrator review.
+7. An agent cannot resolve, close, delete or administratively reroute a ticket.
+8. Administrator review has explicit pending, approved and changes-requested outcomes without overloading customer waiting states.
+9. Admin tabs expose new, assigned, in progress, waiting, ready for OK, processed and trash queues with tenant-scoped counts.
+10. Agent and customer workspaces group only their visible tickets by business stage.
+11. Administrators can view every profile and customer record in their tenant and are the only role that can create, change role or disable users.
+12. Administrators can soft-delete one ticket or a confirmed batch, inspect trash and restore tickets. No UI operation permanently destroys ticket history.
+13. Every service-role query and mutation includes explicit organization plus actor-specific predicates.
+14. Routing, field permissions, review decisions and deletion/restoration emit audit events without ticket content.
+
+## Constraints
+
+- Preserve the existing storage status enum and the distinct meanings of `pending_customer` and `pending_third_party`.
+- Add workflow metadata only through a new idempotent forward migration.
+- Existing tickets remain readable after rollout and receive safe defaults.
+- Public registration remains customer-only.
+- The service-role key never reaches browser code.
+- Bulk operations are tenant-bound, recoverable and require explicit confirmation.
+- The UI continues the existing Swiss operations control-room design and semantic tokens.
+
+## Design
+
+- Keep operational status and review decision separate. Add `review_status` (`not_requested`, `pending`, `approved`, `changes_requested`) plus request/review actor timestamps.
+- Add `routing_override`, `assigned_by` and `assigned_at`. Automatic routing may update only unassigned tickets where `routing_override = false`; every admin assignment decision sets the override.
+- Add `deleted_at` and `deleted_by`. Standard queries exclude deleted tickets; trash queries include only deleted tickets.
+- Put pure role/field/transition rules in `lib/ticket-workflow.ts` and pure specialist selection in `lib/ticket-routing.ts`.
+- Expose dedicated review and deletion Route Handlers rather than overloading the generic ticket PATCH contract.
+- Treat “ready for OK” as `review_status = pending`; admin approval atomically sets review approved and status resolved. A change request returns the ticket to in progress.
+- Use the ticket detail as the visible chain-of-custody surface, showing intake, routing, execution, review and resolution milestones.
+
+## Implementation
+
+1. Add domain rules, migration and generated-equivalent TypeScript types.
+2. Harden ticket visibility and field-level mutation permissions.
+3. Replace generic fallback assignment with category/specialty load-balanced routing.
+4. Add review, soft-delete, restore and bulk-delete endpoints with audit events.
+5. Rebuild admin status controls and add safe cleanup controls.
+6. Rebuild agent and customer stage views and remove self-assignment.
+7. Harden tenant user administration and align documentation.
+
+## Validation
+
+- Unit: strict owner/assignee/admin access matrix â€” passed.
+- Unit: exact-specialty routing, load balancing and no-match behavior â€” passed.
+- Unit: role-specific patch fields, review decisions and business-stage projection â€” passed.
+- Application: zero-warning ESLint, TypeScript and 29 Vitest tests â€” passed on 2026-07-18.
+- Database: forward migration applied; final RLS inventory contains only the intended enterprise ticket/comment/profile/AI policies â€” passed on 2026-07-18.
+- Build: a new Next.js `BUILD_ID` and route artifacts were generated twice; the Windows runner retained the npm wrapper until timeout, so CI/Vercel exit confirmation remains pending.
+- Remaining: authenticated post-deployment E2E with admin, agent and customer demo accounts and a two-tenant disposable-database suite.

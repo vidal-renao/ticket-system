@@ -22,7 +22,8 @@ Public registration creates customers only. Staff accounts are created by authen
 - Prefer session clients and RLS.
 - Service clients bypass RLS and require explicit tenant/owner predicates.
 - Child resources inherit access from the parent ticket.
-- Apply `docs/migration_security_hardening.sql` and test with at least two tenants before production promotion.
+- Apply `docs/migration_security_hardening.sql` followed by `docs/migration_enterprise_ticket_workflow.sql`, then test with at least two tenants before production promotion.
+- Customers are creator-scoped, agents are assignee-scoped, and only administrators can route, approve or soft-delete tickets.
 
 ## Data and AI
 

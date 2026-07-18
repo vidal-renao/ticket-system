@@ -17,6 +17,12 @@ export type TicketStatus =
   | "resolved"
   | "closed";
 
+export type TicketReviewStatus =
+  | "not_requested"
+  | "pending"
+  | "approved"
+  | "changes_requested";
+
 export type TicketPriority = "low" | "medium" | "high" | "critical";
 export type UserRole = "customer" | "agent" | "manager" | "admin";
 export type TicketSource = "portal" | "email" | "api" | "phone";
@@ -139,6 +145,9 @@ export interface Database {
           category_id: string | null;
           created_by: string;
           assigned_to: string | null;
+          assigned_at: string | null;
+          assigned_by: string | null;
+          routing_override: boolean;
           title: string;
           description: string;
           detected_language: string | null;
@@ -160,14 +169,20 @@ export interface Database {
           sla_breached: boolean;
           resolved_at: string | null;
           closed_at: string | null;
+          review_status: TicketReviewStatus;
+          review_requested_at: string | null;
+          review_requested_by: string | null;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          deleted_at: string | null;
+          deleted_by: string | null;
           contains_pii: boolean;
           anonymized_at: string | null;
           retention_delete_at: string | null;
           metadata: Json;
           created_at: string;
-          updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["tickets"]["Row"], "id" | "ticket_number" | "created_at" | "updated_at">;
+        Insert: Omit<Database["public"]["Tables"]["tickets"]["Row"], "id" | "ticket_number" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["tickets"]["Insert"]>;
       };
       ticket_comments: {

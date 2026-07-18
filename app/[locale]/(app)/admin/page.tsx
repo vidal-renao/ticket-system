@@ -10,6 +10,7 @@ import { AdminFilters } from "@/components/admin/AdminFilters";
 import { AdminStatusTabs } from "@/components/admin/AdminStatusTabs";
 import { AdminPageControls } from "@/components/admin/AdminPageControls";
 import { AdminTicketActions } from "@/components/admin/AdminTicketActions";
+import { TicketCleanupControls } from "@/components/admin/TicketCleanupControls";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { formatAgentIdentity } from "@/lib/ticket-visibility";
 import { getTicketPresentation } from "@/lib/ticket-presentation";
@@ -48,6 +49,8 @@ type RawTicket = {
   sla_breached: boolean | null;
   category_id: string | null;
   metadata?: unknown;
+  review_status: "not_requested" | "pending" | "approved" | "changes_requested";
+  deleted_at: string | null;
 };
 
 type ProfileRow = {
@@ -72,6 +75,7 @@ export default async function AdminPage({
     company?: string;
     priority?: string;
     status?: string;
+    stage?: string;
     category?: string;
     agent?: string;
     sla?: string;
@@ -107,11 +111,21 @@ export default async function AdminPage({
     (() => {
       let query = svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id, metadata")
+        .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id, metadata, review_status, deleted_at")
         .eq("organization_id", orgId)
         .limit(500);
 
-      query = filters.status ? query.eq("status", filters.status) : query.neq("status", "closed");
+      if (filters.stage === "trash") query = query.not("deleted_at", "is", null);
+      else query = query.is("deleted_at", null);
+
+      if (filters.status) query = query.eq("status", filters.status);
+      else if (filters.stage === "new") query = query.eq("status", "open").is("assigned_to", null);
+      else if (filters.stage === "assigned") query = query.eq("status", "open").not("assigned_to", "is", null);
+      else if (filters.stage === "in_progress") query = query.eq("status", "in_progress").neq("review_status", "pending");
+      else if (filters.stage === "waiting") query = query.in("status", ["pending_customer", "pending_third_party"]);
+      else if (filters.stage === "ready") query = query.eq("review_status", "pending");
+      else if (filters.stage === "processed") query = query.in("status", ["resolved", "closed"]);
+      else if (filters.stage !== "trash") query = query.in("status", ACTIVE_TICKET_STATUSES);
       if (filters.priority) query = query.eq("priority", filters.priority);
       if (filters.agent === "unassigned") query = query.is("assigned_to", null);
       else if (filters.agent) query = query.eq("assigned_to", filters.agent);
@@ -181,7 +195,7 @@ export default async function AdminPage({
   if (organization?.name?.trim()) allCompanyNames.add(organization.name.trim());
   const companies = [...allCompanyNames].sort();
   const allAgents = profiles
-    .filter((entry) => ["agent", "manager", "admin"].includes(entry.role))
+    .filter((entry) => entry.role === "agent")
     .map((entry) => ({ id: entry.id, name: formatAgentIdentity(entry) }));
   const categoryNames = [...new Set([...categories.map((entry) => entry.name), ...Object.values(aiByTicket).filter((value): value is string => Boolean(value))])].sort();
 
@@ -211,7 +225,8 @@ export default async function AdminPage({
   );
 
   const hasFilters = Boolean(
-    filters.company ||
+      filters.company ||
+      filters.stage ||
       filters.priority ||
       filters.status ||
       filters.category ||
@@ -225,6 +240,7 @@ export default async function AdminPage({
     if (filters.company) search.set("company", filters.company);
     if (filters.priority) search.set("priority", filters.priority);
     if (filters.status) search.set("status", filters.status);
+    if (filters.stage) search.set("stage", filters.stage);
     if (filters.category) search.set("category", filters.category);
     if (filters.agent) search.set("agent", filters.agent);
     if (filters.sla) search.set("sla", filters.sla);
@@ -262,6 +278,9 @@ export default async function AdminPage({
             Manage Users
           </Link>
           {profile.role === "admin" && <AdminPageControls teams={teams} />}
+          {profile.role === "admin" && (
+            <TicketCleanupControls isTrash={filters.stage === "trash"} all />
+          )}
         </div>
       </div>
 
@@ -427,14 +446,24 @@ export default async function AdminPage({
                       <span className="text-xs text-[var(--color-text-muted)]">{formatRelativeTime(ticket.created_at)}</span>
                     </td>
                     <td className="relative z-10 px-4 py-3">
-                      <AdminTicketActions
-                        ticketId={ticket.id}
-                        currentStatus={ticket.status}
-                        currentAssignee={ticket.assigned_to}
-                        currentUserId={currentUserId}
-                        canReassign={profile.role === "admin" || profile.role === "manager"}
-                        agents={allAgents}
-                      />
+                      {profile.role === "admin" ? (
+                        <div className="flex items-center gap-1.5">
+                          {filters.stage !== "trash" && (
+                            <AdminTicketActions
+                              ticketId={ticket.id}
+                              currentStatus={ticket.status}
+                              currentAssignee={ticket.assigned_to}
+                              currentUserId={currentUserId}
+                              canReassign
+                              agents={allAgents}
+                              reviewStatus={ticket.review_status}
+                            />
+                          )}
+                          <TicketCleanupControls ticketId={ticket.id} isTrash={filters.stage === "trash"} />
+                        </div>
+                      ) : (
+                        <Link href={ticketPath} className="text-xs text-[var(--color-signal-blue)]">View</Link>
+                      )}
                     </td>
                   </tr>
                 );

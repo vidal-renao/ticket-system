@@ -29,6 +29,7 @@ export async function POST(
     .select("id, ticket_number, organization_id, created_by, priority, status, created_at, resolved_at, assigned_to, response_due_at, sla_first_response_due, sla_response_breached")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
+    .is("deleted_at", null)
     .single();
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
@@ -37,8 +38,8 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (profile.role === "agent" && ticket.assigned_to !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (profile.role !== "customer" && profile.role !== "admin") {
+    return NextResponse.json({ error: "Only customers or administrators can reopen tickets" }, { status: 403 });
   }
 
   if (ticket.status !== "resolved" && ticket.status !== "closed") {
@@ -75,13 +76,19 @@ export async function POST(
   }
 
   const policy = await getSlaPolicyForTicket(svc, ticket.organization_id, ticket.priority);
-  const reopenPatch = buildReopenedSlaPatch(ticket, policy);
+  const reopenPatch = {
+    ...buildReopenedSlaPatch(ticket, policy),
+    review_status: "changes_requested",
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: profile.role === "admin" ? user.id : null,
+  };
 
   const { error } = await svc
     .from("tickets")
     .update(reopenPatch)
     .eq("id", id)
-    .eq("organization_id", profile.organization_id);
+    .eq("organization_id", profile.organization_id)
+    .is("deleted_at", null);
 
   if (error) {
     return NextResponse.json({ error: "Failed to reopen ticket" }, { status: 500 });

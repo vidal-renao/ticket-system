@@ -77,10 +77,13 @@ export default async function InboxPage({
   let allComments: CommentRow[] = [];
 
   if (isStaff && orgId) {
-    const { data: orgTickets } = await svc
+    let visibleTickets = svc
       .from("tickets")
       .select("id")
-      .eq("organization_id", orgId);
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
+    if (profile.role === "agent") visibleTickets = visibleTickets.eq("assigned_to", user.id);
+    const { data: orgTickets } = await visibleTickets;
     const ticketIds = (orgTickets ?? []).map((t: { id: string }) => t.id);
 
     if (ticketIds.length > 0) {
@@ -96,7 +99,8 @@ export default async function InboxPage({
     const { data: myTickets } = await svc
       .from("tickets")
       .select("id")
-      .eq("created_by", user.id);
+      .eq("created_by", user.id)
+      .is("deleted_at", null);
     const ticketIds = (myTickets ?? []).map((t: { id: string }) => t.id);
 
     if (ticketIds.length > 0) {
@@ -117,7 +121,7 @@ export default async function InboxPage({
 
   const [{ data: ticketsRaw }, { data: profilesRaw }] = await Promise.all([
     uniqueTicketIds.length
-      ? svc.from("tickets").select("id, ticket_number, title, status, created_by, organization_id").in("id", uniqueTicketIds)
+      ? svc.from("tickets").select("id, ticket_number, title, status, created_by, organization_id").eq("organization_id", orgId).in("id", uniqueTicketIds).is("deleted_at", null)
       : Promise.resolve({ data: [] as TicketRow[] }),
     uniqueAuthorIds.length
       ? svc.from("profiles").select("id, full_name, role").in("id", uniqueAuthorIds)

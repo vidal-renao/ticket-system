@@ -39,3 +39,19 @@ Status: accepted. `pending_customer` and `pending_third_party` remain separate s
 ## ADR-010: Swiss operations control-room design
 
 Status: accepted. The product uses semantic graphite, signal-blue, SLA-amber and mint tokens with a restrained pulse-line signature. Accessibility, responsive layout and reduced-motion behavior are release requirements.
+
+## ADR-011: Administrator approval is separate from waiting states
+
+Status: accepted. Agent completion creates a pending review decision without reusing `pending_customer` or `pending_third_party`. Only an administrator can approve work as resolved or request changes.
+
+## ADR-012: Specialist routing fails safely
+
+Status: accepted. Automatic routing selects only active agents with a matching category specialty/team and uses active workload as the tie-breaker. When no specialist matches, the ticket remains unassigned for administrator triage; it is never assigned to an unrelated agent.
+
+## ADR-013: Administrator routing overrides automation
+
+Status: accepted. Assignment, category and priority overrides are administrator-only. A manual routing decision locks automatic reassignment until an administrator explicitly changes it again.
+
+## ADR-014: Operational deletion is recoverable
+
+Status: accepted. Ticket cleanup in the application is an administrator-only, tenant-scoped soft deletion with audit evidence and restoration. Permanent destruction belongs to a separate retention process and is not exposed as a dashboard action.

@@ -24,7 +24,9 @@ Authenticated customer -> validated request -> profile-derived organization -> t
 
 ### Ticket handling
 
-Authenticated staff -> role and tenant check -> visibility policy -> assignment/status/comment mutation -> lifecycle audit -> notification and SLA reassessment.
+Authenticated actor -> role and tenant check -> strict owner/assignee visibility -> role-specific mutation -> lifecycle/review audit -> notification and SLA reassessment. Agents execute assigned work; administrators own routing and approval.
+
+Automatic routing is deterministic before it is probabilistic: explicit team/category and keyword classification can route immediately, then asynchronous AI may refine only an unassigned, unlocked ticket. No-match is a safe administrator intake queue, never an unrelated-agent fallback.
 
 ### Email ingestion
 
@@ -37,6 +39,8 @@ Bearer-authenticated Vercel Cron -> active tickets -> deadline normalization -> 
 ## Data Architecture
 
 `organizations` is the tenant root. `profiles` links Auth users to a tenant and role. Tickets belong to one organization and one creator; comments, attachments and AI analysis inherit access through their ticket. Audit logs and knowledge chunks are organization-scoped.
+
+Operational status and administrator review are separate fields. `routing_override` protects human routing decisions from background automation. `deleted_at` and `deleted_by` provide recoverable, tenant-scoped cleanup while preserving dependent history.
 
 ## Known Constraints
 

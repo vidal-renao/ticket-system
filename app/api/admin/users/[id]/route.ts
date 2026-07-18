@@ -18,7 +18,7 @@ export async function PATCH(
     .eq("id", user.id)
     .single();
 
-  if (!adminProfile || !["admin", "manager"].includes(adminProfile.role)) {
+  if (!adminProfile || adminProfile.role !== "admin" || !adminProfile.organization_id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -46,10 +46,6 @@ export async function PATCH(
     if (key in body) updates[key] = body[key];
   }
 
-  // Managers can't promote to admin or change their own role
-  if (adminProfile.role === "manager") {
-    delete updates.role;
-  }
   if (targetId === user.id) {
     delete updates.role;
     delete updates.is_active;
@@ -59,7 +55,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  const { error } = await svc.from("profiles").update(updates).eq("id", targetId);
+  if (updates.role !== undefined && !["admin", "manager", "agent", "customer"].includes(String(updates.role))) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  }
+  if (updates.specialty !== undefined && typeof updates.specialty !== "string") {
+    return NextResponse.json({ error: "Invalid specialty" }, { status: 400 });
+  }
+  if (updates.is_active !== undefined && typeof updates.is_active !== "boolean") {
+    return NextResponse.json({ error: "Invalid account status" }, { status: 400 });
+  }
+
+  const { error } = await svc
+    .from("profiles")
+    .update(updates)
+    .eq("id", targetId)
+    .eq("organization_id", adminProfile.organization_id);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

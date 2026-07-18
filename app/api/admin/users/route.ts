@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   const { name, email, password, type } = body;
-  if (!name?.trim() || !email?.trim() || !password || !type) {
+  if (!name?.trim() || !email?.trim() || !password || !type || !["agent", "customer"].includes(type)) {
     return NextResponse.json(
       { error: "name, email, password and type are required" },
       { status: 400 }
@@ -85,6 +85,7 @@ export async function POST(request: Request) {
 
   if (profileError) {
     console.error("[admin/users] profile error:", profileError.message);
+    await svc.auth.admin.deleteUser(userId);
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
   }
 
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
           .from("teams")
           .select("name")
           .eq("id", body.team_id.trim())
+          .eq("organization_id", adminProfile.organization_id)
           .single();
         if (team?.name) extended.specialty = team.name;
       }
@@ -109,7 +111,8 @@ export async function POST(request: Request) {
     const { error: extErr } = await svc
       .from("profiles")
       .update(extended)
-      .eq("id", userId);
+      .eq("id", userId)
+      .eq("organization_id", adminProfile.organization_id);
     if (extErr) console.warn("[admin/users] extended fields not saved (migration pending?):", extErr.message);
   }
 

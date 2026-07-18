@@ -120,33 +120,39 @@ async function AdminDashboard({
       .from("tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .in("status", ["open", "in_progress"]),
     svc
       .from("tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .eq("priority", "critical")
       .in("status", ["open", "in_progress"]),
     svc
       .from("tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .eq("status", "resolved"),
     svc
       .from("tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .eq("sla_breached", true),
     svc
       .from("tickets")
       .select("id, ticket_number, title, priority, status, created_at")
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
     svc
       .from("tickets")
       .select("priority")
       .eq("organization_id", orgId)
+      .is("deleted_at", null)
       .in("status", ["open", "in_progress"]),
     svc
       .from("profiles")
@@ -443,6 +449,7 @@ async function AgentDashboard({
           "id, ticket_number, title, priority, status, sla_resolution_due, sla_breached, created_at"
         )
         .eq("assigned_to", userId)
+        .is("deleted_at", null)
         .in("status", [
           "open",
           "in_progress",
@@ -455,6 +462,7 @@ async function AgentDashboard({
         .from("tickets")
         .select("*", { count: "exact", head: true })
         .eq("assigned_to", userId)
+        .is("deleted_at", null)
         .eq("status", "resolved")
         .gte("resolved_at", todayStart.toISOString()),
     ]);
@@ -600,17 +608,20 @@ async function CustomerDashboard({
         .from("tickets")
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId)
+        .is("deleted_at", null)
         .in("status", ["open", "in_progress", "pending_customer", "pending_third_party"]),
       svc
         .from("tickets")
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId)
+        .is("deleted_at", null)
         .eq("status", "resolved"),
       svc
         .from("tickets")
-        .select("id, ticket_number, title, status, priority, updated_at")
+        .select("id, ticket_number, title, status, priority, created_at")
         .eq("created_by", userId)
-        .order("updated_at", { ascending: false })
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
         .limit(5),
     ]);
 
@@ -673,7 +684,7 @@ async function CustomerDashboard({
           )}
           {(recentTickets ?? []).map((ticket, i) => {
             const ticketPath = `${prefix}/tickets/${ticket.id}`;
-            const updatedAt = new Date(ticket.updated_at).toLocaleDateString(
+            const updatedAt = new Date(ticket.created_at).toLocaleDateString(
               locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB"
             );
             return (

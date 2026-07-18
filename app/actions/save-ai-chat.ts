@@ -20,6 +20,7 @@ export async function saveAiChatNote(
     .select("id")
     .eq("id", ticketId)
     .eq("created_by", user.id)
+    .is("deleted_at", null)
     .single();
 
   if (!ticket) return { error: "Access denied" };

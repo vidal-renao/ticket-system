@@ -13,6 +13,7 @@ import { SlaCountdown, CustomerReopenButton } from "@/components/tickets/SlaCoun
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 import { AlertTriangle, Clock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
+import { TicketWorkflowActions } from "@/components/tickets/TicketWorkflowActions";
 
 export default async function TicketDetailPage({
   params,
@@ -170,6 +171,36 @@ export default async function TicketDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {(profile.role === "agent" || profile.role === "admin") && (
+            <Card>
+              <CardHeader>
+                <p className="text-sm font-medium text-[var(--color-text-secondary)]">Chain of custody</p>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 grid grid-cols-5 gap-1 text-center text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+                  {[
+                    ["Intake", true],
+                    ["Routed", Boolean(ticket.assigned_to)],
+                    ["Execution", ticket.status !== "open"],
+                    ["Admin OK", ticket.review_status === "pending" || ticket.review_status === "approved"],
+                    ["Resolved", ticket.status === "resolved" || ticket.status === "closed"],
+                  ].map(([label, active]) => (
+                    <div key={String(label)}>
+                      <div className={`mb-2 h-1 rounded-full ${active ? "bg-[var(--color-signal-blue)]" : "bg-[var(--color-surface-600)]"}`} />
+                      {label}
+                    </div>
+                  ))}
+                </div>
+                <TicketWorkflowActions
+                  ticketId={ticket.id}
+                  role={profile.role}
+                  status={ticket.status}
+                  reviewStatus={ticket.review_status}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           <TicketComments
             ticketId={ticket.id}

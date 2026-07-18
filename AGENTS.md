@@ -23,6 +23,9 @@ Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md`, the active sect
 11. Do not publish invented customers, benchmarks, prices, certifications, residency or competitor comparisons.
 12. Customer ticket access always requires `created_by = authenticated user`; organization membership alone is insufficient.
 13. Preserve `pending_customer` and `pending_third_party` as distinct operational states.
+14. Agents are assignment-scoped: never expose an unassigned or another agent's ticket, and never add self-assignment.
+15. Assignment, category/priority override, review approval and ticket cleanup are administrator-only capabilities.
+16. Operational cleanup is soft deletion; permanent ticket destruction is not an application dashboard action.
 14. Shared UI must remain keyboard accessible, responsive and usable with reduced motion.
 
 ## Sensitive Areas

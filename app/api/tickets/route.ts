@@ -10,6 +10,7 @@ import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { sendEmail, ticketEmailSubject } from "@/lib/email";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
+import { inferTicketCategory, selectSpecialistAgent, type RoutingCandidate } from "@/lib/ticket-routing";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -52,8 +53,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User has no organization" }, { status: 400 });
   }
 
-  // Smart auto-assignment based on selected team
-  const assignment = await autoAssign(svc, profile.organization_id, team_id ?? null);
+  if (profile.role !== "customer") {
+    return NextResponse.json({ error: "Only customers can create portal tickets" }, { status: 403 });
+  }
+
+  const assignment = await findAutomaticAssignment(svc, profile.organization_id, {
+    teamId: team_id ?? null,
+    categoryName: inferTicketCategory(title.trim(), description.trim()),
+  });
   const createdAt = new Date().toISOString();
   const slaPolicy = await getSlaPolicyForTicket(svc, profile.organization_id, priority);
   const slaPatch = buildSlaDeadlinePatch(
@@ -80,7 +87,8 @@ export async function POST(request: Request) {
       source: "portal",
       created_at: createdAt,
       ...slaPatch,
-      ...(assignment.assigned_to && { assigned_to: assignment.assigned_to }),
+      ...(assignment.assignedTo && { assigned_to: assignment.assignedTo, assigned_at: createdAt }),
+      ...(assignment.categoryId && { category_id: assignment.categoryId }),
     })
     .select()
     .single();
@@ -90,7 +98,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (assignment.assigned_to) {
+  if (assignment.assignedTo) {
     await logTicketLifecycleEvents({
       ticketId: ticket.id,
       organizationId: profile.organization_id,
@@ -99,11 +107,11 @@ export async function POST(request: Request) {
       oldStatus: "new",
       newStatus: legacyToCanonicalStatus(ticket.status, ticket.assigned_to),
       oldAssignee: null,
-      newAssignee: assignment.assigned_to,
+      newAssignee: assignment.assignedTo,
     });
 
     await createTicketNotification(supabase, {
-      userId: assignment.assigned_to,
+      userId: assignment.assignedTo,
       ticketId: ticket.id,
       type: "ticket.assigned",
       title: "Ticket assigned",
@@ -137,94 +145,60 @@ function formatTicketNumber(ticketNumber: number | null | undefined) {
 // ─── Auto-assignment engine ─────────────────────────────────────────────────
 
 interface AssignmentResult {
-  assigned_to: string | null;
+  assignedTo: string | null;
+  categoryId: string | null;
 }
 
-async function autoAssign(
+async function findAutomaticAssignment(
   svc: ReturnType<typeof createServiceClientStatic>,
   orgId: string,
-  teamId: string | null
+  input: { teamId: string | null; categoryName: string | null }
 ): Promise<AssignmentResult> {
-  let teamExists = false;
-  if (teamId) {
-    const { data: team } = await svc
-      .from("teams")
-      .select("id, name")
-      .eq("id", teamId)
-      .eq("organization_id", orgId)
-      .single();
+  const [{ data: team }, { data: categories }, { data: agents }, { data: teams }] = await Promise.all([
+    input.teamId
+      ? svc.from("teams").select("id, name").eq("id", input.teamId).eq("organization_id", orgId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    svc.from("categories").select("id, name, slug").eq("organization_id", orgId).eq("is_active", true),
+    svc.from("profiles").select("id, specialty, team_id").eq("organization_id", orgId).eq("role", "agent").eq("is_active", true),
+    svc.from("teams").select("id, name").eq("organization_id", orgId),
+  ]);
 
-    teamExists = Boolean(team);
-  }
+  const category = (categories ?? []).find((entry) => {
+    const target = (input.categoryName ?? "").toLowerCase();
+    return entry.slug?.toLowerCase() === target || entry.name?.toLowerCase() === target;
+  }) ?? null;
 
   // Find agents assigned to this team
-  const { data: teamAgents } = teamExists
-    ? await svc
-        .from("profiles")
-        .select("id")
-        .eq("organization_id", orgId)
-        .eq("team_id", teamId)
-        .eq("role", "agent")
-        .eq("is_active", true)
-    : { data: [] };
-
-  const teamAgentIds = (teamAgents ?? []).map((a: { id: string }) => a.id);
+  const agentIds = (agents ?? []).map((agent) => agent.id);
 
   // Try specialist first (overflow threshold: 5 open tickets)
-  const specialist = await findLeastBusyAgent(svc, teamAgentIds, 5);
-
-  if (specialist) {
-    return { assigned_to: specialist };
+  const { data: openTickets } = agentIds.length
+    ? await svc.from("tickets").select("assigned_to").eq("organization_id", orgId).in("assigned_to", agentIds).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
+    : { data: [] };
+  const counts: Record<string, number> = {};
+  for (const row of openTickets ?? []) {
+    if (row.assigned_to) counts[row.assigned_to] = (counts[row.assigned_to] ?? 0) + 1;
   }
 
   // Overflow — all specialists are saturated; find freest agent org-wide
-  const { data: allAgents } = await svc
-    .from("profiles")
-    .select("id")
-    .eq("organization_id", orgId)
-    .eq("role", "agent")
-    .eq("is_active", true);
+  const teamNames = Object.fromEntries((teams ?? []).map((entry) => [entry.id, entry.name]));
+  const candidates: RoutingCandidate[] = (agents ?? []).map((agent) => ({
+    id: agent.id,
+    specialty: agent.specialty,
+    teamId: agent.team_id,
+    teamName: agent.team_id ? teamNames[agent.team_id] ?? null : null,
+    activeTickets: counts[agent.id] ?? 0,
+  }));
+  const selected = selectSpecialistAgent(candidates, {
+    categoryName: category?.name ?? input.categoryName,
+    teamId: team?.id ?? null,
+    teamName: team?.name ?? null,
+  });
 
-  const allAgentIds = (allAgents ?? []).map((a: { id: string }) => a.id);
-  const overflowAgent = await findLeastBusyAgent(svc, allAgentIds, Infinity);
-
-  return { assigned_to: overflowAgent };
+  return { assignedTo: selected?.id ?? null, categoryId: category?.id ?? null };
 }
 
 /** Returns the agent ID with the fewest open tickets, below maxTickets cap. */
-async function findLeastBusyAgent(
-  svc: ReturnType<typeof createServiceClientStatic>,
-  agentIds: string[],
-  maxTickets: number
-): Promise<string | null> {
-  if (agentIds.length === 0) return null;
-
-  const { data: openTickets } = await svc
-    .from("tickets")
-    .select("assigned_to")
-    .in("assigned_to", agentIds)
-    .in("status", ACTIVE_TICKET_STATUSES);
-
-  // Build count map with 0 as default for every agent
-  const counts: Record<string, number> = {};
-  for (const id of agentIds) counts[id] = 0;
-  for (const t of openTickets ?? []) {
-    if (t.assigned_to) counts[t.assigned_to] = (counts[t.assigned_to] ?? 0) + 1;
-  }
-
-  let bestAgent: string | null = null;
-  let minCount = Infinity;
-
-  for (const [agentId, count] of Object.entries(counts)) {
-    if (count <= maxTickets && count < minCount) {
-      minCount = count;
-      bestAgent = agentId;
-    }
-  }
-
-  return bestAgent;
-}
-
 // ─── Background helpers ─────────────────────────────────────────────────────
 
 function scheduleBackground(promise: Promise<void>): void {
@@ -337,12 +311,12 @@ async function runAITriage(
 
   const { data: currentTicket } = await svc
     .from("tickets")
-    .select("id, organization_id, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due")
+    .select("id, organization_id, created_by, assigned_to, routing_override, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due")
     .eq("id", ticketId)
     .eq("organization_id", orgId)
     .single();
 
-  if (result.confidence_score >= 60) {
+  if (result.confidence_score >= 60 && currentTicket?.routing_override !== true) {
     if (category?.id) patch.category_id = category.id;
   }
 
@@ -369,4 +343,47 @@ async function runAITriage(
     .update(patch)
     .eq("id", ticketId)
     .eq("organization_id", orgId);
+
+  if (currentTicket && !currentTicket.assigned_to && !currentTicket.routing_override && result.confidence_score >= 60) {
+    const assignment = await findAutomaticAssignment(svc, orgId, {
+      teamId: null,
+      categoryName: result.suggested_category,
+    });
+    if (assignment.assignedTo) {
+      const { data: assignedTicket } = await svc
+        .from("tickets")
+        .update({
+          assigned_to: assignment.assignedTo,
+          assigned_at: new Date().toISOString(),
+          ...(category?.id ? { category_id: category.id } : {}),
+        })
+        .eq("id", ticketId)
+        .eq("organization_id", orgId)
+        .eq("routing_override", false)
+        .is("assigned_to", null)
+        .is("deleted_at", null)
+        .select("id, ticket_number, status, assigned_to")
+        .maybeSingle();
+
+      if (assignedTicket?.assigned_to) {
+        await logTicketLifecycleEvents({
+          ticketId,
+          organizationId: orgId,
+          actorId: currentTicket.created_by,
+          actorRole: "system",
+          oldStatus: "new",
+          newStatus: legacyToCanonicalStatus(assignedTicket.status, assignedTicket.assigned_to),
+          oldAssignee: null,
+          newAssignee: assignedTicket.assigned_to,
+        });
+        await createTicketNotification(svc, {
+          userId: assignedTicket.assigned_to,
+          ticketId,
+          type: "ticket.assigned",
+          title: "Ticket assigned",
+          message: `${formatTicketNumber(assignedTicket.ticket_number)} was assigned to you.`,
+        });
+      }
+    }
+  }
 }

@@ -21,6 +21,7 @@ interface UserRow {
   is_active: boolean | null;
   avatar_url: string | null;
   company_name: string | null;
+  email: string | null;
 }
 
 interface Team {
@@ -67,7 +68,7 @@ export function UserManagementPanel({
     .filter((u) => {
       const q = search.toLowerCase();
       return !q || (u.full_name ?? "").toLowerCase().includes(q) ||
-        u.role.includes(q) || (u.company_name ?? "").toLowerCase().includes(q) ||
+        (u.email ?? "").toLowerCase().includes(q) || u.role.includes(q) || (u.company_name ?? "").toLowerCase().includes(q) ||
         (u.specialty ?? "").toLowerCase().includes(q);
     })
     .sort((a, b) => {
@@ -202,7 +203,7 @@ export function UserManagementPanel({
                           {isSelf && <span className="ml-1.5 text-[10px] text-indigo-400">(you)</span>}
                         </p>
                         <p className="text-[11px] text-[var(--color-text-muted)] font-mono">
-                          {u.id.slice(0, 8)}
+                          {u.email ?? u.id.slice(0, 8)}
                         </p>
                       </div>
                     </div>

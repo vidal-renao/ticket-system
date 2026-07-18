@@ -37,13 +37,20 @@
     "pattern": "App Router with tested domain policies and PostgreSQL RLS",
     "sourceRoots": ["app", "components", "lib"],
     "testsRoot": "tests",
-    "skillsRoot": ".agents/skills"
+    "skillsRoot": ".agents/skills",
+    "ticketWorkflow": {
+      "customerScope": "created_by",
+      "agentScope": "assigned_to",
+      "routingOverrideRole": "admin",
+      "approvalRole": "admin",
+      "cleanup": "audited soft delete"
+    }
   },
   "quality": {
     "zeroWarningLint": true,
     "strictTypeScript": true,
     "requiredCommands": ["npm run check", "npm run build", "npm audit --audit-level=high"],
-    "externalReleaseGates": ["two-tenant RLS integration", "authenticated E2E", "staging migration verification"]
+    "externalReleaseGates": ["apply enterprise workflow migration", "two-tenant RLS integration", "authenticated role E2E", "staging migration verification"]
   },
   "design": {
     "direction": "Swiss support operations control room",

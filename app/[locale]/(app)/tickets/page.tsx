@@ -55,7 +55,6 @@ type StaffTicket = {
   status: string;
   priority: string;
   created_at: string;
-  updated_at: string;
   assigned_to: string | null;
   sla_breached: boolean | null;
   response_due_at: string | null;
@@ -99,7 +98,6 @@ export default async function TicketsPage({
   const isStaff = isStaffRole(profile.role);
   const isCustomer = profile.role === "customer";
 
-  const staffQueryOptions = profile.role === "agent" ? { includeUnassignedForAgents: false } : undefined;
   let filteredTicketIds: string[] | null = null;
 
   if (isStaff && filters.category) {
@@ -114,9 +112,8 @@ export default async function TicketsPage({
   let staffTicketsQuery = getTicketsByRole(
     svc,
     profile,
-    "id, ticket_number, title, created_by, status, priority, created_at, updated_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, metadata",
-    staffQueryOptions
-  );
+    "id, ticket_number, title, created_by, status, priority, created_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, metadata"
+  ).is("deleted_at", null);
 
   if (isStaff && filters.status && ["open", "in_progress", "pending_customer", "resolved", "closed"].includes(filters.status)) {
     staffTicketsQuery = staffTicketsQuery.eq("status", filters.status);
@@ -132,7 +129,7 @@ export default async function TicketsPage({
       userId: user.id,
       role: profile.role,
       filters,
-      includeUnassignedForAgents: staffQueryOptions?.includeUnassignedForAgents ?? true,
+      includeUnassignedForAgents: false,
     });
   }
 
@@ -143,6 +140,7 @@ export default async function TicketsPage({
   const { data: tickets, error } = isStaff
     ? await staffTicketsQuery.order("created_at", { ascending: false }).limit(100)
     : await getTicketsByRole(svc, profile, "id, ticket_number, title, created_by, status, priority, created_at, resolved_at")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -169,6 +167,12 @@ export default async function TicketsPage({
   const staffTickets = (tickets ?? []) as StaffTicket[];
   const openCustomerTickets = customerTickets.filter((ticket) => !isResolved(ticket.status));
   const resolvedCustomerTickets = customerTickets.filter((ticket) => isResolved(ticket.status));
+  const customerStageCounts = {
+    received: customerTickets.filter((ticket) => ticket.status === "open").length,
+    progress: customerTickets.filter((ticket) => ticket.status === "in_progress").length,
+    waiting: customerTickets.filter((ticket) => ticket.status === "pending_customer" || ticket.status === "pending_third_party").length,
+    resolved: resolvedCustomerTickets.length,
+  };
   const staffBreachedCount = staffTickets.filter((ticket) => getTicketListSlaState(ticket).key === "breached").length;
   const allVisibleTickets = (tickets ?? []) as Array<CustomerTicket | StaffTicket>;
 
@@ -184,7 +188,7 @@ export default async function TicketsPage({
       ? svc.from("profiles").select("id, full_name, specialty").in("id", assigneeIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null; specialty: string | null }[] }),
     isStaff
-      ? svc.from("tickets").select("id", { count: "exact", head: true }).eq("assigned_to", user.id).in("status", ACTIVE_TICKET_STATUSES)
+      ? svc.from("tickets").select("id", { count: "exact", head: true }).eq("organization_id", profile.organization_id).eq("assigned_to", user.id).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
       : Promise.resolve({ count: 0 }),
   ]);
 
@@ -271,6 +275,23 @@ export default async function TicketsPage({
             </div>
           </div>
         </Card>
+      )}
+
+      {isCustomer && (
+        <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Ticket stages">
+          {[
+            ["Received", customerStageCounts.received, "Your request is registered"],
+            ["In progress", customerStageCounts.progress, "A specialist is working"],
+            ["Waiting", customerStageCounts.waiting, "Input or supplier pending"],
+            ["Resolved", customerStageCounts.resolved, "Work completed"],
+          ].map(([label, value, description]) => (
+            <Card key={String(label)} className="p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">{label}</p>
+              <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">{value}</p>
+              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">{description}</p>
+            </Card>
+          ))}
+        </section>
       )}
 
       {isStaff && (
@@ -560,7 +581,7 @@ export default async function TicketsPage({
                         <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>
                         <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                           <Clock className="h-3 w-3" />
-                          {formatRelativeTime(ticket.updated_at)}
+                          {formatRelativeTime(ticket.created_at)}
                         </span>
                       </div>
                     </div>

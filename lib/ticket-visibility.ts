@@ -40,11 +40,10 @@ function debugError(message: string, payload: Record<string, unknown>) {
 export function applyTicketVisibilityScope(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: any,
-  profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
-  options?: { includeUnassignedForAgents?: boolean }
+  profile: Pick<CurrentProfile, "id" | "role" | "organization_id">
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
-  const scoped = query.eq("organization_id", profile.organization_id);
+  const scoped = query.eq("organization_id", profile.organization_id).is("deleted_at", null);
 
   if (profile.role === "customer") {
     return scoped.eq("created_by", profile.id);
@@ -54,17 +53,12 @@ export function applyTicketVisibilityScope(
     return scoped;
   }
 
-  if (options?.includeUnassignedForAgents === false) {
-    return scoped.eq("assigned_to", profile.id);
-  }
-
-  return scoped.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
+  return scoped.eq("assigned_to", profile.id);
 }
 
 export function canProfileAccessTicket(
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
-  ticket: Pick<TicketAccessRow, "organization_id" | "created_by" | "assigned_to">,
-  options?: { includeUnassignedForAgents?: boolean }
+  ticket: Pick<TicketAccessRow, "organization_id" | "created_by" | "assigned_to">
 ): boolean {
   if (!profile.organization_id || ticket.organization_id !== profile.organization_id) {
     return false;
@@ -75,8 +69,7 @@ export function canProfileAccessTicket(
   }
 
   if (profile.role === "agent") {
-    if (ticket.assigned_to === profile.id) return true;
-    return options?.includeUnassignedForAgents !== false && ticket.assigned_to === null;
+    return ticket.assigned_to === profile.id;
   }
 
   return profile.role === "manager" || profile.role === "admin";
@@ -85,10 +78,9 @@ export function canProfileAccessTicket(
 export function getTicketsByRole(
   client: QueryClient,
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
-  select: string,
-  options?: { includeUnassignedForAgents?: boolean }
+  select: string
 ) {
-  return applyTicketVisibilityScope(client.from("tickets").select(select), profile, options);
+  return applyTicketVisibilityScope(client.from("tickets").select(select), profile);
 }
 
 export async function getTicketIdsBySuggestedCategory(
@@ -162,13 +154,13 @@ export async function resolveTicketAccess<T>(
   client: QueryClient,
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
   ticketId: string,
-  select: string,
-  options?: { includeUnassignedForAgents?: boolean }
+  select: string
 ): Promise<TicketAccessResult<T>> {
   const { data: baseTicket, error: baseError } = await client
     .from("tickets")
     .select("id, organization_id, created_by, assigned_to")
     .eq("id", ticketId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (baseError) {
@@ -184,7 +176,7 @@ export async function resolveTicketAccess<T>(
     return { kind: "not_found" };
   }
 
-  if (!canProfileAccessTicket(profile, baseTicket as TicketAccessRow, options)) {
+  if (!canProfileAccessTicket(profile, baseTicket as TicketAccessRow)) {
     debugWarn("[TicketAccess] policy denied access", {
       ticketId,
       userId: profile.id,
@@ -195,8 +187,7 @@ export async function resolveTicketAccess<T>(
 
   const scopedQuery = applyTicketVisibilityScope(
     client.from("tickets").select(select).eq("id", ticketId),
-    profile,
-    options
+    profile
   );
 
   const { data: ticket, error } = await scopedQuery.single();
