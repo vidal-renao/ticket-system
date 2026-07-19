@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
 import { generateCif } from "@/lib/tax-id";
+import { adoptUnassignedTicketsForNewAgent } from "@/lib/ticket-inheritance";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -71,7 +72,32 @@ export async function POST(request: Request) {
   const userId = newUserData.user.id;
   const role = type === "customer" ? "customer" : "agent";
 
-  // Step 1: save base profile (columns that always exist)
+  // Resolve team/specialty BEFORE writing the profile so both land in a
+  // single write — a prior two-step version (base profile, then a follow-up
+  // update for team_id/specialty) could silently leave a new agent
+  // unrouted if anything interrupted the second call.
+  let resolvedTeamId: string | undefined;
+  let resolvedSpecialty: string | undefined;
+  if (role === "agent") {
+    const requestedTeamId = body.team_id?.trim();
+    resolvedSpecialty = body.specialty?.trim() || undefined;
+
+    if (requestedTeamId) {
+      const { data: team } = await svc
+        .from("teams")
+        .select("id, name")
+        .eq("id", requestedTeamId)
+        .eq("organization_id", adminProfile.organization_id)
+        .maybeSingle();
+      if (!team) {
+        await svc.auth.admin.deleteUser(userId);
+        return NextResponse.json({ error: "Invalid team" }, { status: 400 });
+      }
+      resolvedTeamId = team.id;
+      if (!resolvedSpecialty) resolvedSpecialty = team.name;
+    }
+  }
+
   const { error: profileError } = await svc
     .from("profiles")
     .upsert(
@@ -81,6 +107,8 @@ export async function POST(request: Request) {
         organization_id: adminProfile.organization_id,
         role,
         is_active: true,
+        ...(resolvedTeamId ? { team_id: resolvedTeamId } : {}),
+        ...(resolvedSpecialty ? { specialty: resolvedSpecialty } : {}),
       },
       { onConflict: "id" }
     );
@@ -91,31 +119,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
   }
 
-  // Step 2: try to set team_id / specialty — may fail if migration hasn't run yet
-  if (role === "agent" && (body.team_id?.trim() || body.specialty?.trim())) {
-    const extended: Record<string, unknown> = {};
-    if (body.team_id?.trim()) {
-      extended.team_id = body.team_id.trim();
-      if (body.specialty?.trim()) {
-        extended.specialty = body.specialty.trim();
-      } else {
-        const { data: team } = await svc
-          .from("teams")
-          .select("name")
-          .eq("id", body.team_id.trim())
-          .eq("organization_id", adminProfile.organization_id)
-          .single();
-        if (team?.name) extended.specialty = team.name;
-      }
-    } else if (body.specialty?.trim()) {
-      extended.specialty = body.specialty.trim();
-    }
-    const { error: extErr } = await svc
-      .from("profiles")
-      .update(extended)
-      .eq("id", userId)
-      .eq("organization_id", adminProfile.organization_id);
-    if (extErr) console.warn("[admin/users] extended fields not saved (migration pending?):", extErr.message);
+  // Inherit the backlog: any ticket left unassigned only because no
+  // specialist existed for this specialty yet is handed to the new agent now.
+  let adoptedCount = 0;
+  if (role === "agent" && resolvedSpecialty && adminProfile.organization_id) {
+    const adopted = await adoptUnassignedTicketsForNewAgent(svc, {
+      organizationId: adminProfile.organization_id,
+      agentId: userId,
+      actorId: user.id,
+      specialty: resolvedSpecialty,
+    });
+    adoptedCount = adopted.length;
   }
 
   let taxId: string | null = null;
@@ -141,5 +155,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     user: { id: userId, email: email.trim(), name: name.trim(), role, tax_id: taxId },
+    adoptedTicketCount: adoptedCount,
   });
 }

@@ -24,7 +24,7 @@ export function normalizeRoutingLabel(value: string | null | undefined): string 
     .trim();
 }
 
-function canonicalRoutingLabel(value: string | null | undefined): string {
+export function canonicalRoutingLabel(value: string | null | undefined): string {
   const normalized = normalizeRoutingLabel(value);
   for (const [canonical, aliases] of Object.entries(CATEGORY_ALIASES)) {
     if (normalized === canonical || aliases.some((alias) => normalized.includes(alias))) return canonical;

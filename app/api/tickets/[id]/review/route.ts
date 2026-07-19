@@ -83,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: "Review update failed" }, { status: 500 });
   if (!updated) return NextResponse.json({ error: "Ticket changed; refresh and retry" }, { status: 409 });
 
-  await svc.from("audit_logs").insert({
+  await svc.from("ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

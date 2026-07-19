@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   }
   if (error) return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
 
-  await svc.from("audit_logs").insert({
+  await svc.from("ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

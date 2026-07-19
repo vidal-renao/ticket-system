@@ -85,7 +85,7 @@ async function autoCloseConfirmedResolutions(
 
   await Promise.all(
     stale.map((ticket) =>
-      svc.from("audit_logs").insert({
+      svc.from("ticket_audit_logs").insert({
         organization_id: ticket.organization_id,
         actor_id: null,
         actor_role: "system",

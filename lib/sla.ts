@@ -258,7 +258,7 @@ async function logSlaEventOnce(
 ) {
   const svc = createServiceClientStatic();
   const { data: existing } = await svc
-    .from("audit_logs")
+    .from("ticket_audit_logs")
     .select("id")
     .eq("resource_type", "ticket")
     .eq("resource_id", ticket.id)
@@ -267,7 +267,7 @@ async function logSlaEventOnce(
 
   if (existing?.length) return;
 
-  await svc.from("audit_logs").insert({
+  await svc.from("ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: actorId,
     actor_role: actorRole,

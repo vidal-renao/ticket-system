@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Building2, Eye, EyeOff, Loader2, ShieldCheck, UserPlus, X } from "lucide-react";
+import { Building2, Eye, EyeOff, Loader2, Plus, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
@@ -48,6 +48,14 @@ export function CreateUserModal({
   const [taxId, setTaxId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localTeams, setLocalTeams] = useState<Team[]>(teams);
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [teamSaving, setTeamSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalTeams(teams);
+  }, [teams]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +69,36 @@ export function CreateUserModal({
     setCompanyName("");
     setIndustry("");
     setError(null);
+    setCreatingTeam(false);
+    setNewTeamName("");
   }, [open, defaultType]);
+
+  async function handleCreateTeam() {
+    const trimmed = newTeamName.trim();
+    if (!trimmed) return;
+    setTeamSaving(true);
+    try {
+      const res = await fetch("/api/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not create team");
+        return;
+      }
+      setLocalTeams((prev) => [...prev, data.team].sort((a, b) => a.name.localeCompare(b.name)));
+      setTeamId(data.team.id);
+      setCreatingTeam(false);
+      setNewTeamName("");
+      toast.success(`Team "${data.team.name}" created`);
+    } catch {
+      toast.error("Network error — check the connection and try again");
+    } finally {
+      setTeamSaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -135,7 +172,12 @@ export function CreateUserModal({
         setError(data.error ?? "Account could not be created");
         return;
       }
-      toast.success(`${type === "agent" ? "Employee" : "Company"} created successfully`);
+      const adopted = Number(data.adoptedTicketCount ?? 0);
+      toast.success(
+        adopted > 0
+          ? `Employee created — inherited ${adopted} unassigned ticket${adopted === 1 ? "" : "s"} from the backlog`
+          : `${type === "agent" ? "Employee" : "Company"} created successfully`
+      );
       onSuccess();
       onClose();
     } catch {
@@ -288,13 +330,47 @@ export function CreateUserModal({
                       <label htmlFor={`${fieldId}-team`} className={label}>Team</label>
                       <select
                         id={`${fieldId}-team`}
-                        value={teamId}
-                        onChange={(event) => setTeamId(event.target.value)}
+                        value={creatingTeam ? "__create__" : teamId}
+                        onChange={(event) => {
+                          if (event.target.value === "__create__") {
+                            setCreatingTeam(true);
+                            setTeamId("");
+                          } else {
+                            setCreatingTeam(false);
+                            setTeamId(event.target.value);
+                          }
+                        }}
                         className={input}
                       >
                         <option value="">No team assigned</option>
-                        {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                        {localTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                        <option value="__create__">+ Create new team…</option>
                       </select>
+                      {creatingTeam && (
+                        <div className="mt-2 flex gap-2">
+                          <input
+                            autoFocus
+                            value={newTeamName}
+                            onChange={(event) => setNewTeamName(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleCreateTeam();
+                              }
+                            }}
+                            placeholder="e.g. VPN & Remote Access"
+                            className={input}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCreateTeam}
+                            disabled={teamSaving || !newTeamName.trim()}
+                          >
+                            {teamSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label htmlFor={`${fieldId}-specialty`} className={label}>

@@ -7,7 +7,11 @@ All notable changes are documented here. This project follows a simple unrelease
 ### Fixed
 
 - Ticket creation for new companies failed with "column updated_at of relation tickets does not exist": a legacy DB-side auto-assignment trigger was dropped (routing is owned by the application layer). `profiles.created_at` was also added to match the code's expectations.
-- Photo/logo upload never worked: the `avatars` storage bucket did not exist. Created with public read and per-user write policies — companies, employees and admins can now set their picture in Settings.
+- Photo/logo upload never worked for anyone: the `avatars` storage bucket did not exist, **and** the `authenticated` Postgres role had no UPDATE privilege at all on `profiles` (confirmed via `information_schema`), so even with the bucket present the profile-row write always failed. Fixed both; granted UPDATE scoped to exactly `avatar_url` and `availability_status` (verified by RLS simulation that role/organization_id and other users' rows remain unwritable from the browser).
+- Assigning a specialty/team to a new employee silently failed to save whenever the value wasn't one of `hardware/software/networking/security/billing/other` — a stale DB check constraint rejected `vpn`, `email`, `m365` and every custom team name, and the API only logged a warning instead of surfacing the failure. The constraint is dropped (specialty is fuzzy-matched, not an enum); team/specialty are now written in the same call as profile creation instead of a fragile two-step update.
+- The `manager` role could never actually be assigned — a separate check constraint only allowed `admin/agent/customer`. Fixed.
+- `/team/[id]` always 404'd: the query selected `profiles.department`, a column that never existed in this database. Added the column (nullable, used only as a UI fallback label).
+- Ticket-system's audit trail (review approvals, customer confirmations, archiving, cleanup, SLA breach logging) was silently going nowhere: this Supabase project is shared with another app that already owns a same-named but structurally different `audit_logs` table. Ticket-system now writes to its own `ticket_audit_logs` table. This also fixes SLA-breach notifications being re-sent on every cron run instead of once (the dedupe check was reading the wrong table).
 - Switching the interface language no longer loses active filters/search or the scroll position.
 - The admin ticket table now always shows who each ticket belongs to (company, with the contact underneath; falls back to the creator's name).
 
@@ -19,6 +23,8 @@ All notable changes are documented here. This project follows a simple unrelease
 - Clear inbox model: Inbox (received), To read (truly unread — cleared when the ticket is opened, not the inbox), Outbox (sent) and Waiting tabs, with sender name/company next to each ticket reference.
 - AI triage now receives organization context: the org's active categories (preferred for classification) and the submitting company's name, sector and background, grounding category, priority and the suggested reply.
 - Day/Night/Auto theme with a light palette for sunlight readability, plus a brightness slider (soft-light overlay, no layout impact), persisted per device and applied before first paint.
+- Backlog inheritance: onboarding a new agent with a specialty/team now immediately hands them every currently-unassigned ticket matching that specialty (e.g. a new VPN/Network specialist inherits any open, unrouted VPN ticket), instead of leaving it unrouted until the next matching ticket arrives. Admin gets a toast with the inherited count.
+- Admins can create new routing teams inline from the New Employee form (`+ Create new team…`), backed by `POST /api/teams`.
 
 - Heartbeat-verified presence: the app shell pings `/api/profile/heartbeat` every minute and every "online/busy" status older than 3 minutes is displayed as offline (`lib/presence.ts`, migration `docs/migration_presence_heartbeat.sql`). Stale statuses can no longer masquerade as connected.
 - Team member profile page (`/team/[id]`) for managers/admins: live presence, last-seen, current in-progress task, workload stats and the full active queue.

@@ -50,7 +50,7 @@ export async function logTicketLifecycleEvents({
   if (events.length === 0) return;
 
   const svc = createServiceClientStatic();
-  const { error } = await svc.from("audit_logs").insert(events);
+  const { error } = await svc.from("ticket_audit_logs").insert(events);
   if (error) {
     console.error("[ticket lifecycle audit]", error);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferTicketCategory, selectSpecialistAgent } from "../../lib/ticket-routing";
+import { canonicalRoutingLabel, inferTicketCategory, selectSpecialistAgent } from "../../lib/ticket-routing";
 
 describe("enterprise ticket routing", () => {
   const candidates = [
@@ -25,5 +25,20 @@ describe("enterprise ticket routing", () => {
 
   it("infers obvious software requests without AI", () => {
     expect(inferTicketCategory("CRM error", "The software application crashes on login")).toBe("software");
+  });
+
+  it("maps a new agent's specialty/team selection onto the same canonical category as a ticket's", () => {
+    // A new employee onboarded with specialty "vpn" (New Employee form value)
+    // and a team literally named "Network" must both resolve to the same
+    // bucket as a ticket categorized "VPN & Remote Access", so backlog
+    // inheritance on agent creation actually finds matching work.
+    expect(canonicalRoutingLabel("vpn")).toBe("networking");
+    expect(canonicalRoutingLabel("Network")).toBe("networking");
+    expect(canonicalRoutingLabel("VPN & Remote Access")).toBe("networking");
+  });
+
+  it("keeps unrelated labels distinct", () => {
+    expect(canonicalRoutingLabel("billing")).not.toBe(canonicalRoutingLabel("networking"));
+    expect(canonicalRoutingLabel("Legal")).toBe("legal");
   });
 });

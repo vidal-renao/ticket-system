@@ -298,7 +298,7 @@ CREATE TABLE ai_analysis (
 -- 9. AUDIT LOGS (DSG/LPD — mandatory)
 -- ============================================================
 
-CREATE TABLE audit_logs (
+CREATE TABLE ticket_audit_logs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
   actor_id        UUID REFERENCES profiles(id) ON DELETE SET NULL,
@@ -314,8 +314,8 @@ CREATE TABLE audit_logs (
 );
 
 -- Audit logs are immutable — no UPDATE or DELETE allowed (DSG compliance)
-CREATE RULE audit_logs_no_update AS ON UPDATE TO audit_logs DO INSTEAD NOTHING;
-CREATE RULE audit_logs_no_delete AS ON DELETE TO audit_logs DO INSTEAD NOTHING;
+CREATE RULE ticket_audit_logs_no_update AS ON UPDATE TO ticket_audit_logs DO INSTEAD NOTHING;
+CREATE RULE ticket_audit_logs_no_delete AS ON DELETE TO ticket_audit_logs DO INSTEAD NOTHING;
 
 -- ============================================================
 -- 10. NOTIFICATIONS
@@ -355,8 +355,8 @@ CREATE INDEX idx_ai_ticket             ON ai_analysis(ticket_id);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
 
 -- Audit logs: compliance queries
-CREATE INDEX idx_audit_org_action      ON audit_logs(organization_id, action, created_at DESC);
-CREATE INDEX idx_audit_resource        ON audit_logs(resource_type, resource_id);
+CREATE INDEX idx_audit_org_action      ON ticket_audit_logs(organization_id, action, created_at DESC);
+CREATE INDEX idx_audit_resource        ON ticket_audit_logs(resource_type, resource_id);
 
 -- ============================================================
 -- TRIGGERS: auto updated_at
@@ -440,7 +440,7 @@ $$;
 CREATE OR REPLACE FUNCTION audit_ticket_changes()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO audit_logs (organization_id, actor_id, action, resource_type, resource_id, old_values, new_values)
+  INSERT INTO ticket_audit_logs (organization_id, actor_id, action, resource_type, resource_id, old_values, new_values)
   VALUES (
     COALESCE(NEW.organization_id, OLD.organization_id),
     auth.uid(),
@@ -571,9 +571,9 @@ CREATE POLICY "users_own_notifications" ON notifications
   FOR ALL USING (user_id = auth.uid());
 
 -- Audit Logs: managers and admins can read (not customers)
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ticket_audit_logs ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "managers_read_audit_logs" ON audit_logs
+CREATE POLICY "managers_read_ticket_audit_logs" ON ticket_audit_logs
   FOR SELECT USING (
     organization_id = (SELECT organization_id FROM profiles WHERE id = auth.uid())
     AND (SELECT role FROM profiles WHERE id = auth.uid()) IN ('manager', 'admin')

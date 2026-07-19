@@ -68,7 +68,7 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: "Archive update failed" }, { status: 500 });
 
-  await svc.from("audit_logs").insert({
+  await svc.from("ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

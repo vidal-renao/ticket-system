@@ -231,7 +231,10 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["ai_analysis"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["ai_analysis"]["Insert"]>;
       };
-      audit_logs: {
+      // Named ticket_audit_logs (not audit_logs) because this Supabase
+      // project is shared with other apps and a pre-existing "audit_logs"
+      // table there belongs to a different one, with an incompatible shape.
+      ticket_audit_logs: {
         Row: {
           id: string;
           organization_id: string | null;
@@ -242,12 +245,10 @@ export interface Database {
           resource_id: string | null;
           old_values: Json | null;
           new_values: Json | null;
-          ip_address: string | null;
-          user_agent: string | null;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["audit_logs"]["Row"], "id" | "created_at">;
-        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["ticket_audit_logs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["ticket_audit_logs"]["Insert"]>;
       };
       notifications: {
         Row: {
@@ -296,7 +297,7 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type SlaPolicy = Database["public"]["Tables"]["sla_policies"]["Row"];
 export type AIAnalysis = Database["public"]["Tables"]["ai_analysis"]["Row"];
-export type AuditLog = Database["public"]["Tables"]["audit_logs"]["Row"];
+export type AuditLog = Database["public"]["Tables"]["ticket_audit_logs"]["Row"];
 export type TicketComment = Database["public"]["Tables"]["ticket_comments"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 

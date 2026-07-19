@@ -78,7 +78,7 @@ export async function POST(
     newAssignee: ticket.assigned_to,
   });
 
-  await svc.from("audit_logs").insert({
+  await svc.from("ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: user.id,
     actor_role: profile.role,
