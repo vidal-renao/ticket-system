@@ -177,6 +177,8 @@ export interface Database {
           reviewed_by: string | null;
           deleted_at: string | null;
           deleted_by: string | null;
+          archived_at: string | null;
+          archived_by: string | null;
           contains_pii: boolean;
           anonymized_at: string | null;
           retention_delete_at: string | null;

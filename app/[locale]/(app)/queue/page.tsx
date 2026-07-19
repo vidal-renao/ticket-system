@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/Badge";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { AlertTriangle, CheckCircle2, Clock3, Inbox, PlayCircle, ShieldCheck } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, priorityColor, statusColor } from "@/lib/utils";
+import { matchesTicketQuery, ticketRefTokens } from "@/lib/ticket-search";
+import { TicketSearch } from "@/components/tickets/TicketSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +25,15 @@ type AgentTicket = {
   review_status: "not_requested" | "pending" | "approved" | "changes_requested";
 };
 
-export default async function QueuePage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function QueuePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ q?: string }>;
+}) {
   const { locale } = await params;
+  const { q } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
@@ -46,13 +55,22 @@ export default async function QueuePage({ params }: { params: Promise<{ locale: 
       "id, ticket_number, title, status, priority, created_at, assigned_to, sla_breached, review_status"
     )
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("sla_breached", { ascending: false })
       .order("created_at", { ascending: false }),
     svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
   ]);
   if (error) console.error("[AgentWorkspace] ticket query failed", { actorId: user.id, error: error.message });
 
-  const tickets = (ticketRows ?? []) as AgentTicket[];
+  const allTickets = (ticketRows ?? []) as AgentTicket[];
+  const tickets = allTickets.filter((ticket) =>
+    matchesTicketQuery(q, [
+      ...ticketRefTokens(ticket.ticket_number),
+      ticket.title,
+      ticket.status.replaceAll("_", " "),
+      ticket.priority,
+    ])
+  );
   const groups = [
     {
       key: "assigned",
@@ -109,6 +127,8 @@ export default async function QueuePage({ params }: { params: Promise<{ locale: 
           </div>
         </Card>
       </header>
+
+      <TicketSearch className="mb-5" />
 
       <section className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Active" value={activeCount} />

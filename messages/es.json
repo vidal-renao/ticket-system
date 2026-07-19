@@ -95,7 +95,8 @@
     "admin": "Administración",
     "signOut": "Cerrar sesión",
     "home": "Inicio",
-    "inbox": "Bandeja"
+    "inbox": "Bandeja",
+    "history": "Historial"
   },
   "tickets": {
     "myTickets": "Mis Tickets",

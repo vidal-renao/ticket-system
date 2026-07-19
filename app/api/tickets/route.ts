@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   });
 
   scheduleBackground(
-    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id, priority)
+    runAITriage(ticket.id, title.trim(), description.trim(), profile.organization_id, priority, user.id)
   );
 
   return NextResponse.json({ ticket }, { status: 201 });
@@ -230,15 +230,18 @@ async function runAITriage(
   title: string,
   description: string,
   orgId: string,
-  initialPriority: string
+  initialPriority: string,
+  creatorId?: string
 ): Promise<void> {
   const svc = createServiceClientStatic();
 
-  const { data: org } = await svc
-    .from("organizations")
-    .select("settings")
-    .eq("id", orgId)
-    .single();
+  const [{ data: org }, { data: orgCategories }, { data: creatorCompany }] = await Promise.all([
+    svc.from("organizations").select("settings").eq("id", orgId).single(),
+    svc.from("categories").select("name").eq("organization_id", orgId).eq("is_active", true).order("name"),
+    creatorId
+      ? svc.from("customers_info").select("company_name, industry, business_details").eq("id", creatorId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   const piiEnabled =
     org?.settings &&
@@ -255,12 +258,19 @@ async function runAITriage(
   const ragChunks  = await retrieveRelevantKnowledge(svc, orgId, triageDescription);
   const ragContext = buildRAGContext(ragChunks);
 
+  const orgContext = {
+    companyName: creatorCompany?.company_name ?? null,
+    companySector: creatorCompany?.industry ?? null,
+    companyDetails: piiEnabled ? null : creatorCompany?.business_details ?? null,
+    activeCategories: (orgCategories ?? []).map((c: { name: string }) => c.name).filter(Boolean),
+  };
+
   let result;
   try {
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), AI_TRIAGE_TIMEOUT_MS);
     try {
-      result = await triageTicket(triageTitle, triageDescription, ac.signal, ragContext);
+      result = await triageTicket(triageTitle, triageDescription, ac.signal, ragContext, orgContext);
     } finally {
       clearTimeout(timeout);
     }

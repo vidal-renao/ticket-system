@@ -3,7 +3,7 @@
 import type { MouseEvent } from "react";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, CheckCircle2, RotateCcw, XCircle, Loader2 } from "lucide-react";
+import { Play, CheckCircle2, RotateCcw, XCircle, Loader2, Archive } from "lucide-react";
 import { toast } from "sonner";
 
 interface Agent {
@@ -102,6 +102,26 @@ export function AdminTicketActions({
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Review failed");
+      }
+    });
+  }
+
+  function handleArchive() {
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}/archive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "archive" }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(formatErrorMessage(data.error ?? "Archive failed"));
+        }
+        toast.success("Moved to History");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Archive failed");
       }
     });
   }
@@ -216,20 +236,48 @@ export function AdminTicketActions({
           >
             <RotateCcw className="h-3 w-3" />
           </button>
+          <button
+            type="button"
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+              handleArchive();
+            }}
+            title="Move to History"
+            className={`${buttonBase} border-[var(--color-surface-600)] bg-[var(--color-surface-800)] text-[var(--color-text-muted)] hover:border-indigo-500/30 hover:text-indigo-300`}
+          >
+            <Archive className="h-3 w-3" />
+          </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={(event: MouseEvent<HTMLButtonElement>) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleStatus("in_progress", "reopened");
-          }}
-          title="Reopen ticket"
-          className={`${buttonBase} border-[var(--color-surface-600)] bg-[var(--color-surface-800)] text-[var(--color-text-muted)] hover:border-amber-500/30 hover:text-amber-400`}
-        >
-          <RotateCcw className="h-3 w-3" /> Reopen
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              event.stopPropagation();
+              handleStatus("in_progress", "reopened");
+            }}
+            title="Reopen ticket"
+            className={`${buttonBase} border-[var(--color-surface-600)] bg-[var(--color-surface-800)] text-[var(--color-text-muted)] hover:border-amber-500/30 hover:text-amber-400`}
+          >
+            <RotateCcw className="h-3 w-3" /> Reopen
+          </button>
+          {currentStatus === "closed" && (
+            <button
+              type="button"
+              onClick={(event: MouseEvent<HTMLButtonElement>) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleArchive();
+              }}
+              title="Move to History"
+              className={`${buttonBase} border-[var(--color-surface-600)] bg-[var(--color-surface-800)] text-[var(--color-text-muted)] hover:border-indigo-500/30 hover:text-indigo-300`}
+            >
+              <Archive className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

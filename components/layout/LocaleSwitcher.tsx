@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 
@@ -9,10 +10,17 @@ const LOCALE_LABELS: Record<string, string> = { de: "DE", en: "EN", es: "ES" };
 export function LocaleSwitcher() {
   const locale = useLocale();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
   function handleChange(next: string) {
-    router.replace(pathname, { locale: next });
+    // Keep the user exactly where they are: preserve active filters/search
+    // params and do not scroll back to the top when the language changes.
+    const query = searchParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      locale: next,
+      scroll: false,
+    });
   }
 
   return (

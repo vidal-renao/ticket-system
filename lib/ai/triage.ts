@@ -97,17 +97,45 @@ SMART RESPONSE GUIDELINES:
 - Give a realistic timeframe based on priority
 - Tone: professional, calm, solution-oriented (Swiss business standard)`;
 
+export interface TriageOrgContext {
+  companyName?: string | null;
+  companySector?: string | null;
+  companyDetails?: string | null;
+  activeCategories?: string[];
+}
+
+function buildOrgContextBlock(ctx?: TriageOrgContext): string {
+  if (!ctx) return "";
+  const lines: string[] = [];
+  if (ctx.companyName) {
+    lines.push(
+      `The ticket was submitted by the company "${ctx.companyName}"${ctx.companySector ? ` (sector: ${ctx.companySector})` : ""}.`
+    );
+  }
+  if (ctx.companyDetails?.trim()) {
+    lines.push(`Company background: ${ctx.companyDetails.trim().slice(0, 400)}`);
+  }
+  if (ctx.activeCategories?.length) {
+    lines.push(
+      `This organization's active support categories are: ${ctx.activeCategories.join(", ")}. ` +
+        `When one of them clearly fits, use its exact name as suggested_category (it takes precedence over the generic list); otherwise fall back to the generic list.`
+    );
+  }
+  if (!lines.length) return "";
+  return `\n\nORGANIZATION CONTEXT (use it to ground category, priority, summary and smart_response — e.g. an outage has more impact for a retailer at opening hours than a single-user cosmetic issue):\n- ${lines.join("\n- ")}`;
+}
+
 export async function triageTicket(
   title: string,
   description: string,
   signal?: AbortSignal,
-  ragContext?: string
+  ragContext?: string,
+  orgContext?: TriageOrgContext
 ): Promise<TriageResultWithMeta> {
   const startTime = Date.now();
 
-  const systemPrompt = ragContext
-    ? `${SYSTEM_PROMPT}\n\n${ragContext}`
-    : SYSTEM_PROMPT;
+  const systemPrompt =
+    SYSTEM_PROMPT + buildOrgContextBlock(orgContext) + (ragContext ? `\n\n${ragContext}` : "");
 
   const response = await client.messages.create(
     {

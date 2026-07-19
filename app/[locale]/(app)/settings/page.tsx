@@ -10,6 +10,7 @@ import { CustomerProfileForm } from "@/components/settings/CustomerProfileForm";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 import { AvatarUpload } from "@/components/settings/AvatarUpload";
+import { generateCif } from "@/lib/tax-id";
 
 export const dynamic = "force-dynamic";
 
@@ -90,8 +91,32 @@ export default async function SettingsPage({
       .from("customers_info")
       .select("company_name, industry, business_details, tax_id")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
     customerInfo = data ?? null;
+
+    // Self-healing fiscal identity: companies onboarded before automatic
+    // CIF/NIF assignment get one generated and persisted on first visit.
+    if (!customerInfo?.tax_id?.trim()) {
+      const companyName = customerInfo?.company_name?.trim() || profile.full_name?.trim() || user.email || user.id;
+      const generated = generateCif(companyName);
+      await svc.from("customers_info").upsert(
+        {
+          id: user.id,
+          company_name: customerInfo?.company_name ?? companyName,
+          industry: customerInfo?.industry ?? "",
+          business_details: customerInfo?.business_details ?? "",
+          tax_id: generated,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
+      customerInfo = {
+        company_name: customerInfo?.company_name ?? companyName,
+        industry: customerInfo?.industry ?? "",
+        business_details: customerInfo?.business_details ?? "",
+        tax_id: generated,
+      };
+    }
   }
 
   // Agent/Manager: fetch team name
@@ -137,8 +162,12 @@ export default async function SettingsPage({
               <p className="text-sm text-[var(--color-text-primary)]">{user.email}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Employee ID</p>
-              <p className="text-sm font-mono text-[var(--color-text-primary)]">{employeeId}</p>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">
+                {isCustomer ? "CIF/NIF" : "Employee ID"}
+              </p>
+              <p className="text-sm font-mono text-[var(--color-text-primary)]">
+                {isCustomer ? customerInfo?.tax_id || "—" : employeeId}
+              </p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Role</p>

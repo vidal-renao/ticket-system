@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { LocaleSwitcher } from "./LocaleSwitcher";
+import { ThemeControl } from "./ThemeControl";
 import {
   TicketIcon,
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   Home,
   Building2,
   MessageSquare,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
@@ -33,7 +35,8 @@ type NavKey =
   | "team"
   | "settings"
   | "admin"
-  | "inbox";
+  | "inbox"
+  | "history";
 
 interface NavItem {
   href: string;
@@ -53,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/team", labelKey: "team", icon: Users, roles: ["manager", "admin"] },
   { href: "/admin", labelKey: "admin", icon: Building2, roles: ["manager", "admin"] },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare, roles: ["admin", "manager", "agent", "customer"] },
+  { href: "/history", labelKey: "history", icon: History, roles: ["admin", "manager", "agent", "customer"] },
   { href: "/settings", labelKey: "settings", icon: Settings, roles: ["admin", "manager", "agent", "customer"] },
 ];
 
@@ -169,6 +173,10 @@ export function Sidebar({
           <Home className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("home")}
         </button>
+      </div>
+
+      <div className="border-t border-[var(--color-surface-600)]">
+        <ThemeControl />
       </div>
 
       <div className="border-t border-[var(--color-surface-600)]">

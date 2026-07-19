@@ -40,10 +40,24 @@ export default async function AppLayout({
     user.email?.split("@")[0] ||
     "User";
 
-  const resolvedSubtitle =
+  let resolvedSubtitle: string =
     resolvedProfile.role === "agent"
       ? resolvedProfile.specialty?.trim() || "General support"
       : resolvedProfile.role;
+
+  // Companies see their company identity and sector next to the name.
+  if (resolvedProfile.role === "customer") {
+    const { data: companyInfo } = await svc
+      .from("customers_info")
+      .select("company_name, industry")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (companyInfo?.company_name?.trim()) {
+      resolvedSubtitle = [companyInfo.company_name.trim(), companyInfo.industry?.trim()]
+        .filter(Boolean)
+        .join(" · ");
+    }
+  }
 
   const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult, { count: inboxUnreadCount }] = await Promise.all([
     svc

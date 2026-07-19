@@ -45,6 +45,7 @@ export function CreateUserModal({
   const [specialty, setSpecialty] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
+  const [taxId, setTaxId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,6 +126,7 @@ export function CreateUserModal({
           ...(type === "customer" && {
             company_name: companyName,
             industry: industry || undefined,
+            tax_id: taxId.trim() || undefined,
           }),
         }),
       });
@@ -357,6 +359,18 @@ export function CreateUserModal({
                         <option value="Hospitality & Tourism">Hospitality & Tourism</option>
                         <option value="Other">Other</option>
                       </select>
+                    </div>
+                    <div>
+                      <label htmlFor={`${fieldId}-taxid`} className={label}>
+                        CIF/NIF <span className="font-normal text-[var(--color-text-muted)]">(optional — auto-generated if empty)</span>
+                      </label>
+                      <input
+                        id={`${fieldId}-taxid`}
+                        value={taxId}
+                        onChange={(event) => setTaxId(event.target.value)}
+                        placeholder="B1234567X"
+                        className={input}
+                      />
                     </div>
                   </>
                 )}

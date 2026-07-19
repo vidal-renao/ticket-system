@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
+import { generateCif } from "@/lib/tax-id";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     specialty?: string;
     company_name?: string;
     industry?: string;
+    tax_id?: string;
   };
   try {
     body = await request.json();
@@ -116,14 +118,20 @@ export async function POST(request: Request) {
     if (extErr) console.warn("[admin/users] extended fields not saved (migration pending?):", extErr.message);
   }
 
-  if (role === "customer" && body.company_name?.trim()) {
+  let taxId: string | null = null;
+  if (role === "customer") {
+    // Every company gets a fiscal identifier at onboarding: the one provided
+    // by the company, or an auto-generated well-formed CIF derived from the
+    // company name (replaceable later in Settings → Company profile).
+    const companyName = body.company_name?.trim() || name.trim();
+    taxId = body.tax_id?.trim() || generateCif(companyName);
     const { error: custError } = await svc.from("customers_info").upsert(
       {
         id: userId,
-        company_name: body.company_name.trim(),
+        company_name: companyName,
         industry: body.industry?.trim() ?? "",
         business_details: "",
-        tax_id: "",
+        tax_id: taxId,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "id" }
@@ -132,6 +140,6 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    user: { id: userId, email: email.trim(), name: name.trim(), role },
+    user: { id: userId, email: email.trim(), name: name.trim(), role, tax_id: taxId },
   });
 }

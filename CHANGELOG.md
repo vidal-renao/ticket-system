@@ -4,7 +4,21 @@ All notable changes are documented here. This project follows a simple unrelease
 
 ## Unreleased
 
+### Fixed
+
+- Ticket creation for new companies failed with "column updated_at of relation tickets does not exist": a legacy DB-side auto-assignment trigger was dropped (routing is owned by the application layer). `profiles.created_at` was also added to match the code's expectations.
+- Photo/logo upload never worked: the `avatars` storage bucket did not exist. Created with public read and per-user write policies — companies, employees and admins can now set their picture in Settings.
+- Switching the interface language no longer loses active filters/search or the scroll position.
+- The admin ticket table now always shows who each ticket belongs to (company, with the contact underneath; falls back to the creator's name).
+
 ### Added
+
+- Smart search on every ticket list (admin cockpit, tickets, agent queue, history): one box matching any criterion — TK-ref in any form, subject, company, contact, agent, category, status, priority — all tokens, any order, accent-insensitive.
+- Automatic CIF/NIF: companies onboarded by an admin get a well-formed fiscal identifier (deterministic from the company name, official control-digit algorithm) unless one is provided; company Settings shows CIF/NIF instead of Employee ID (self-healing for existing companies) and the sidebar shows company · sector next to the name.
+- Ticket History (`/history`) for all roles: customers see their finished tickets, agents their finished assignments, managers/admins everything, including archived. Admins can archive resolved/closed tickets out of the operational lists (audited, restorable) from the cockpit actions.
+- Clear inbox model: Inbox (received), To read (truly unread — cleared when the ticket is opened, not the inbox), Outbox (sent) and Waiting tabs, with sender name/company next to each ticket reference.
+- AI triage now receives organization context: the org's active categories (preferred for classification) and the submitting company's name, sector and background, grounding category, priority and the suggested reply.
+- Day/Night/Auto theme with a light palette for sunlight readability, plus a brightness slider (soft-light overlay, no layout impact), persisted per device and applied before first paint.
 
 - Heartbeat-verified presence: the app shell pings `/api/profile/heartbeat` every minute and every "online/busy" status older than 3 minutes is displayed as offline (`lib/presence.ts`, migration `docs/migration_presence_heartbeat.sql`). Stale statuses can no longer masquerade as connected.
 - Team member profile page (`/team/[id]`) for managers/admins: live presence, last-seen, current in-progress task, workload stats and the full active queue.

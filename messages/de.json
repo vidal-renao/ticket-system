@@ -95,7 +95,8 @@
     "admin": "Administration",
     "signOut": "Abmelden",
     "home": "Startseite",
-    "inbox": "Posteingang"
+    "inbox": "Posteingang",
+    "history": "Verlauf"
   },
   "tickets": {
     "myTickets": "Meine Anfragen",

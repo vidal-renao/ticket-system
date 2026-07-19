@@ -59,6 +59,23 @@
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, ui-monospace, monospace;
 }
 
+/* ── Day mode (data-theme="light") ─────────────────────────────
+   The app is dark-first; light mode remaps the surface/text scale so the
+   interface stays readable under direct sunlight. "Auto" follows the OS. */
+:root[data-theme="light"] {
+  --color-surface-950: #eef2f7;
+  --color-surface-900: #ffffff;
+  --color-surface-850: #f6f8fb;
+  --color-surface-800: #eef2f7;
+  --color-surface-700: #e3e9f1;
+  --color-surface-600: #cfd9e6;
+  --color-surface-500: #b3c2d6;
+
+  --color-text-primary:   #101827;
+  --color-text-secondary: #3c495b;
+  --color-text-muted:     #64748b;
+}
+
 /* ── Base styles ── */
 *, *::before, *::after {
   box-sizing: border-box;

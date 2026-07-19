@@ -29,6 +29,8 @@ import {
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
+import { matchesTicketQuery, ticketRefTokens } from "@/lib/ticket-search";
+import { TicketSearch } from "@/components/tickets/TicketSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,7 @@ export default async function AdminPage({
     sla?: string;
     sort?: string;
     page?: string;
+    q?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -118,7 +121,7 @@ export default async function AdminPage({
         .limit(500);
 
       if (filters.stage === "trash") query = query.not("deleted_at", "is", null);
-      else query = query.is("deleted_at", null);
+      else query = query.is("deleted_at", null).is("archived_at", null);
 
       if (filters.status) query = query.eq("status", filters.status);
       else if (filters.stage === "new") query = query.eq("status", "open").is("assigned_to", null);
@@ -203,7 +206,19 @@ export default async function AdminPage({
 
   const filtered = enriched
     .filter((ticket) => !filters.company || ticket.company_name === filters.company)
-    .filter((ticket) => !filters.category || ticket.category_name === filters.category);
+    .filter((ticket) => !filters.category || ticket.category_name === filters.category)
+    .filter((ticket) =>
+      matchesTicketQuery(filters.q, [
+        ...ticketRefTokens(ticket.ticket_number),
+        ticket.title,
+        ticket.company_name,
+        ticket.creator_name,
+        ticket.agent_name,
+        ticket.category_name,
+        ticket.status.replaceAll("_", " "),
+        ticket.priority,
+      ])
+    );
 
   const currentPage = Math.max(1, parseInt(filters.page ?? "1", 10));
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -259,6 +274,7 @@ export default async function AdminPage({
     if (filters.agent) search.set("agent", filters.agent);
     if (filters.sla) search.set("sla", filters.sla);
     if (filters.sort) search.set("sort", filters.sort);
+    if (filters.q) search.set("q", filters.q);
     if (page > 1) search.set("page", String(page));
     const base = locale === "de" ? "/admin" : `/${locale}/admin`;
     const query = search.toString();
@@ -394,7 +410,8 @@ export default async function AdminPage({
 
       <AdminStatusTabs />
 
-      <div className="mb-5 mt-5">
+      <div className="mb-5 mt-5 space-y-3">
+        <TicketSearch placeholder="Search: TK-0042, company, subject, agent, category, priority…" />
         <AdminFilters companies={companies} agents={allAgents} categories={categoryNames} />
       </div>
 
@@ -437,8 +454,17 @@ export default async function AdminPage({
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      {ticket.company_name ? (
-                        <span className="text-xs font-medium text-[var(--color-text-primary)]">{ticket.company_name}</span>
+                      {ticket.company_name || ticket.creator_name ? (
+                        <div className="min-w-0">
+                          <span className="block truncate text-xs font-medium text-[var(--color-text-primary)]">
+                            {ticket.company_name ?? ticket.creator_name}
+                          </span>
+                          {ticket.company_name && ticket.creator_name && (
+                            <span className="block truncate text-[10px] text-[var(--color-text-muted)]">
+                              {ticket.creator_name}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs italic text-[var(--color-text-muted)]">{t("internal")}</span>
                       )}

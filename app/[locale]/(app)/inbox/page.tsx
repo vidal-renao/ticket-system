@@ -2,10 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
-import { MessageSquare, Lock, Building2, UserCircle2, Send, Bell, Clock } from "lucide-react";
+import { MessageSquare, Lock, Building2, UserCircle2, Send, Inbox as InboxIcon, MailOpen, Clock } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
-import { InboxMarkReadTrigger } from "./InboxMarkReadTrigger";
 import { WAITING_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +51,7 @@ export default async function InboxPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { locale } = await params;
-  const { tab = "all" } = await searchParams;
+  const { tab = "inbox" } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -136,6 +135,20 @@ export default async function InboxPage({
     ? await svc.from("customers_info").select("id, company_name").in("id", customerAuthorIds)
     : { data: [] as CustomerInfo[] };
 
+  // True "to read" state: comment notifications the user has not read yet.
+  // They are marked read when the user opens the ticket, not the inbox.
+  const { data: unreadNotifRows } = await svc
+    .from("notifications")
+    .select("ticket_id")
+    .eq("user_id", user.id)
+    .eq("is_read", false)
+    .eq("type", "comment.public");
+  const unreadTicketIds = new Set(
+    ((unreadNotifRows ?? []) as { ticket_id: string | null }[])
+      .map((n) => n.ticket_id)
+      .filter((v): v is string => Boolean(v))
+  );
+
   const ticketById = Object.fromEntries(tickets.map((t) => [t.id, t]));
   const authorById = Object.fromEntries(authors.map((p) => [p.id, p]));
   const companyById = Object.fromEntries(
@@ -170,55 +183,48 @@ export default async function InboxPage({
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
-  // "all"     — latest per ticket (same as before)
-  // "unread"  — tickets with customer messages (staff) or staff messages (customer) not yet read
-  // "sent"    — messages authored by current user
-  // "pending" — tickets in pending_customer status (staff) / open tickets waiting on staff (customer)
+  // "inbox"   — messages received from others, latest per ticket
+  // "toread"  — received messages you have not read yet (unread notifications)
+  // "outbox"  — messages you sent
+  // "waiting" — tickets currently waiting on someone
 
-  function getFiltered(): EnrichedComment[] {
-    if (tab === "sent") {
-      return enriched.filter((e) => e.isMyMessage);
-    }
-    if (tab === "pending") {
-      const pending = isStaff
-        ? enriched.filter((e) => WAITING_TICKET_STATUSES.includes(e.ticket.status as (typeof WAITING_TICKET_STATUSES)[number]))
-        : enriched.filter((e) => ["open", "in_progress"].includes(e.ticket.status));
-      // de-dupe by ticket
-      const seen = new Set<string>();
-      return pending.filter((e) => {
-        if (seen.has(e.ticket.id)) return false;
-        seen.add(e.ticket.id);
-        return true;
-      });
-    }
-    if (tab === "unread") {
-      const unread = isStaff
-        ? enriched.filter((e) => e.isCustomerMessage)
-        : enriched.filter((e) => !e.isCustomerMessage);
-      const seen = new Set<string>();
-      return unread.filter((e) => {
-        if (seen.has(e.ticket.id)) return false;
-        seen.add(e.ticket.id);
-        return true;
-      });
-    }
-    // "all" — one per ticket (latest)
+  function dedupeByTicket(list: EnrichedComment[]): EnrichedComment[] {
     const seen = new Set<string>();
-    return enriched.filter((e) => {
+    return list.filter((e) => {
       if (seen.has(e.ticket.id)) return false;
       seen.add(e.ticket.id);
       return true;
     });
   }
 
+  const received = enriched.filter((e) => !e.isMyMessage);
+  const toReadList = dedupeByTicket(received.filter((e) => unreadTicketIds.has(e.ticket.id)));
+
+  function getFiltered(): EnrichedComment[] {
+    if (tab === "outbox") {
+      return enriched.filter((e) => e.isMyMessage);
+    }
+    if (tab === "toread") {
+      return toReadList;
+    }
+    if (tab === "waiting") {
+      const pending = isStaff
+        ? enriched.filter((e) => WAITING_TICKET_STATUSES.includes(e.ticket.status as (typeof WAITING_TICKET_STATUSES)[number]))
+        : enriched.filter((e) => ["open", "in_progress"].includes(e.ticket.status));
+      return dedupeByTicket(pending);
+    }
+    // "inbox" — received messages, one per ticket (latest)
+    return dedupeByTicket(received);
+  }
+
   const filtered = getFiltered();
   const inboxPath = locale === "de" ? "/inbox" : `/${locale}/inbox`;
 
   const TABS = [
-    { key: "all",     label: "All",     icon: MessageSquare },
-    { key: "unread",  label: isStaff ? "Customer Messages" : "Staff Replies", icon: Bell },
-    { key: "sent",    label: "Sent",    icon: Send },
-    { key: "pending", label: "Pending", icon: Clock },
+    { key: "inbox",   label: "Inbox",   icon: InboxIcon, count: null },
+    { key: "toread",  label: "To read", icon: MailOpen,  count: toReadList.length },
+    { key: "outbox",  label: "Outbox",  icon: Send,      count: null },
+    { key: "waiting", label: "Waiting", icon: Clock,     count: null },
   ];
 
   const ticketPath = (id: string) =>
@@ -226,7 +232,6 @@ export default async function InboxPage({
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
-      <InboxMarkReadTrigger />
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">
           <MessageSquare className="w-5 h-5 text-indigo-400" aria-hidden="true" />
@@ -239,7 +244,7 @@ export default async function InboxPage({
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 mb-5 p-1 bg-[var(--color-surface-800)] rounded-xl border border-[var(--color-surface-700)]">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {TABS.map(({ key, label, icon: Icon, count }) => (
           <Link
             key={key}
             href={`${inboxPath}?tab=${key}`}
@@ -251,6 +256,13 @@ export default async function InboxPage({
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
+            {typeof count === "number" && count > 0 && (
+              <span className={`min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center ${
+                tab === key ? "bg-white/20 text-white" : "bg-indigo-500 text-white"
+              }`}>
+                {count > 9 ? "9+" : count}
+              </span>
+            )}
           </Link>
         ))}
       </div>
@@ -260,10 +272,10 @@ export default async function InboxPage({
           <MessageSquare className="w-10 h-10 text-[var(--color-text-muted)] mb-3" />
           <p className="text-[var(--color-text-secondary)] font-medium">No messages here.</p>
           <p className="text-xs text-[var(--color-text-muted)] mt-1">
-            {tab === "pending" ? "No tickets waiting for a response." :
-             tab === "sent"    ? "You haven't sent any messages yet." :
-             tab === "unread"  ? "All caught up!" :
-             isStaff ? "Comments on org tickets will appear here." : "Replies to your tickets will appear here."}
+            {tab === "waiting" ? "No tickets waiting for a response." :
+             tab === "outbox"  ? "You haven't sent any messages yet." :
+             tab === "toread"  ? "All caught up — nothing left to read!" :
+             isStaff ? "Messages you receive on org tickets will appear here." : "Replies to your tickets will appear here."}
           </p>
         </Card>
       ) : (

@@ -59,6 +59,15 @@ export default async function TicketDetailPage({
 
   const ticket = access.ticket;
 
+  // Opening a ticket is what marks its notifications as read for this user —
+  // the inbox "To read" tab stays accurate until each conversation is opened.
+  await svc
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", currentUserId)
+    .eq("ticket_id", ticket.id)
+    .eq("is_read", false);
+
   const slaStatus = getSlaStatus(ticket);
   const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;
   const resolutionDueAt = ticket.resolution_due_at ?? ticket.sla_resolution_due;

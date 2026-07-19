@@ -33,6 +33,8 @@ import {
 } from "@/lib/utils";
 import { getTicketPresentation } from "@/lib/ticket-presentation";
 import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
+import { matchesTicketQuery, ticketRefTokens } from "@/lib/ticket-search";
+import { TicketSearch } from "@/components/tickets/TicketSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +78,7 @@ export default async function TicketsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ status?: string; priority?: string; sla?: string; category?: string; specialty?: string }>;
+  searchParams: Promise<{ status?: string; priority?: string; sla?: string; category?: string; specialty?: string; q?: string }>;
 }) {
   const { locale } = await params;
   const filters = await searchParams;
@@ -113,7 +115,7 @@ export default async function TicketsPage({
     svc,
     profile,
     "id, ticket_number, title, created_by, status, priority, created_at, assigned_to, sla_breached, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, first_response_at, first_agent_response_at, metadata"
-  ).is("deleted_at", null);
+  ).is("deleted_at", null).is("archived_at", null);
 
   if (isStaff && filters.status && ["open", "in_progress", "pending_customer", "resolved", "closed"].includes(filters.status)) {
     staffTicketsQuery = staffTicketsQuery.eq("status", filters.status);
@@ -141,6 +143,7 @@ export default async function TicketsPage({
     ? await staffTicketsQuery.order("created_at", { ascending: false }).limit(100)
     : await getTicketsByRole(svc, profile, "id, ticket_number, title, created_by, status, priority, created_at, resolved_at")
         .is("deleted_at", null)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -165,8 +168,16 @@ export default async function TicketsPage({
   const newTicketPath = locale === "de" ? "/tickets/new" : `/${locale}/tickets/new`;
   const customerTickets = (tickets ?? []) as CustomerTicket[];
   const staffTickets = (tickets ?? []) as StaffTicket[];
-  const openCustomerTickets = customerTickets.filter((ticket) => !isResolved(ticket.status));
-  const resolvedCustomerTickets = customerTickets.filter((ticket) => isResolved(ticket.status));
+  const searchedCustomerTickets = customerTickets.filter((ticket) =>
+    matchesTicketQuery(filters.q, [
+      ...ticketRefTokens(ticket.ticket_number),
+      ticket.title,
+      ticket.status.replaceAll("_", " "),
+      ticket.priority,
+    ])
+  );
+  const openCustomerTickets = searchedCustomerTickets.filter((ticket) => !isResolved(ticket.status));
+  const resolvedCustomerTickets = searchedCustomerTickets.filter((ticket) => isResolved(ticket.status));
   const customerStageCounts = {
     received: customerTickets.filter((ticket) => ticket.status === "open").length,
     progress: customerTickets.filter((ticket) => ticket.status === "in_progress").length,
@@ -208,7 +219,18 @@ export default async function TicketsPage({
 
   const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const availableCategories = [...new Set(Object.values(aiCategoryMap).filter((value): value is string => Boolean(value)))].sort();
-  const visibleStaffTickets = staffTickets;
+  const visibleStaffTickets = staffTickets.filter((ticket) =>
+    matchesTicketQuery(filters.q, [
+      ...ticketRefTokens(ticket.ticket_number),
+      ticket.title,
+      companyContextByCreator[ticket.created_by]?.company_name,
+      companyContextByCreator[ticket.created_by]?.sector,
+      ticket.assigned_to ? assigneeById[ticket.assigned_to]?.full_name : null,
+      aiCategoryMap[ticket.id],
+      ticket.status.replaceAll("_", " "),
+      ticket.priority,
+    ])
+  );
 
   function ticketsFilterHref(next: { status?: string; priority?: string; sla?: string; category?: string; specialty?: string }) {
     const search = new URLSearchParams();
@@ -222,6 +244,7 @@ export default async function TicketsPage({
     if (sla) search.set("sla", sla);
     if (category) search.set("category", category);
     if (specialty) search.set("specialty", specialty);
+    if (filters.q) search.set("q", filters.q);
     const query = search.toString();
     const base = locale === "de" ? "/tickets" : `/${locale}/tickets`;
     return query ? `${base}?${query}` : base;
@@ -251,6 +274,8 @@ export default async function TicketsPage({
           </Link>
         )}
       </div>
+
+      <TicketSearch className="mb-5" />
 
       {(isCustomer || profile.role === "agent") && (
         <Card className="mb-5 p-4">

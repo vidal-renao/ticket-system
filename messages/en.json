@@ -95,7 +95,8 @@
     "admin": "Admin",
     "signOut": "Sign out",
     "home": "Home",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "history": "History"
   },
   "tickets": {
     "myTickets": "My Tickets",
