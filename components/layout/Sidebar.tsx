@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
-import { NotificationsMenu, type ShellNotification } from "./NotificationsMenu";
+import { NotificationsBell, type ShellNotification } from "./NotificationsBell";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 
 type NavKey =
@@ -111,19 +111,22 @@ export function Sidebar({
         className
       )}
     >
-      <Link
-        href={ROLE_HOME[role]}
-        onClick={onNavigate}
-        className="flex items-center gap-2.5 border-b border-[var(--color-surface-600)] px-5 py-5 transition-colors hover:bg-[var(--color-surface-800)]"
-      >
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-brand-500)] shadow-lg shadow-blue-950/30">
-          <Zap className="h-4 w-4 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">HelpDesk AI</p>
-          <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{role}</p>
-        </div>
-      </Link>
+      <div className="flex items-center gap-2 border-b border-[var(--color-surface-600)] px-3 py-3">
+        <Link
+          href={ROLE_HOME[role]}
+          onClick={onNavigate}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--color-surface-800)]"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-brand-500)] shadow-lg shadow-blue-950/30">
+            <Zap className="h-4 w-4 text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">HelpDesk AI</p>
+            <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{role}</p>
+          </div>
+        </Link>
+        <NotificationsBell notifications={notifications} unreadCount={unreadNotifications} align="left" />
+      </div>
 
       <nav aria-label="Main navigation" className="flex-1 overflow-y-auto space-y-0.5 px-3 py-4">
         {visibleItems.map((item) => {
@@ -161,8 +164,6 @@ export function Sidebar({
           );
         })}
       </nav>
-
-      <NotificationsMenu notifications={notifications} unreadCount={unreadNotifications} />
 
       <div className="border-t border-[var(--color-surface-600)] px-3 pb-2 pt-2">
         <button

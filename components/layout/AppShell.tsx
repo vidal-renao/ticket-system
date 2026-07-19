@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
 import { PageTransition } from "./PageTransition";
 import type { UserRole } from "@/lib/supabase/types";
-import type { ShellNotification } from "./NotificationsMenu";
-import { Bell, Menu, X, Zap } from "lucide-react";
+import { NotificationsBell, type ShellNotification } from "./NotificationsBell";
+import { Menu, X, Zap } from "lucide-react";
 import { ScrollToTop } from "./ScrollToTop";
 import { SessionTimeoutModal } from "./SessionTimeoutModal";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
@@ -165,18 +164,7 @@ export function AppShell({
               )}
             </div>
           </div>
-          <Link
-            href={locale === "de" ? "/inbox" : `/${locale}/inbox`}
-            aria-label="Notifications"
-            className="relative w-10 h-10 rounded-lg border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] flex items-center justify-center hover:bg-[var(--color-surface-800)] transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            {liveUnreadNotifications > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                {liveUnreadNotifications > 9 ? "9+" : liveUnreadNotifications}
-              </span>
-            )}
-          </Link>
+          <NotificationsBell notifications={liveNotifications} unreadCount={liveUnreadNotifications} align="right" />
         </div>
       </div>
 

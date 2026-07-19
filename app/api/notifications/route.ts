@@ -22,7 +22,7 @@ export async function GET() {
       .select("id, ticket_id, type, title, message, is_read, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(5),
+      .limit(20),
     svc
       .from("notifications")
       .select("id", { count: "exact", head: true })
@@ -55,7 +55,7 @@ export async function GET() {
   });
 }
 
-/** Mark all comment.public notifications as read for the current user. */
+/** Mark every unread notification as read for the current user ("Mark all read"). */
 export async function PATCH() {
   const supabase = await createClient();
   const {
@@ -71,7 +71,7 @@ export async function PATCH() {
     .from("notifications")
     .update({ is_read: true })
     .eq("user_id", user.id)
-    .eq("type", "comment.public");
+    .eq("is_read", false);
 
   return NextResponse.json({ ok: true });
 }
