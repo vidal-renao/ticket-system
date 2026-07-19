@@ -29,7 +29,7 @@ export function AdminStatusTabs() {
   }
 
   return (
-    <div className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] p-1">
+    <div aria-label="Ticket workflow stages" className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] p-1 pb-2 sm:pb-1">
       {TABS.map((tab) => {
         const isActive = current === tab.value;
         return (
@@ -37,6 +37,7 @@ export function AdminStatusTabs() {
             key={tab.value}
             type="button"
             onClick={() => setStatus(tab.value)}
+            aria-pressed={isActive}
             className={[
               "shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all",
               isActive

@@ -43,11 +43,12 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
         <Button
           size="sm"
           variant="secondary"
           onClick={() => openModal("agent")}
+          className="w-full whitespace-nowrap sm:w-auto"
         >
           <UserPlus className="w-3.5 h-3.5" />
           New Employee
@@ -56,6 +57,7 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
           size="sm"
           variant="secondary"
           onClick={() => openModal("customer")}
+          className="w-full whitespace-nowrap sm:w-auto"
         >
           <Building2 className="w-3.5 h-3.5" />
           New Company
@@ -66,6 +68,7 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
           onClick={handleSeedCategories}
           disabled={seeding}
           title="Add new IT categories (Email, VPN, M365, etc.)"
+          className="col-span-2 w-full whitespace-nowrap sm:w-auto"
         >
           <Tags className="w-3.5 h-3.5" />
           {seeding ? "Seeding…" : "Seed Categories"}

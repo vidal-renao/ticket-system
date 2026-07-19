@@ -170,3 +170,39 @@ There is no enforceable chain of custody from customer intake through specialist
 - Production role E2E: customer `TK-0068` creation was automatically classified as Software and assigned to the least-loaded matching `software` specialist; the agent saw only the assigned task, started it and submitted it for admin review; the admin approved it as resolved and moved the disposable test ticket to recoverable trash. Passed on 2026-07-18.
 - Production administration E2E: active/new/assigned/in-progress/waiting/ready/processed/trash views, single-ticket cleanup, team workload and the complete tenant user directory were exercised with authenticated demo roles.
 - Remaining external validation: automated two-tenant RLS integration suite against a disposable Supabase project.
+
+---
+
+# Active Specification: Responsive Administration Workspace
+
+Status: implemented; visual and CI validation pending
+Owner: Senior Software Development
+Started: 2026-07-19
+
+## Context
+
+Administrator account provisioning uses one modal from both the ticket operations page and user directory. The existing fixed, vertically centered panel is taller than short mobile viewports and clips its own form because the panel uses `overflow-hidden` without a scrollable content region. Administrative action rows and the user directory table also exceed narrow viewports.
+
+## Requirements
+
+1. Employee and company forms remain fully usable at 320 px width and short 667 px viewports.
+2. Modal header and actions remain visible while only the form body scrolls.
+3. Opening a modal locks background scroll, moves focus into the form, traps keyboard focus and supports Escape/explicit close.
+4. Every form control has a programmatic label and password visibility is keyboard accessible.
+5. Administrative header actions wrap without increasing document width.
+6. The mobile user directory presents readable cards with all edit and activation actions visible.
+7. Dense ticket operations use an explicit contained horizontal viewport rather than clipping content.
+8. Desktop density and the existing Swiss operations visual system remain intact.
+
+## Design
+
+- Treat account creation as an identity-provisioning dossier: one restrained signal-blue control line, concise operational copy and a two-column desktop field grid.
+- Render the mobile modal as a bottom sheet bounded by `100dvh`; use a flex column with a scrollable body and fixed header/footer.
+- Replace the user table below the medium breakpoint with action-complete directory cards; retain the dense table on larger screens.
+- Keep workflow tabs intentionally horizontally scrollable because their sequence is meaningful and preserve their active-state semantics with `aria-pressed`.
+
+## Validation
+
+- Pending: production-equivalent desktop and 390 x 667 mobile visual checks for both account types.
+- Pending: keyboard focus, Escape, background lock and internal-scroll verification.
+- Pending: ESLint, TypeScript, Vitest and production build.

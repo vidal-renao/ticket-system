@@ -39,6 +39,9 @@ All notable changes are documented here. This project follows a simple unrelease
 
 ### Product and design
 
+- Rebuilt employee/company provisioning as an accessible, viewport-bounded dialog with background lock, focus management, internal scrolling and fixed actions.
+- Reworked administration controls for narrow screens and replaced the clipped mobile user table with action-complete directory cards.
+- Contained dense ticket operations in an explicit horizontal viewport instead of allowing administrative controls to render off-screen.
 - Added a customer-to-specialist-to-admin chain of custody with an explicit **Ready for admin OK** gate.
 - Rebuilt the agent workspace as assigned-only stages and the admin console as new/assigned/in-progress/waiting/review/processed/trash queues.
 - Added tenant-wide administrator user search with Auth email, role, specialty/company and activation status.

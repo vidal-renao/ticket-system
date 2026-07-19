@@ -61,7 +61,7 @@ export default async function AdminUsersPage({
   }));
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:p-6">
       <div className="mb-6 flex items-center gap-2">
         <Users className="w-5 h-5 text-indigo-400" />
         <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">User Management</h1>
