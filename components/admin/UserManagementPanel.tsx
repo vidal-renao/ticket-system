@@ -126,21 +126,23 @@ export function UserManagementPanel({
 
   return (
     <div>
-      {/* ── Controls ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <div className="relative flex-1 min-w-[200px]">
+      {/* Directory controls */}
+      <div className="mb-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+        <div className="relative col-span-2 min-w-0 flex-1 sm:min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-text-muted)]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search users…"
+            aria-label="Search users"
             className={`${inputCls} pl-8 w-full`}
           />
         </div>
         <select
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value as FilterRole)}
-          className={inputCls}
+          aria-label="Filter users by role"
+          className={`${inputCls} w-full`}
         >
           <option value="all">All roles</option>
           <option value="admin">Admin</option>
@@ -151,16 +153,17 @@ export function UserManagementPanel({
         <button
           type="button"
           onClick={() => setSortAsc(!sortAsc)}
-          className={`${inputCls} flex items-center gap-1.5`}
+          aria-label={`Sort by name ${sortAsc ? "descending" : "ascending"}`}
+          className={`${inputCls} flex w-full items-center justify-center gap-1.5`}
         >
           {sortAsc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           Name
         </button>
-        <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => { setCreateType("agent"); setCreateOpen(true); }}>
+        <div className="col-span-2 grid grid-cols-2 gap-2 sm:ml-auto sm:flex sm:items-center">
+          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => { setCreateType("agent"); setCreateOpen(true); }}>
             <UserPlus className="w-3.5 h-3.5" /> New Employee
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => { setCreateType("customer"); setCreateOpen(true); }}>
+          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => { setCreateType("customer"); setCreateOpen(true); }}>
             <Building2 className="w-3.5 h-3.5" /> New Company
           </Button>
         </div>
@@ -170,9 +173,124 @@ export function UserManagementPanel({
         {filtered.length} of {users.length} users
       </p>
 
-      {/* ── Table ── */}
-      <div className="overflow-hidden rounded-xl border border-[var(--color-surface-600)]">
-        <table className="w-full text-sm">
+      {filtered.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-[var(--color-surface-600)] px-5 py-10 text-center">
+          <p className="text-sm font-medium text-[var(--color-text-secondary)]">No users match these filters</p>
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">Change the role filter or search for a different name, email or company.</p>
+        </div>
+      )}
+
+      {/* Mobile directory cards keep every action visible without horizontal scrolling. */}
+      <div className="space-y-3 md:hidden">
+        {filtered.map((u) => {
+          const isEditing = editingId === u.id;
+          const isSaving = savingId === u.id;
+          const isSelf = u.id === currentUserId;
+
+          return (
+            <article
+              key={u.id}
+              className={`rounded-2xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] p-4 shadow-sm shadow-black/20 ${!u.is_active ? "opacity-60" : ""}`}
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <PresenceAvatar
+                  name={u.full_name ?? "?"}
+                  avatarUrl={u.avatar_url}
+                  status={u.availability_status}
+                  size="sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                      {u.full_name ?? "—"}
+                    </h2>
+                    {isSelf && <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-300">You</span>}
+                  </div>
+                  <p className="mt-0.5 break-all font-mono text-[11px] text-[var(--color-text-muted)]">
+                    {u.email ?? u.id.slice(0, 8)}
+                  </p>
+                </div>
+              </div>
+
+              {isEditing && isAdmin ? (
+                <div className="mt-4 grid gap-3 rounded-xl border border-[var(--color-surface-700)] bg-[var(--color-surface-800)] p-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-[var(--color-text-secondary)]">Role</label>
+                    <select aria-label="Role" value={editRole} onChange={(e) => setEditRole(e.target.value)} className={`${inputCls} w-full`}>
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="agent">Agent</option>
+                      <option value="customer">Customer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-[var(--color-text-secondary)]">Specialty</label>
+                    <input
+                      value={editSpecialty}
+                      onChange={(e) => setEditSpecialty(e.target.value)}
+                      placeholder="Software, hardware, networking…"
+                      aria-label="Specialty"
+                      className={`${inputCls} w-full`}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Badge className={ROLE_COLORS[u.role] ?? ""}>{u.role}</Badge>
+                  <span className="rounded-lg border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-2 py-1 text-[11px] text-[var(--color-text-muted)]">
+                    {u.company_name ?? u.specialty ?? "No specialty"}
+                  </span>
+                  <span className={`ml-auto flex items-center gap-1 text-xs ${u.is_active !== false ? "text-green-400" : "text-[var(--color-text-muted)]"}`}>
+                    {u.is_active !== false ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                    {u.is_active !== false ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="mt-4 flex items-center gap-2 border-t border-[var(--color-surface-700)] pt-3">
+                  {isEditing ? (
+                    <>
+                      <Button size="sm" variant="secondary" className="flex-1" onClick={() => saveEdit(u)} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save changes"}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="flex-1" onClick={() => setEditingId(null)} disabled={isSaving}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="ghost" className="flex-1" onClick={() => startEdit(u)}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                      {!isSelf && (
+                        <Button
+                          size="sm"
+                          variant={u.is_active !== false ? "danger" : "secondary"}
+                          className="flex-1"
+                          onClick={() => toggleActive(u)}
+                          disabled={isSaving}
+                        >
+                          {isSaving
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : u.is_active !== false
+                              ? <><Trash2 className="h-3.5 w-3.5" /> Deactivate</>
+                              : <><CheckCircle2 className="h-3.5 w-3.5" /> Activate</>
+                          }
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      {/* Desktop directory table */}
+      <div className="hidden overflow-x-auto rounded-xl border border-[var(--color-surface-600)] md:block">
+        <table className="min-w-[760px] w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--color-surface-600)] bg-[var(--color-surface-800)]">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">User</th>

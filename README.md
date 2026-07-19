@@ -63,7 +63,7 @@ Read [ARCHITECTURE.md](./ARCHITECTURE.md), [DOMAIN.md](./DOMAIN.md), [SECURITY.m
 
 ## Local setup
 
-Requirements: Node.js 20+, a Supabase project and the required provider credentials.
+Requirements: Node.js 24, a Supabase project and the required provider credentials.
 
 ```bash
 npm ci

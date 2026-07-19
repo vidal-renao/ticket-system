@@ -252,8 +252,8 @@ export default async function AdminPage({
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:p-6">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 xl:flex-row">
         <div>
           <div className="mb-1 flex items-center gap-2">
             <Building2 className="h-5 w-5 text-indigo-400" aria-hidden="true" />
@@ -269,10 +269,10 @@ export default async function AdminPage({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:gap-3 xl:w-auto xl:justify-end">
           <Link
             href={locale === "de" ? "/admin/users" : `/${locale}/admin/users`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] hover:border-indigo-500/30 hover:text-indigo-400 transition-colors"
+            className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[var(--color-surface-600)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] transition-colors hover:border-indigo-500/30 hover:text-indigo-300 sm:flex-none"
           >
             <UserCog className="h-3.5 w-3.5" />
             Manage Users
@@ -365,8 +365,8 @@ export default async function AdminPage({
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">Try widening the filters or switching the ticket status tab.</p>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--color-surface-600)] shadow-sm shadow-black/20">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-[var(--color-surface-600)] shadow-sm shadow-black/20">
+          <table className="min-w-[760px] w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--color-surface-600)] bg-[var(--color-surface-800)]">
                 <th className="w-24 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Ref</th>
