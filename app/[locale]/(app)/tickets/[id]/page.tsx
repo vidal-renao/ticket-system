@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
 import { AITriagePanel } from "@/components/ai/AITriagePanel";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
-import { SlaCountdown, CustomerReopenButton } from "@/components/tickets/SlaCountdown";
+import { SlaCountdown } from "@/components/tickets/SlaCountdown";
+import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
+import { effectivePresence } from "@/lib/presence";
+import { getLastSeenMap } from "@/lib/presence-server";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 import { AlertTriangle, Clock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
@@ -92,15 +95,22 @@ export default async function TicketDetailPage({
       .maybeSingle(),
   ]);
 
-  // For customers: check if any staff is online to decide whether to show AI chat
-  const onlineAgentCount = !isStaff && ticket.organization_id
-    ? (await svc
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("organization_id", ticket.organization_id)
-        .in("role", ["agent", "manager", "admin"])
-        .eq("availability_status", "online")).count ?? 0
-    : null;
+  // For customers: check if any staff is genuinely online (heartbeat-verified)
+  // to decide whether to show the AI chat fallback.
+  let onlineAgentCount: number | null = null;
+  if (!isStaff && ticket.organization_id) {
+    const { data: staffRows } = await svc
+      .from("profiles")
+      .select("id, availability_status")
+      .eq("organization_id", ticket.organization_id)
+      .in("role", ["agent", "manager", "admin"])
+      .in("availability_status", ["online", "busy"]);
+    const staffIds = ((staffRows ?? []) as { id: string }[]).map((row) => row.id);
+    const staffLastSeen = await getLastSeenMap(svc, staffIds);
+    onlineAgentCount = ((staffRows ?? []) as { id: string; availability_status: string | null }[]).filter(
+      (row) => effectivePresence(row.availability_status, staffLastSeen[row.id]) === "online"
+    ).length;
+  }
 
   const companyName =
     creatorCompanyInfo?.company_name?.trim() ||
@@ -112,7 +122,7 @@ export default async function TicketDetailPage({
   const creatorInitials = getInitials(creatorName);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-mono text-[var(--color-text-muted)]">
@@ -178,13 +188,14 @@ export default async function TicketDetailPage({
                 <p className="text-sm font-medium text-[var(--color-text-secondary)]">Chain of custody</p>
               </CardHeader>
               <CardContent>
-                <div className="mb-4 grid grid-cols-5 gap-1 text-center text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+                <div className="mb-4 grid grid-cols-3 sm:grid-cols-6 gap-1 text-center text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
                   {[
                     ["Intake", true],
                     ["Routed", Boolean(ticket.assigned_to)],
                     ["Execution", ticket.status !== "open"],
                     ["Admin OK", ticket.review_status === "pending" || ticket.review_status === "approved"],
                     ["Resolved", ticket.status === "resolved" || ticket.status === "closed"],
+                    ["Customer OK", ticket.status === "closed"],
                   ].map(([label, active]) => (
                     <div key={String(label)}>
                       <div className={`mb-2 h-1 rounded-full ${active ? "bg-[var(--color-signal-blue)]" : "bg-[var(--color-surface-600)]"}`} />
@@ -286,14 +297,11 @@ export default async function TicketDetailPage({
             />
           )}
 
-          {/* Customer reopen within 48h */}
+          {/* Company sign-off: confirm the resolution or reopen within 48h */}
           {!isStaff && ticket.status === "resolved" && (
-            <Card>
-              <CardContent className="py-3">
-                <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">
-                  Issue not resolved?
-                </p>
-                <CustomerReopenButton
+            <Card className="border-emerald-500/25">
+              <CardContent className="py-4">
+                <CustomerResolutionActions
                   ticketId={ticket.id}
                   resolvedAt={ticket.resolved_at}
                 />

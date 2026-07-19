@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
 import { canDecideTicketReview, canRequestTicketReview, type TicketReviewStatus } from "@/lib/ticket-workflow";
-import { createTicketNotification } from "@/lib/notifications";
+import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
 
 type ReviewAction = "request" | "approve" | "changes";
@@ -93,6 +93,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     old_values: { review_status: reviewStatus, status: ticket.status },
     new_values: { review_status: updated.review_status, status: updated.status },
   });
+
+  if (body.action === "request") {
+    // Administrators must know work is waiting for their OK.
+    await notifyOrgManagers(profile.organization_id, {
+      ticketId: ticket.id,
+      type: "ticket.review_requested",
+      title: "Ready for admin OK",
+      message: `${formatTicketNumber(ticket.ticket_number)}: ${ticket.title} was submitted for review.`,
+    });
+  }
 
   const recipientId = body.action === "request" ? null : ticket.assigned_to;
   if (recipientId) {

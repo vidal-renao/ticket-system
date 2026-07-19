@@ -4,6 +4,23 @@ All notable changes are documented here. This project follows a simple unrelease
 
 ## Unreleased
 
+### Added
+
+- Heartbeat-verified presence: the app shell pings `/api/profile/heartbeat` every minute and every "online/busy" status older than 3 minutes is displayed as offline (`lib/presence.ts`, migration `docs/migration_presence_heartbeat.sql`). Stale statuses can no longer masquerade as connected.
+- Team member profile page (`/team/[id]`) for managers/admins: live presence, last-seen, current in-progress task, workload stats and the full active queue.
+- Admin cockpit drill-down: the Open volume, Critical and SLA breached cards open the filtered ticket list; the Team online card names who is connected and opens the online-only team view (`/team?presence=online`); Team status rows link to each member profile.
+- Customer resolution sign-off: after the administrator certifies work as resolved, the company confirms ("all good" → closed, audited as `ticket.customer_confirmed`) or reopens within 48h; unanswered resolutions auto-close after 48h via the SLA cron (`ticket.auto_closed`).
+- Administrator notifications when an agent submits work for review and when a new ticket lands unrouted in the intake queue.
+
+### Changed
+
+- Inactivity sign-out extended to 30 minutes with the 2-minute warning countdown retained; the timed-out profile is marked offline before redirecting to login.
+- Manager/admin dashboard KPI cards deep-link to the corresponding filtered admin views; the team availability panel shows heartbeat-verified presence and links to member profiles.
+- Ticket chain of custody now displays six stages ending in "Customer OK".
+- App shell navigation switches to the sidebar at `lg` (1024px) instead of `xl`, the mobile bell opens the inbox, and main pages use tighter padding on small screens.
+- The AI support chat fallback for customers now uses heartbeat-verified agent presence.
+- Team directory shows real presence with last-seen labels, sorts online members first and fixes the Companies section never rendering (customers were excluded from the query).
+
 ### Security
 
 - Restricted agents to explicitly assigned tickets across RLS, pages, inbox, comments and mutations; removed self-assignment.

@@ -36,10 +36,68 @@ export async function GET(request: Request) {
     if (assessment.breached) breached += 1;
   }
 
+  const autoClosed = await autoCloseConfirmedResolutions(svc);
+
   return NextResponse.json({
     ok: true,
     assessed,
     breached,
+    autoClosed,
   });
+}
+
+const AUTO_CLOSE_AFTER_HOURS = 48;
+
+/**
+ * Resolved tickets the customer neither confirmed nor reopened within the 48h
+ * window are closed automatically, mirroring the customer reopen window so
+ * tickets never linger in `resolved` forever.
+ */
+async function autoCloseConfirmedResolutions(
+  svc: ReturnType<typeof createServiceClientStatic>
+): Promise<number> {
+  const cutoff = new Date(Date.now() - AUTO_CLOSE_AFTER_HOURS * 3_600_000).toISOString();
+  const now = new Date().toISOString();
+
+  const { data: stale } = await svc
+    .from("tickets")
+    .select("id, organization_id")
+    .eq("status", "resolved")
+    .is("deleted_at", null)
+    .not("resolved_at", "is", null)
+    .lt("resolved_at", cutoff)
+    .limit(200);
+
+  if (!stale?.length) return 0;
+
+  const ids = stale.map((ticket) => ticket.id);
+  const { error } = await svc
+    .from("tickets")
+    .update({ status: "closed", closed_at: now })
+    .in("id", ids)
+    .eq("status", "resolved")
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("[cron/sla] auto-close failed", error.message);
+    return 0;
+  }
+
+  await Promise.all(
+    stale.map((ticket) =>
+      svc.from("audit_logs").insert({
+        organization_id: ticket.organization_id,
+        actor_id: null,
+        actor_role: "system",
+        action: "ticket.auto_closed",
+        resource_type: "ticket",
+        resource_id: ticket.id,
+        old_values: { status: "resolved" },
+        new_values: { status: "closed", closed_at: now },
+      })
+    )
+  );
+
+  return ids.length;
 }
 

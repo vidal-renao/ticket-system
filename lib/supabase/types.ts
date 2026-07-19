@@ -74,6 +74,7 @@ export interface Database {
           team_id: string | null;
           specialty: string | null;
           availability_status: AvailabilityStatus | null;
+          last_seen_at: string | null;
           created_at: string;
           updated_at: string;
         };

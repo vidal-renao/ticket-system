@@ -27,6 +27,8 @@ import {
   UserCog,
 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
+import { effectivePresence } from "@/lib/presence";
+import { getLastSeenMap } from "@/lib/presence-server";
 
 export const dynamic = "force-dynamic";
 
@@ -212,7 +214,16 @@ export default async function AdminPage({
   const criticalCount = filtered.filter((ticket) => ticket.priority === "critical").length;
   const breachedCount = filtered.filter((ticket) => ticket.sla_breached).length;
   const staffEntries = profiles.filter((entry) => entry.role === "agent");
-  const onlineStaffCount = staffEntries.filter((entry) => entry.availability_status === "online").length;
+
+  // Presence is only trusted when backed by a recent heartbeat, so "Team
+  // online" reflects who is genuinely connected right now.
+  const lastSeenMap = await getLastSeenMap(svc, staffEntries.map((entry) => entry.id));
+  const staffWithPresence = staffEntries.map((entry) => ({
+    ...entry,
+    presence: effectivePresence(entry.availability_status, lastSeenMap[entry.id]),
+  }));
+  const onlineStaff = staffWithPresence.filter((entry) => entry.presence !== "offline");
+  const onlineStaffCount = onlineStaff.length;
   const queueByAgent = Object.fromEntries(
     staffEntries.map((entry) => [
       entry.id,
@@ -234,6 +245,9 @@ export default async function AdminPage({
       filters.sla ||
       filters.sort
   );
+
+  const adminBase = locale === "de" ? "/admin" : `/${locale}/admin`;
+  const teamBase = locale === "de" ? "/team" : `/${locale}/team`;
 
   function pageHref(page: number) {
     const search = new URLSearchParams();
@@ -286,65 +300,91 @@ export default async function AdminPage({
 
       <section className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-[1.6fr_1fr]">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Open volume</p>
-            <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">{openCount}</p>
-          </Card>
-          <Card className="border-red-500/20 bg-red-950/20 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wider text-red-200/80">Critical</p>
-              <Flame className="h-4 w-4 text-red-300" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-red-200">{criticalCount}</p>
-          </Card>
-          <Card className="border-amber-500/20 bg-amber-950/20 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wider text-amber-200/80">SLA breached</p>
-              <ShieldAlert className="h-4 w-4 text-amber-300" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-amber-200">{breachedCount}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Team online</p>
-              <Users className="h-4 w-4 text-emerald-300" />
-            </div>
-            <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">
-              {onlineStaffCount}
-              <span className="ml-1 text-base font-medium text-[var(--color-text-muted)]">/ {staffEntries.length}</span>
-            </p>
-          </Card>
+          <Link href={`${adminBase}?status=open`} aria-label={`Open volume: ${openCount} tickets — view list`}>
+            <Card hover className="h-full p-4 transition-colors hover:border-indigo-500/40">
+              <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Open volume</p>
+              <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">{openCount}</p>
+              <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">View list →</p>
+            </Card>
+          </Link>
+          <Link href={`${adminBase}?priority=critical`} aria-label={`Critical: ${criticalCount} tickets — view list`}>
+            <Card hover className="h-full border-red-500/20 bg-red-950/20 p-4 transition-colors hover:border-red-400/40">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wider text-red-200/80">Critical</p>
+                <Flame className="h-4 w-4 text-red-300" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-red-200">{criticalCount}</p>
+              <p className="mt-1 text-[11px] text-red-200/60">View list →</p>
+            </Card>
+          </Link>
+          <Link href={`${adminBase}?sla=breached`} aria-label={`SLA breached: ${breachedCount} tickets — view list`}>
+            <Card hover className="h-full border-amber-500/20 bg-amber-950/20 p-4 transition-colors hover:border-amber-400/40">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wider text-amber-200/80">SLA breached</p>
+                <ShieldAlert className="h-4 w-4 text-amber-300" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-amber-200">{breachedCount}</p>
+              <p className="mt-1 text-[11px] text-amber-200/60">View list →</p>
+            </Card>
+          </Link>
+          <Link href={`${teamBase}?presence=online`} aria-label={`Team online: ${onlineStaffCount} of ${staffEntries.length} — see who is connected`}>
+            <Card hover className="h-full p-4 transition-colors hover:border-emerald-500/40">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wider text-[var(--color-text-muted)]">Team online</p>
+                <Users className="h-4 w-4 text-emerald-300" />
+              </div>
+              <p className="mt-2 text-3xl font-semibold text-[var(--color-text-primary)]">
+                {onlineStaffCount}
+                <span className="ml-1 text-base font-medium text-[var(--color-text-muted)]">/ {staffEntries.length}</span>
+              </p>
+              <p className="mt-1 truncate text-[11px] text-[var(--color-text-muted)]">
+                {onlineStaff.length
+                  ? onlineStaff.slice(0, 3).map((agent) => (agent.full_name ?? "Agent").split(" ")[0]).join(", ") + (onlineStaff.length > 3 ? ` +${onlineStaff.length - 3}` : "")
+                  : "Nobody connected"}
+              </p>
+            </Card>
+          </Link>
         </div>
 
         <Card className="p-4">
           <div className="mb-4 flex items-center gap-2">
             <BriefcaseBusiness className="h-4 w-4 text-indigo-300" />
             <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Team status</h2>
+            <Link href={teamBase} className="ml-auto text-xs text-indigo-300 transition-colors hover:text-indigo-200">
+              View all
+            </Link>
           </div>
           <div className="space-y-3">
-            {staffEntries.slice(0, 5).map((agent) => (
-              <div key={agent.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-3">
-                  <PresenceAvatar
-                    name={agent.full_name?.trim() || "Agent"}
-                    status={agent.availability_status}
-                    queueCount={queueByAgent[agent.id] ?? 0}
-                    size="sm"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
-                      {agent.full_name?.trim() || "Agent"}
-                    </p>
-                    <p className="truncate text-xs text-[var(--color-text-muted)]">
-                      {agent.specialty?.trim() || "General support"}
-                    </p>
+            {[...staffWithPresence]
+              .sort((a, b) => Number(b.presence !== "offline") - Number(a.presence !== "offline"))
+              .slice(0, 5)
+              .map((agent) => (
+                <Link
+                  key={agent.id}
+                  href={`${teamBase}/${agent.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-3 py-2.5 transition-colors hover:border-indigo-500/30"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <PresenceAvatar
+                      name={agent.full_name?.trim() || "Agent"}
+                      status={agent.presence}
+                      queueCount={queueByAgent[agent.id] ?? 0}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                        {agent.full_name?.trim() || "Agent"}
+                      </p>
+                      <p className="truncate text-xs text-[var(--color-text-muted)]">
+                        {agent.specialty?.trim() || "General support"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <Badge className="border-[var(--color-surface-500)] bg-[var(--color-surface-700)] text-[var(--color-text-secondary)]">
-                  {queueByAgent[agent.id] ?? 0} in queue
-                </Badge>
-              </div>
-            ))}
+                  <Badge className="border-[var(--color-surface-500)] bg-[var(--color-surface-700)] text-[var(--color-text-secondary)]">
+                    {queueByAgent[agent.id] ?? 0} in queue
+                  </Badge>
+                </Link>
+              ))}
             {staffEntries.length === 0 && (
               <p className="text-sm text-[var(--color-text-muted)]">No agents configured yet.</p>
             )}

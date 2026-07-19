@@ -94,7 +94,7 @@ export default async function QueuePage({ params }: { params: Promise<{ locale: 
   const breachedCount = tickets.filter((ticket) => ticket.sla_breached).length;
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-signal-blue)]">Specialist workspace</p>

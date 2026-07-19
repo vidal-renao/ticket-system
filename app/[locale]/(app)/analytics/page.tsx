@@ -38,7 +38,7 @@ export default async function AnalyticsPage({
   // Guard: no org → nothing to show yet
   if (!profile.organization_id) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">{t("title")}</h1>
         <p className="text-sm text-[var(--color-text-muted)]">{t("noData")}</p>
       </div>
@@ -166,7 +166,7 @@ export default async function AnalyticsPage({
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t("title")}</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{t("subtitle")}</p>

@@ -16,6 +16,13 @@ export function SessionTimeoutModal({ locale }: Props) {
   const supabase = createClient();
 
   const handleTimeout = useCallback(async () => {
+    // Mark the profile offline first so presence never lingers after an
+    // inactivity sign-out. sendBeacon survives the page navigation below.
+    try {
+      navigator.sendBeacon("/api/profile/offline");
+    } catch {
+      /* presence cleanup is best-effort */
+    }
     await supabase.auth.signOut();
     const loginPath = locale === "de" ? "/login" : `/${locale}/login`;
     window.location.href = loginPath;

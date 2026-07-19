@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
@@ -10,6 +11,7 @@ import type { ShellNotification } from "./NotificationsMenu";
 import { Bell, Menu, X, Zap } from "lucide-react";
 import { ScrollToTop } from "./ScrollToTop";
 import { SessionTimeoutModal } from "./SessionTimeoutModal";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -41,6 +43,10 @@ export function AppShell({
   const supabase = createClient();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Liveness heartbeat: keeps profiles.last_seen_at fresh so presence shown
+  // across the app reflects who is actually connected.
+  usePresenceHeartbeat();
   const [liveNotifications, setLiveNotifications] = useState(notifications);
   const [liveUnreadNotifications, setLiveUnreadNotifications] = useState(unreadNotifications);
   const [liveInboxUnread, setLiveInboxUnread] = useState(inboxUnreadCount);
@@ -138,7 +144,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-surface-950)]">
-      <div className="xl:hidden fixed top-0 inset-x-0 z-40 border-b border-[var(--color-surface-600)] bg-[var(--color-surface-900)]/95 backdrop-blur">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 border-b border-[var(--color-surface-600)] bg-[var(--color-surface-900)]/95 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3">
           <button
             type="button"
@@ -159,14 +165,18 @@ export function AppShell({
               )}
             </div>
           </div>
-          <div className="relative w-10 h-10 rounded-lg border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] flex items-center justify-center">
+          <Link
+            href={locale === "de" ? "/inbox" : `/${locale}/inbox`}
+            aria-label="Notifications"
+            className="relative w-10 h-10 rounded-lg border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] flex items-center justify-center hover:bg-[var(--color-surface-800)] transition-colors"
+          >
             <Bell className="w-4 h-4" />
             {liveUnreadNotifications > 0 && (
               <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-full bg-indigo-500 text-white text-[10px] font-semibold flex items-center justify-center">
                 {liveUnreadNotifications > 9 ? "9+" : liveUnreadNotifications}
               </span>
             )}
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -174,7 +184,7 @@ export function AppShell({
         <button
           type="button"
           aria-label="Close navigation overlay"
-          className="xl:hidden fixed inset-0 z-30 bg-black/60"
+          className="lg:hidden fixed inset-0 z-30 bg-black/60"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
@@ -192,11 +202,11 @@ export function AppShell({
         onSignOut={handleSignOut}
         onGoHome={handleGoHome}
         onNavigate={() => setMobileMenuOpen(false)}
-        className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 xl:static xl:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 lg:static lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       />
-      <main className="flex-1 overflow-y-auto pt-16 xl:pt-0 min-w-0">
+      <main className="flex-1 overflow-y-auto pt-16 lg:pt-0 min-w-0">
         <PageTransition>{children}</PageTransition>
       </main>
       <ScrollToTop />

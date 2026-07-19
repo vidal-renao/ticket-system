@@ -111,7 +111,7 @@ export default async function SettingsPage({
     : "—";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">{t("title")}</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">{t("subtitle")}</p>

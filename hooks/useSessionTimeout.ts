@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const TIMEOUT_MS = 15 * 60 * 1000;
-const WARNING_MS =  2 * 60 * 1000;
+// Sessions are never eternal: 30 minutes without user activity signs the
+// session out for every role (admin, company, agent). A countdown warning is
+// shown during the final 2 minutes so active users can extend.
+const TIMEOUT_MS = 30 * 60 * 1000;
+const WARNING_MS = 2 * 60 * 1000;
 
 const ACTIVITY_EVENTS = [
   "mousemove",

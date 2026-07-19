@@ -7,7 +7,7 @@ import { getCurrentProfile } from "@/lib/authz";
 import { ACTIVE_TICKET_STATUSES, legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
-import { createTicketNotification } from "@/lib/notifications";
+import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
 import { sendEmail, ticketEmailSubject } from "@/lib/email";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
 import { inferTicketCategory, selectSpecialistAgent, type RoutingCandidate } from "@/lib/ticket-routing";
@@ -116,6 +116,15 @@ export async function POST(request: Request) {
       type: "ticket.assigned",
       title: "Ticket assigned",
       message: `${formatTicketNumber(ticket.ticket_number)} was assigned to you.`,
+    });
+  } else {
+    // No matching specialist: the ticket sits in the administrator intake
+    // queue, so administrators must be told there is unrouted work.
+    await notifyOrgManagers(profile.organization_id, {
+      ticketId: ticket.id,
+      type: "ticket.unassigned",
+      title: "Ticket needs routing",
+      message: `${formatTicketNumber(ticket.ticket_number)}: ${ticket.title} has no matching specialist and awaits manual assignment.`,
     });
   }
 

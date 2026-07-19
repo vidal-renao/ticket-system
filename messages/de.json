@@ -150,7 +150,13 @@
     "messagesSection": "Nachrichten",
     "internalSection": "Interne Notizen",
     "noMessages": "Noch keine Nachrichten",
-    "noInternalNotes": "Keine internen Notizen"
+    "noInternalNotes": "Keine internen Notizen",
+    "confirmTitle": "Alles gelöst?",
+    "confirmHint": "Bestätigen Sie die Lösung, um das Ticket zu schliessen, oder öffnen Sie es erneut, falls das Problem weiterhin besteht.",
+    "confirmButton": "Bestätigen — alles in Ordnung",
+    "confirmDone": "Danke! Ticket geschlossen.",
+    "reopenHint": "Problem nicht gelöst?",
+    "autoCloseNote": "Ohne Rückmeldung wird das Ticket 48h nach der Lösung automatisch geschlossen."
   },
   "aiChat": {
     "title": "KI-Support-Assistent",
@@ -300,7 +306,8 @@
     "aiBasedOn": "Basierend auf {count} analysierten Anfragen",
     "byCategory": "Nach Kategorie",
     "teamAvailability": "Team-Verfügbarkeit",
-    "noData": "Noch keine Daten"
+    "noData": "Noch keine Daten",
+    "viewAll": "Alle anzeigen"
   },
   "landing": {
     "heroLabel": "KI-gestützter Helpdesk für Schweizer KMU",

@@ -181,7 +181,8 @@
     "aiBasedOn": "Basado en {count} tickets analizados",
     "byCategory": "Por Categoría",
     "teamAvailability": "Disponibilidad del Equipo",
-    "noData": "Sin datos aún"
+    "noData": "Sin datos aún",
+    "viewAll": "Ver todos"
   },
   "ticket": {
     "description": "Descripción",
@@ -195,7 +196,13 @@
     "messagesSection": "Mensajes",
     "internalSection": "Notas internas",
     "noMessages": "Aún no hay mensajes",
-    "noInternalNotes": "Sin notas internas"
+    "noInternalNotes": "Sin notas internas",
+    "confirmTitle": "¿Todo resuelto?",
+    "confirmHint": "Confirma la solución para cerrar el ticket, o reábrelo si el problema persiste.",
+    "confirmButton": "Confirmar — todo correcto",
+    "confirmDone": "¡Gracias! Ticket cerrado.",
+    "reopenHint": "¿No está resuelto?",
+    "autoCloseNote": "Sin respuesta, el ticket se cierra automáticamente 48h después de la resolución."
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",

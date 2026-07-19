@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { formatTicketRef } from "@/lib/utils";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
+import { effectivePresence } from "@/lib/presence";
+import { getLastSeenMap } from "@/lib/presence-server";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +100,7 @@ async function AdminDashboard({
 
   if (!orgId) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">
           {t("title")}
         </h1>
@@ -156,13 +158,33 @@ async function AdminDashboard({
       .in("status", ["open", "in_progress"]),
     svc
       .from("profiles")
-      .select("full_name, role, availability_status, specialty")
+      .select("id, full_name, role, availability_status, specialty")
       .eq("organization_id", orgId)
       .in("role", ["agent", "manager"])
       .eq("is_active", true)
       .order("availability_status", { ascending: false })
       .limit(8),
   ]);
+
+  // Presence backed by the liveness heartbeat: stale "online" flags are
+  // downgraded so the dashboard only shows people actually connected.
+  const teamLastSeen = await getLastSeenMap(
+    svc,
+    ((teamMembers ?? []) as { id: string }[]).map((member) => member.id)
+  );
+  const teamWithPresence = ((teamMembers ?? []) as {
+    id: string;
+    full_name: string | null;
+    role: string;
+    availability_status: string | null;
+    specialty: string | null;
+  }[])
+    .map((member) => ({
+      ...member,
+      presence: effectivePresence(member.availability_status, teamLastSeen[member.id]),
+    }))
+    .sort((a, b) => Number(b.presence !== "offline") - Number(a.presence !== "offline"));
+  const teamOnlineCount = teamWithPresence.filter((member) => member.presence !== "offline").length;
 
   const priorityCounts: Record<string, number> = {};
   for (const row of priorityStats ?? []) {
@@ -178,7 +200,7 @@ async function AdminDashboard({
   const aiTotal = 0;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
           {t("title")}
@@ -193,26 +215,26 @@ async function AdminDashboard({
           icon={<TicketIcon className="w-5 h-5 text-indigo-400" />}
           label={t("openTickets")}
           value={totalOpen ?? 0}
-          href={`${prefix}/queue`}
+          href={`${prefix}/admin`}
         />
         <KPICard
           icon={<AlertCircle className="w-5 h-5 text-red-400" />}
           label={t("critical")}
           value={totalCritical ?? 0}
-          href={`${prefix}/queue`}
+          href={`${prefix}/admin?priority=critical`}
           alert={(totalCritical ?? 0) > 0}
         />
         <KPICard
           icon={<CheckCircle2 className="w-5 h-5 text-green-400" />}
           label={t("resolved")}
           value={totalResolved ?? 0}
-          href={`${prefix}/tickets`}
+          href={`${prefix}/admin?stage=processed`}
         />
         <KPICard
           icon={<ShieldAlert className="w-5 h-5 text-amber-400" />}
           label={t("slaBreached")}
           value={slaBreached ?? 0}
-          href={`${prefix}/tickets`}
+          href={`${prefix}/admin?sla=breached`}
           alert={(slaBreached ?? 0) > 0}
         />
       </div>
@@ -282,7 +304,7 @@ async function AdminDashboard({
             </CardContent>
           </Card>
 
-          {/* Team availability */}
+          {/* Team availability — heartbeat-verified presence */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -290,28 +312,38 @@ async function AdminDashboard({
                 <span className="text-sm font-medium text-[var(--color-text-secondary)]">
                   {t("teamAvailability")}
                 </span>
+                <span className="text-xs text-[var(--color-text-muted)]">
+                  · {teamOnlineCount} online
+                </span>
+                <Link
+                  href={`${prefix}/team?presence=online`}
+                  className="ml-auto text-xs text-indigo-300 hover:text-indigo-200 transition-colors"
+                >
+                  {t("viewAll")}
+                </Link>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {(teamMembers ?? []).length === 0 && (
+              {teamWithPresence.length === 0 && (
                 <p className="px-5 py-4 text-sm text-[var(--color-text-muted)]">
                   {t("noData")}
                 </p>
               )}
-              {(teamMembers ?? []).map((member, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 px-5 py-2.5 ${
-                    i < (teamMembers ?? []).length - 1
+              {teamWithPresence.map((member, i) => (
+                <Link
+                  key={member.id}
+                  href={`${prefix}/team/${member.id}`}
+                  className={`flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-[var(--color-surface-800)] ${
+                    i < teamWithPresence.length - 1
                       ? "border-b border-[var(--color-surface-700)]"
                       : ""
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${
-                      member.availability_status === "online"
+                      member.presence === "online"
                         ? "bg-emerald-400"
-                        : member.availability_status === "busy"
+                        : member.presence === "busy"
                         ? "bg-orange-400"
                         : "bg-slate-500"
                     }`}
@@ -320,22 +352,22 @@ async function AdminDashboard({
                     {member.full_name ?? "—"}
                   </span>
                   {member.specialty && (
-                    <span className="text-xs text-[var(--color-text-muted)] capitalize">
+                    <span className="text-xs text-[var(--color-text-muted)] capitalize hidden sm:inline">
                       {member.specialty}
                     </span>
                   )}
                   <span
                     className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      member.availability_status === "online"
+                      member.presence === "online"
                         ? "bg-emerald-500/10 text-emerald-400"
-                        : member.availability_status === "busy"
+                        : member.presence === "busy"
                         ? "bg-orange-500/10 text-orange-400"
                         : "bg-slate-500/10 text-slate-400"
                     }`}
                   >
-                    {member.availability_status ?? "offline"}
+                    {member.presence}
                   </span>
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>
@@ -468,7 +500,7 @@ async function AgentDashboard({
     ]);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
           {t("title")}
@@ -626,7 +658,7 @@ async function CustomerDashboard({
     ]);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
           {t("title")}
