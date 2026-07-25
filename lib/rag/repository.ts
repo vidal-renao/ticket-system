@@ -1,15 +1,16 @@
+import "server-only";
+
 import type {
   KnowledgeChunk,
   KnowledgeDocument,
   KnowledgeDocumentVersion,
   KnowledgeSource,
   RetrievalResult,
-  TrustedOrganizationContext,
 } from "@/lib/rag/domain";
+import type { TrustedOrganizationContext } from "@/lib/rag/context.server";
 import { KnowledgeRepositoryError } from "@/lib/rag/domain";
 import {
   retrievalRequestSchema,
-  trustedOrganizationContextSchema,
   type RetrievalRequest,
 } from "@/lib/rag/schemas";
 
@@ -52,11 +53,7 @@ export class KnowledgeRepository {
     context: TrustedOrganizationContext,
     private readonly adapter: KnowledgeDataAdapter
   ) {
-    const parsed = trustedOrganizationContextSchema.safeParse(context);
-    if (!parsed.success) {
-      throw new KnowledgeRepositoryError("INVALID_CONTEXT", "Trusted organization context is invalid.");
-    }
-    this.context = parsed.data;
+    this.context = context;
   }
 
   listSources(): Promise<KnowledgeSource[]> {
@@ -115,4 +112,3 @@ export class KnowledgeRepository {
     }
   }
 }
-

@@ -16,7 +16,9 @@ export interface CurrentProfile {
   availability_status?: AvailabilityStatus | null;
 }
 
-export function isStaffRole(role: string | null | undefined): role is UserRole {
+export function isStaffRole(
+  role: string | null | undefined
+): role is Exclude<UserRole, "customer"> {
   return role === "agent" || role === "manager" || role === "admin";
 }
 

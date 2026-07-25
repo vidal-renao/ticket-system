@@ -23,12 +23,6 @@ export type SanitizationState = (typeof SANITIZATION_STATES)[number];
 export type EmbeddingState = (typeof EMBEDDING_STATES)[number];
 export type KnowledgeSourceType = (typeof KNOWLEDGE_SOURCE_TYPES)[number];
 
-export interface TrustedOrganizationContext {
-  readonly organizationId: string;
-  readonly actorId: string;
-  readonly actorRole: "agent" | "manager" | "admin";
-}
-
 export interface KnowledgeSource {
   id: string;
   organizationId: string;
@@ -116,4 +110,3 @@ export class KnowledgeRepositoryError extends Error {
     this.name = "KnowledgeRepositoryError";
   }
 }
-

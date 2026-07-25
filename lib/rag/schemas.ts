@@ -9,12 +9,6 @@ import {
 const uuid = z.string().uuid();
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/);
 
-export const trustedOrganizationContextSchema = z.object({
-  organizationId: uuid,
-  actorId: uuid,
-  actorRole: z.enum(["agent", "manager", "admin"]),
-}).strict();
-
 export const knowledgeSourceSchema = z.object({
   id: uuid,
   organizationId: uuid,
@@ -100,4 +94,3 @@ export const retrievalRequestSchema = z.object({
 }).strict();
 
 export type RetrievalRequest = z.infer<typeof retrievalRequestSchema>;
-
