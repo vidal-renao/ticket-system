@@ -8,3 +8,5 @@ Rollback disables feature flags and workers, preserves audit/run state, stops ne
 
 Stop conditions include any tenant-boundary failure, fabricated citation, approval bypass, unexplained destructive effect, migration inconsistency, unacceptable provider data processing, runaway cost or inability to correlate actions. The disabled GitHub Audit workflow (ID 294419190) is not part of rollout and remains disabled.
 
+Phase 4A must run first on a Supabase Preview Branch following `docs/runbooks/rag-schema-migration.md`. Rollback initially disables all v2 consumers; because v2 has no production consumer or backfill, objects may be removed only in Preview after evidence export and dependency inspection. Production direct application is prohibited.
+

@@ -20,3 +20,11 @@ Use UUIDs, UTC timestamps, constrained enums/checks and append-only event/audit 
 
 Every RLS policy derives organization membership from `auth.uid()`. Service-role queries additionally require explicit organization predicates. Storage paths are tenant-scoped and signed.
 
+## Phase 4A realized subset
+
+The implemented additive names are `rag_knowledge_sources`, `rag_knowledge_documents`, `rag_knowledge_document_versions`, `rag_knowledge_chunks` and `rag_embedding_jobs`. Composite foreign keys carry `organization_id`, preventing a child from referencing another tenant even when RLS is bypassed. `current_version_id` is constrained to a version of the same document and organization.
+
+The legacy flat chunk table is not migrated or deleted. A future reviewed backfill will sanitize and map legacy content into v2, compare retrieval, switch consumers behind a feature flag and retain rollback.
+
+Valid lifecycle transitions are draft → processing → ready/failed; ready/failed → processing for reviewed retry; ready → archived; any active state → deleted by soft deletion. Sanitization is pending → approved/rejected/failed. Embedding is pending → processing → ready/failed, and ready/failed → stale after content, model, dimension, version, archive or deletion changes.
+

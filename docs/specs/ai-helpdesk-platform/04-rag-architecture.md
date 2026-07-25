@@ -21,3 +21,15 @@ Response contract:
 
 Each evidence item contains document/version/section/chunk identifiers, title and relevance. The server constructs citations from retrieved rows; the model cannot invent identifiers. Persist model, embedding model/dimension, prompt version, filters, candidates, chosen chunks, latency and token/cost metadata.
 
+## Phase 4A implementation inventory
+
+| Component | Exists | Completeness | Consumer | Risk | Decision |
+|---|---:|---|---|---|---|
+| Legacy `knowledge_chunks` | local SQL | partial | `lib/ai/rag.ts` | deployed shape/data unknown | preserve |
+| Legacy `match_knowledge_chunks` | local SQL | partial | AI triage | accepts trusted org only in service path | preserve/revoke non-server |
+| Versioned `rag_*` model | Phase 4A migration | foundation | future ingestion/retrieval | Preview untested | canonical v2 |
+| Ingestion/embeddings | no | absent | none | PII/provider boundary | Phase 4B |
+| Grounded citations | design only | absent | none | fabrication | later phase |
+
+Phase 4A uses exact cosine search with a relational retrieval-filter index. No ANN index is created until Preview supplies tenant distribution, row count, filtered recall and latency. Official guidance: <https://github.com/pgvector/pgvector#filtering> and <https://supabase.com/docs/guides/ai/vector-indexes>.
+

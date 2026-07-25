@@ -20,3 +20,5 @@ Each phase requires security review, tests, acceptance criteria, rollback and st
 
 Every phase documents scope, dependencies, migrations, threat changes, unit/contract/RLS/e2e tests, measurable acceptance and rollback rehearsal. A failed tenant, citation or approval invariant is an immediate stop.
 
+Phase 4A local implementation is complete but remains blocked from deployment pending independent review and Preview PostgreSQL validation. It does not authorize Phase 4B.
+

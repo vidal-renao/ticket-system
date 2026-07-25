@@ -13,3 +13,9 @@ Owner review is required before implementation:
 
 Provisional decisions are recorded in the ADRs. Embedding choice remains conditional on legal/data-residency approval. These questions do not prevent owner review, but Phase 4A cannot start until decisions 1, 3, 4 and 6 are resolved.
 
+## Owner decisions recorded for Phase 4A
+
+Approved source types, manual-only curated resolutions, strict PII exclusion, role-based approvals, fixed-tenant MCP, provisional OpenAI `text-embedding-3-small`/1536 profile, Preview-first environments, explicit-data-only VIP and MCP ownership of audit email are accepted.
+
+Remaining: provider DPA/region/retention, measured retrieval targets, Preview project and migration-history verification, legacy production schema/embedding inventory, and the reviewed cutover/backfill date.
+

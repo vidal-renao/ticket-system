@@ -52,3 +52,9 @@ Operational status and administrator review are separate fields. `routing_overri
 ## Target Direction
 
 Move tenant-aware data access behind typed repositories, consolidate forward-only migrations, use a durable background queue for AI/email work, and add integration tests against disposable Supabase environments.
+
+## Phase 4A RAG Foundation
+
+The additive `rag_*` model is the canonical target for new knowledge work. It separates approved sources, logical documents, immutable versions, sanitized chunks and embedding jobs. The legacy `knowledge_chunks` table and `match_knowledge_chunks` RPC remain untouched until Preview metadata and a future backfill prove a safe cutover.
+
+Authenticated retrieval derives organization from the current profile. Backend retrieval accepts organization only across an internal server boundary and is executable only by `service_role`; MCP tool schemas never expose that parameter. Both paths filter organization, current approved version and active ready chunks inside SQL before exact cosine ordering.

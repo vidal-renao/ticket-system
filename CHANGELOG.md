@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Phase 4A
+
+- Added an additive, versioned `rag_*` knowledge schema with tenant-safe composite relationships, forced RLS and explicit grants.
+- Added separate authenticated and server-only exact-cosine retrieval RPC contracts without changing the legacy RAG table/RPC.
+- Added typed knowledge-domain validation, a trusted-tenant repository boundary, synthetic fixtures and schema/security contract tests.
+- Added Preview migration, verification and rollback guidance. No migration has been applied.
+
 All notable changes are documented here. This project follows a simple unreleased-first format.
 
 ## Unreleased

@@ -15,3 +15,7 @@ Low confidence or missing evidence yields an abstention. Citations are server-de
 
 Threat review covers spoofed MIME, poisoned KB, prompt injection, stale embeddings, citation forgery, arbitrary tenant UUID, replayed approvals, confused deputy, service-role leakage and audit tampering.
 
+Phase 4A enforces approved source types and internal visibility. Sanitization approval is represented by status, approver and timestamp; a trigger prevents an unapproved version from producing a ready chunk. Only sanitized chunk content may be stored. The phase performs no upload, extraction, provider call or embedding.
+
+Composite tenant foreign keys protect parent/child integrity independently of RLS. Customers/anon have no table or RPC access. Authenticated retrieval has no organization argument; backend retrieval is revoked from authenticated/anon and accepts organization only as a trusted server parameter.
+

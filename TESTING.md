@@ -27,3 +27,7 @@ npm run build
 - RLS changes are validated against two organizations and all four roles in a disposable database.
 
 The current suite covers bearer fail-closed behavior and rejection of public staff registration. Database integration, component and E2E coverage remain required before a production-ready verdict.
+
+## RAG foundation
+
+Vitest validates Zod contracts, the maximum application result count, embedding profile, sanitized approval contract, trusted tenant injection and static migration invariants. `supabase/tests/rag_foundation.sql` is an opt-in pgTAP metadata harness for a disposable Supabase Preview Branch. It must never target production. Runtime RLS, composite-FK rejection and RPC behavior remain a Preview release gate until that harness is executed with synthetic Alpha/Beta actors.
