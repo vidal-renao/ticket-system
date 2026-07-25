@@ -89,10 +89,11 @@ describe("Phase 4A migration contract", () => {
   });
 
   it("orchestrates two database sessions and asserts lock outcomes", () => {
-    expect(harnessRunner).toContain("Start-Job");
-    expect(harnessRunner).toContain("Wait-Job");
-    expect(harnessRunner).toContain("deadlock detected");
-    expect(harnessRunner).toContain("statement timeout");
+    expect(harnessRunner).toContain("Start-Process");
+    expect(harnessRunner).toContain("LOCK_ACQUIRED");
+    expect(harnessRunner).toContain("--set=VERBOSITY=verbose");
+    expect(harnessRunner).toContain("\\b(40P01|55P03|57014)\\b");
+    expect(harnessRunner).toContain("foreach ($iteration in 1..3)");
     expect(harnessRunner).toContain("rag_sanitization_concurrency_assert.sql");
     expect(harnessRunner).toContain("rag_sanitization_concurrency_cleanup.sql");
   });

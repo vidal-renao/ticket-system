@@ -99,53 +99,103 @@ function Assert-DisposableTarget {
   }
 }
 
-function Invoke-ConcurrencyTest {
+function Invoke-ConcurrencyIteration {
+  param([Parameter(Mandatory = $true)][int]$Iteration)
+
   Invoke-PsqlFile "supabase/tests/rag_sanitization_concurrency_setup.sql"
 
   $sessionAPath = Join-Path $repoRoot "supabase/tests/rag_sanitization_concurrency_session_a.sql"
   $sessionBPath = Join-Path $repoRoot "supabase/tests/rag_sanitization_concurrency_session_b.sql"
-  $jobScript = {
-    param($Connection, $SqlFile)
-    $output = & psql --dbname=$Connection --set=ON_ERROR_STOP=1 --file=$SqlFile 2>&1
-    [PSCustomObject]@{
-      ExitCode = $LASTEXITCODE
-      Output = ($output -join "`n")
+  $barrierId = "$([guid]::NewGuid().ToString('N'))-$Iteration"
+  $tempRoot = [System.IO.Path]::GetTempPath()
+
+  function Start-PsqlSession {
+    param(
+      [Parameter(Mandatory = $true)][string]$Name,
+      [Parameter(Mandatory = $true)][string]$SqlFile
+    )
+
+    $stdoutPath = Join-Path $tempRoot "rag-$barrierId-$Name.stdout"
+    $stderrPath = Join-Path $tempRoot "rag-$barrierId-$Name.stderr"
+    $process = Start-Process -FilePath "psql" -ArgumentList @(
+      "--dbname=$DatabaseUrl",
+      "--set=ON_ERROR_STOP=1",
+      "--set=VERBOSITY=verbose",
+      "--set=barrier_id=$barrierId",
+      "--file=$SqlFile"
+    ) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
+      -WindowStyle Hidden -PassThru
+    return [PSCustomObject]@{
+      Process = $process
+      StdoutPath = $stdoutPath
+      StderrPath = $stderrPath
     }
   }
 
-  $sessionA = Start-Job -ScriptBlock $jobScript -ArgumentList $DatabaseUrl, $sessionAPath
-  Start-Sleep -Milliseconds 300
-  $sessionB = Start-Job -ScriptBlock $jobScript -ArgumentList $DatabaseUrl, $sessionBPath
-  $jobs = @($sessionA, $sessionB)
-
+  $sessionA = $null
+  $sessionB = $null
   try {
-    $null = Wait-Job -Job $jobs -Timeout 30
-    if ($jobs.State -contains "Running") {
-      Stop-Job -Job $jobs
-      throw "RAG concurrency test exceeded its orchestration timeout."
+    $sessionA = Start-PsqlSession -Name "a" -SqlFile $sessionAPath
+    $marker = "LOCK_ACQUIRED $barrierId"
+    $markerDeadline = [DateTime]::UtcNow.AddSeconds(10)
+    $markerObserved = $false
+    while ([DateTime]::UtcNow -lt $markerDeadline -and -not $markerObserved) {
+      if (Test-Path -LiteralPath $sessionA.StdoutPath) {
+        $markerObserved = (Get-Content -LiteralPath $sessionA.StdoutPath -Raw) -match `
+          [regex]::Escape($marker)
+      }
+      if ($sessionA.Process.HasExited -and -not $markerObserved) {
+        break
+      }
+      if (-not $markerObserved) {
+        Start-Sleep -Milliseconds 50
+      }
+    }
+    if (-not $markerObserved) {
+      throw "RAG concurrency barrier was not observed."
     }
 
-    $results = @($jobs | Receive-Job)
-    foreach ($result in $results) {
-      if ($result.ExitCode -ne 0) {
-        if ($result.Output -match "deadlock detected") {
-          throw "RAG concurrency test detected a deadlock."
-        }
-        if ($result.Output -match "statement timeout|canceling statement") {
-          throw "RAG concurrency test detected a database timeout."
-        }
-        throw "RAG concurrency session failed."
+    $sessionB = Start-PsqlSession -Name "b" -SqlFile $sessionBPath
+    foreach ($session in @($sessionA, $sessionB)) {
+      if (-not $session.Process.WaitForExit(30000)) {
+        $session.Process.Kill($true)
+        throw "RAG concurrency session exceeded its process timeout."
       }
-      if ($result.Output -match "deadlock detected|statement timeout|canceling statement") {
-        throw "RAG concurrency test returned an unexpected lock error."
+
+      $stdout = if (Test-Path -LiteralPath $session.StdoutPath) {
+        Get-Content -LiteralPath $session.StdoutPath -Raw
+      } else { "" }
+      $stderr = if (Test-Path -LiteralPath $session.StderrPath) {
+        Get-Content -LiteralPath $session.StderrPath -Raw
+      } else { "" }
+      $combinedOutput = "$stdout`n$stderr"
+      if ($combinedOutput -match "\b(40P01|55P03|57014)\b") {
+        throw "RAG concurrency test detected PostgreSQL lock SQLSTATE."
+      }
+      if ($session.Process.ExitCode -ne 0) {
+        throw "RAG concurrency session failed."
       }
     }
 
     Invoke-PsqlFile "supabase/tests/rag_sanitization_concurrency_assert.sql"
   }
   finally {
-    Remove-Job -Job $jobs -Force -ErrorAction SilentlyContinue
+    foreach ($session in @($sessionA, $sessionB)) {
+      if ($null -ne $session) {
+        if (-not $session.Process.HasExited) {
+          $session.Process.Kill($true)
+        }
+        Remove-Item -LiteralPath $session.StdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $session.StderrPath -Force -ErrorAction SilentlyContinue
+      }
+    }
     Invoke-PsqlFile "supabase/tests/rag_sanitization_concurrency_cleanup.sql"
+  }
+}
+
+function Invoke-ConcurrencyTest {
+  foreach ($iteration in 1..3) {
+    Invoke-ConcurrencyIteration -Iteration $iteration
   }
 }
 
