@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 SET search_path = pg_catalog, public, extensions;
 BEGIN;
-SELECT plan(31);
+SELECT plan(32);
 
 SELECT has_table('public', 'rag_knowledge_sources', 'sources table');
 SELECT has_table('public', 'rag_knowledge_documents', 'documents table');
@@ -118,6 +118,12 @@ SELECT throws_ok(
     SET embedding_dimensions = NULL
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
   '23514', 'ready dimension mutation is rejected'
+);
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET embedding = array_fill(0.002::real, ARRAY[1536])::vector
+    WHERE id = '10000000-0000-4000-8000-000000000401'$$,
+  '23514', 'ready vector mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks

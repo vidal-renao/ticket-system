@@ -353,6 +353,7 @@ BEGIN
        AND (
          NEW.content IS DISTINCT FROM OLD.content
          OR NEW.content_hash IS DISTINCT FROM OLD.content_hash
+         OR NEW.embedding IS DISTINCT FROM OLD.embedding
          OR NEW.embedding_model IS DISTINCT FROM OLD.embedding_model
          OR NEW.embedding_dimensions IS DISTINCT FROM OLD.embedding_dimensions
          OR NEW.document_version_id IS DISTINCT FROM OLD.document_version_id
