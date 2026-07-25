@@ -288,10 +288,14 @@ CREATE TABLE public.rag_embedding_jobs (
   CONSTRAINT rag_jobs_attempt_number_ck CHECK (attempt_number > 0),
   CONSTRAINT rag_jobs_retry_ck CHECK (
     (attempt_number = 1 AND retry_of_job_id IS NULL)
-    OR (attempt_number > 1 AND retry_of_job_id IS NOT NULL)
+    OR (
+      attempt_number > 1
+      AND retry_of_job_id IS NOT NULL
+      AND retry_of_job_id <> id
+    )
   ),
   CONSTRAINT rag_jobs_status_ck CHECK (
-    status IN ('pending', 'processing', 'ready', 'failed', 'stale')
+    status IN ('pending', 'processing', 'completed', 'failed', 'stale')
   ),
   CONSTRAINT rag_jobs_attempt_ck CHECK (attempt_count BETWEEN 0 AND 10),
   CONSTRAINT rag_jobs_error_code_ck CHECK (
@@ -303,7 +307,7 @@ CREATE TABLE public.rag_embedding_jobs (
   ),
   CONSTRAINT rag_jobs_timestamps_ck CHECK (
     (status <> 'processing' OR started_at IS NOT NULL)
-    AND (status NOT IN ('ready', 'failed') OR completed_at IS NOT NULL)
+    AND (status NOT IN ('completed', 'failed') OR completed_at IS NOT NULL)
   )
 );
 
@@ -349,21 +353,29 @@ DECLARE
   version_deleted_at timestamptz;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
-    IF OLD.embedding_status = 'ready'
-       AND (
-         NEW.content IS DISTINCT FROM OLD.content
+    IF OLD.embedding_status = 'ready' THEN
+      IF NEW.content IS DISTINCT FROM OLD.content
          OR NEW.content_hash IS DISTINCT FROM OLD.content_hash
-         OR NEW.embedding IS DISTINCT FROM OLD.embedding
          OR NEW.embedding_model IS DISTINCT FROM OLD.embedding_model
          OR NEW.embedding_dimensions IS DISTINCT FROM OLD.embedding_dimensions
          OR NEW.document_version_id IS DISTINCT FROM OLD.document_version_id
          OR NEW.document_id IS DISTINCT FROM OLD.document_id
          OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
-         OR NEW.chunk_index IS DISTINCT FROM OLD.chunk_index
-       ) THEN
-      RAISE EXCEPTION USING
-        ERRCODE = '23514',
-        MESSAGE = 'RAG_READY_CHUNK_IS_IMMUTABLE';
+         OR NEW.chunk_index IS DISTINCT FROM OLD.chunk_index THEN
+        RAISE EXCEPTION USING
+          ERRCODE = '23514',
+          MESSAGE = 'RAG_READY_CHUNK_IS_IMMUTABLE';
+      END IF;
+
+      IF NEW.embedding_status IS DISTINCT FROM OLD.embedding_status
+         OR NEW.embedding IS DISTINCT FROM OLD.embedding THEN
+        IF NEW.embedding_status IS DISTINCT FROM 'stale'
+           OR NEW.embedding IS NOT NULL THEN
+          RAISE EXCEPTION USING
+            ERRCODE = '23514',
+            MESSAGE = 'RAG_READY_CHUNK_INVALID_TRANSITION';
+        END IF;
+      END IF;
     END IF;
 
     IF (NEW.content IS DISTINCT FROM OLD.content)
@@ -381,6 +393,8 @@ BEGIN
          OR NEW.embedding_dimensions IS DISTINCT FROM OLD.embedding_dimensions
        ) THEN
       NEW.embedding := NULL;
+      NEW.embedding_model := NULL;
+      NEW.embedding_dimensions := NULL;
       NEW.embedding_status := 'pending';
     END IF;
   END IF;
@@ -392,8 +406,6 @@ BEGIN
         MESSAGE = 'RAG_READY_REQUIRES_PROCESSING';
     END IF;
 
-    -- FOR SHARE conflicts with concurrent sanitization UPDATE while allowing
-    -- concurrent readers. FOR KEY SHARE would not block a non-key status update.
     SELECT sanitization_status, ingestion_status, approved_for_embedding_at,
            approved_by, superseded_at, deleted_at
     INTO version_sanitization, version_ingestion, version_approved_at,
@@ -401,8 +413,7 @@ BEGIN
     FROM public.rag_knowledge_document_versions
     WHERE id = NEW.document_version_id
       AND document_id = NEW.document_id
-      AND organization_id = NEW.organization_id
-    FOR SHARE;
+      AND organization_id = NEW.organization_id;
 
     IF version_sanitization IS DISTINCT FROM 'approved'
        OR version_ingestion IS DISTINCT FROM 'processing'
@@ -528,7 +539,7 @@ BEGIN
      AND NEW.status IS DISTINCT FROM OLD.status
      AND NOT (
        (OLD.status = 'pending' AND NEW.status IN ('processing', 'failed', 'stale'))
-       OR (OLD.status = 'processing' AND NEW.status IN ('ready', 'failed', 'stale'))
+       OR (OLD.status = 'processing' AND NEW.status IN ('completed', 'failed', 'stale'))
      ) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_INVALID_JOB_TRANSITION';
   END IF;
@@ -584,6 +595,41 @@ CREATE TRIGGER rag_versions_state_transition_trg
 BEFORE UPDATE ON public.rag_knowledge_document_versions
 FOR EACH ROW EXECUTE FUNCTION public.rag_enforce_version_transition();
 
+CREATE OR REPLACE FUNCTION public.rag_validate_embedding_job_retry()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  predecessor_attempt integer;
+  predecessor_status text;
+BEGIN
+  IF NEW.attempt_number = 1 THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT attempt_number, status
+  INTO predecessor_attempt, predecessor_status
+  FROM public.rag_embedding_jobs
+  WHERE id = NEW.retry_of_job_id
+    AND organization_id = NEW.organization_id
+    AND document_version_id = NEW.document_version_id;
+
+  IF predecessor_attempt IS DISTINCT FROM NEW.attempt_number - 1
+     OR predecessor_status NOT IN ('failed', 'stale') THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER rag_jobs_validate_retry_trg
+BEFORE INSERT ON public.rag_embedding_jobs
+FOR EACH ROW EXECUTE FUNCTION public.rag_validate_embedding_job_retry();
+
 CREATE OR REPLACE FUNCTION public.search_rag_knowledge_authenticated(
   query_embedding vector(1536),
   match_count integer DEFAULT 3,
@@ -621,12 +667,15 @@ BEGIN
   FROM public.rag_knowledge_chunks c
   JOIN public.rag_knowledge_documents d
     ON d.id = c.document_id AND d.organization_id = c.organization_id
+  JOIN public.rag_knowledge_sources s
+    ON s.id = d.source_id AND s.organization_id = d.organization_id
   JOIN public.rag_knowledge_document_versions v
     ON v.id = c.document_version_id
    AND v.document_id = c.document_id
    AND v.organization_id = c.organization_id
   WHERE c.organization_id = public.current_profile_org_id()
     AND public.current_profile_role() IN ('agent', 'manager', 'admin')
+    AND s.status = 'ready' AND s.deleted_at IS NULL
     AND d.current_version_id = v.id
     AND d.status = 'ready' AND d.deleted_at IS NULL
     AND v.sanitization_status = 'approved'
@@ -682,11 +731,14 @@ BEGIN
   FROM public.rag_knowledge_chunks c
   JOIN public.rag_knowledge_documents d
     ON d.id = c.document_id AND d.organization_id = c.organization_id
+  JOIN public.rag_knowledge_sources s
+    ON s.id = d.source_id AND s.organization_id = d.organization_id
   JOIN public.rag_knowledge_document_versions v
     ON v.id = c.document_version_id
    AND v.document_id = c.document_id
    AND v.organization_id = c.organization_id
   WHERE c.organization_id = trusted_organization_id
+    AND s.status = 'ready' AND s.deleted_at IS NULL
     AND d.current_version_id = v.id
     AND d.status = 'ready' AND d.deleted_at IS NULL
     AND v.sanitization_status = 'approved'
@@ -940,6 +992,8 @@ REVOKE ALL ON FUNCTION public.rag_mark_superseded_chunks_stale()
 REVOKE ALL ON FUNCTION public.rag_enforce_state_transition()
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.rag_enforce_version_transition()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_validate_embedding_job_retry()
   FROM PUBLIC, anon, authenticated;
 
 COMMIT;

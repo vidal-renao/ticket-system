@@ -21,6 +21,27 @@ FROM pg_indexes
 WHERE schemaname = 'public' AND tablename LIKE 'rag_%'
 ORDER BY tablename, indexname;
 
+SELECT relation.relname AS table_name,
+       constraint_definition.conname AS constraint_name,
+       constraint_definition.contype AS constraint_type,
+       pg_get_constraintdef(constraint_definition.oid) AS definition
+FROM pg_constraint constraint_definition
+JOIN pg_class relation ON relation.oid = constraint_definition.conrelid
+JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relname LIKE 'rag_%'
+ORDER BY relation.relname, constraint_definition.conname;
+
+SELECT event_object_table AS table_name,
+       trigger_name,
+       action_timing,
+       event_manipulation,
+       action_statement
+FROM information_schema.triggers
+WHERE event_object_schema = 'public'
+  AND event_object_table LIKE 'rag_%'
+ORDER BY event_object_table, trigger_name, event_manipulation;
+
 SELECT tablename, policyname, roles, cmd, qual, with_check
 FROM pg_policies
 WHERE schemaname = 'public' AND tablename LIKE 'rag_%'

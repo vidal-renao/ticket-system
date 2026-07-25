@@ -7,6 +7,4 @@ SET sanitization_status = 'rejected',
     approved_by = NULL
 WHERE id = '10000000-0000-4000-8000-000000000301';
 COMMIT;
--- Expected: UPDATE waits for session A, then atomically leaves the chunk stale
--- with a NULL embedding; retrieval returns no row.
-
+-- This waits for session A's chunk row without creating a reverse dependency.

@@ -74,12 +74,32 @@ describe("Phase 4A migration contract", () => {
     ).toThrow();
   });
 
+  it("positively identifies disposable harness targets", () => {
+    expect(harnessRunner).toContain('[ValidateSet("Local", "SupabasePreview")]');
+    expect(harnessRunner).toContain('"_rag_preview_test$"');
+    expect(harnessRunner).toContain('"focgfmhgfmhmcbywwsej"');
+    expect(harnessRunner).toContain("VerifiedProjectRef");
+    expect(harnessRunner).toContain("connection identity does not match verified project ref");
+    expect(harnessRunner).toContain("127.0.0.1");
+  });
+
+  it("orchestrates two database sessions and asserts lock outcomes", () => {
+    expect(harnessRunner).toContain("Start-Job");
+    expect(harnessRunner).toContain("Wait-Job");
+    expect(harnessRunner).toContain("deadlock detected");
+    expect(harnessRunner).toContain("statement timeout");
+    expect(harnessRunner).toContain("rag_sanitization_concurrency_assert.sql");
+    expect(harnessRunner).toContain("rag_sanitization_concurrency_cleanup.sql");
+  });
+
   it("protects ready content and atomically invalidates revoked approval", () => {
     expect(migration).toContain("RAG_READY_CHUNK_IS_IMMUTABLE");
+    expect(migration).toContain("RAG_READY_CHUNK_INVALID_TRANSITION");
     expect(migration).toContain("RAG_CONTENT_AND_HASH_MUST_CHANGE_TOGETHER");
-    expect(migration).toContain("FOR SHARE");
+    expect(migration).not.toContain("FOR SHARE");
     expect(migration).toContain("rag_invalidate_chunks_on_version_change");
     expect(migration).toContain("embedding_status = 'stale'");
+    expect(migration).toContain("NEW.embedding IS NOT NULL");
   });
 
   it("revokes trigger helper execution and preserves legacy service access", () => {
@@ -89,6 +109,7 @@ describe("Phase 4A migration contract", () => {
       "rag_mark_superseded_chunks_stale",
       "rag_enforce_state_transition",
       "rag_enforce_version_transition",
+      "rag_validate_embedding_job_retry",
     ]) {
       expect(grantsMigration).toContain(`public.${functionName}()`);
     }
@@ -101,6 +122,8 @@ describe("Phase 4A migration contract", () => {
     expect(migration).toContain("retry_of_job_id uuid");
     expect(migration).toContain("rag_jobs_one_active_version_idx");
     expect(migration).toContain("WHERE status IN ('pending', 'processing')");
+    expect(migration).toContain("status IN ('pending', 'processing', 'completed', 'failed', 'stale')");
+    expect(migration).toContain("RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT");
   });
 
   it("restricts direct agent reads to retrievable rows", () => {
@@ -112,5 +135,19 @@ describe("Phase 4A migration contract", () => {
     expect(migration).toContain("embedding_status = 'ready'");
     expect(migration).toContain("CREATE POLICY rag_chunks_lead_read");
     expect(migration).not.toContain("rag_chunks_staff_read");
+  });
+
+  it("uses the same active-source predicate in both retrieval RPCs", () => {
+    for (const functionName of [
+      "search_rag_knowledge_authenticated",
+      "search_rag_knowledge_backend",
+    ]) {
+      const start = migration.indexOf(`FUNCTION public.${functionName}`);
+      const end = migration.indexOf("$$;", start);
+      const body = migration.slice(start, end);
+      expect(body).toContain("JOIN public.rag_knowledge_sources s");
+      expect(body).toContain("s.status = 'ready'");
+      expect(body).toContain("s.deleted_at IS NULL");
+    }
   });
 });

@@ -26,6 +26,8 @@ REVOKE ALL ON FUNCTION public.rag_enforce_state_transition()
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.rag_enforce_version_transition()
   FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_validate_embedding_job_retry()
+  FROM PUBLIC, anon, authenticated;
 
 -- Preserve the legacy contract for its known server-side triage consumer, but
 -- close arbitrary organization selection to browser/session roles.

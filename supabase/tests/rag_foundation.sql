@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 SET search_path = pg_catalog, public, extensions;
 BEGIN;
-SELECT plan(32);
+SELECT plan(50);
 
 SELECT has_table('public', 'rag_knowledge_sources', 'sources table');
 SELECT has_table('public', 'rag_knowledge_documents', 'documents table');
@@ -80,6 +80,21 @@ SELECT is(
   1::bigint,
   'authenticated retrieval is tenant scoped'
 );
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET content = 'Agent mutation', content_hash = repeat('d', 64)$$,
+  '42501', 'agent cannot update chunks'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_knowledge_sources
+    (organization_id, name, source_type, created_by)
+    VALUES (
+      '10000000-0000-4000-8000-000000000001',
+      'Agent source', 'manual',
+      '10000000-0000-4000-8000-000000000012'
+    )$$,
+  '42501', 'agent cannot insert sources'
+);
 
 SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000013', true);
 SELECT is((SELECT count(*) FROM public.rag_knowledge_chunks), 0::bigint, 'customer cannot read chunks');
@@ -92,6 +107,15 @@ SELECT is(
    WHERE id = '10000000-0000-4000-8000-000000000101'),
   0::bigint,
   'manager cannot read another tenant'
+);
+SELECT is(
+  (WITH changed AS (
+    UPDATE public.rag_knowledge_sources SET name = 'Cross-tenant update'
+    WHERE id = '10000000-0000-4000-8000-000000000101'
+    RETURNING id
+  ) SELECT count(*) FROM changed),
+  0::bigint,
+  'manager cannot update another tenant'
 );
 RESET ROLE;
 
@@ -131,6 +155,43 @@ SELECT throws_ok(
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
   '23514', 'ready version mutation is rejected'
 );
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET embedding_status = 'processing'
+    WHERE id = '10000000-0000-4000-8000-000000000401'$$,
+  '23514', 'ready chunk cannot return to processing'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.search_rag_knowledge_backend(
+    '10000000-0000-4000-8000-000000000001',
+    array_fill(0.001::real, ARRAY[1536])::vector, 8, 0
+  )),
+  1::bigint,
+  'backend retrieval returns active source'
+);
+UPDATE public.rag_knowledge_sources SET status = 'archived'
+WHERE id = '10000000-0000-4000-8000-000000000101';
+SELECT is(
+  (SELECT count(*) FROM public.search_rag_knowledge_backend(
+    '10000000-0000-4000-8000-000000000001',
+    array_fill(0.001::real, ARRAY[1536])::vector, 8, 0
+  )),
+  0::bigint,
+  'backend retrieval excludes archived source'
+);
+SELECT is(
+  (SELECT count(*) FROM public.search_rag_knowledge_backend(
+    '20000000-0000-4000-8000-000000000002',
+    array_fill(0.001::real, ARRAY[1536])::vector, 8, 0
+  )),
+  0::bigint,
+  'backend retrieval cannot cross tenant'
+);
+UPDATE public.rag_knowledge_sources SET status = 'processing'
+WHERE id = '10000000-0000-4000-8000-000000000101';
+UPDATE public.rag_knowledge_sources SET status = 'ready'
+WHERE id = '10000000-0000-4000-8000-000000000101';
 
 SELECT throws_ok(
   $$SELECT * FROM public.search_rag_knowledge_authenticated(
@@ -166,6 +227,21 @@ SELECT ok(has_function_privilege('service_role',
 SELECT ok(NOT has_function_privilege('authenticated',
   'public.rag_validate_chunk_embedding()', 'EXECUTE'),
   'trigger helper is not executable by authenticated');
+SELECT ok(NOT has_function_privilege('authenticated',
+  'public.rag_invalidate_chunks_on_version_change()', 'EXECUTE'),
+  'invalidation helper is not executable by authenticated');
+SELECT ok(NOT has_function_privilege('authenticated',
+  'public.rag_mark_superseded_chunks_stale()', 'EXECUTE'),
+  'supersession helper is not executable by authenticated');
+SELECT ok(NOT has_function_privilege('authenticated',
+  'public.rag_enforce_state_transition()', 'EXECUTE'),
+  'state helper is not executable by authenticated');
+SELECT ok(NOT has_function_privilege('authenticated',
+  'public.rag_enforce_version_transition()', 'EXECUTE'),
+  'version helper is not executable by authenticated');
+SELECT ok(NOT has_function_privilege('authenticated',
+  'public.rag_validate_embedding_job_retry()', 'EXECUTE'),
+  'retry helper is not executable by authenticated');
 
 INSERT INTO public.rag_embedding_jobs
   (id, organization_id, document_id, document_version_id, attempt_number, status)
@@ -192,10 +268,46 @@ SELECT throws_ok(
     VALUES (
       gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000201',
-      '10000000-0000-4000-8000-000000000301', 3,
-      '10000000-0000-4000-8000-000000000502', 'processing'
+      '10000000-0000-4000-8000-000000000301', 2,
+      '10000000-0000-4000-8000-000000000501', 'processing'
     )$$,
   '23505', 'only one active job per version'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      '10000000-0000-4000-8000-000000000599',
+      '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000201',
+      '10000000-0000-4000-8000-000000000301', 3,
+      '10000000-0000-4000-8000-000000000599', 'pending'
+    )$$,
+  '23514', 'retry cannot reference itself'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000201',
+      '10000000-0000-4000-8000-000000000301', 3,
+      '10000000-0000-4000-8000-000000000501', 'pending'
+    )$$,
+  '23514', 'retry must reference immediately preceding attempt'
+);
+UPDATE public.rag_embedding_jobs
+SET status = 'processing', started_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000502';
+UPDATE public.rag_embedding_jobs
+SET status = 'completed', completed_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000502';
+SELECT is(
+  (SELECT status FROM public.rag_embedding_jobs
+   WHERE id = '10000000-0000-4000-8000-000000000502'),
+  'completed', 'embedding job terminal success is completed'
 );
 
 UPDATE public.rag_knowledge_document_versions
@@ -223,6 +335,18 @@ SELECT throws_ok(
       'Cross tenant', 'faq', '10000000-0000-4000-8000-000000000011'
     )$$,
   '23503', 'cross-tenant parent reference is rejected'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_chunks', 'rag_chunks_version_org_document_fk',
+  'chunk version foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_embedding_jobs', 'rag_jobs_retry_fk',
+  'job retry foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_embedding_jobs', 'rag_jobs_retry_ck',
+  'job retry check exists'
 );
 
 SELECT * FROM finish();
