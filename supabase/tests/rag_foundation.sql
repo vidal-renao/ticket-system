@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 SET search_path = pg_catalog, public, extensions;
 BEGIN;
-SELECT plan(50);
+SELECT plan(82);
 
 SELECT has_table('public', 'rag_knowledge_sources', 'sources table');
 SELECT has_table('public', 'rag_knowledge_documents', 'documents table');
@@ -18,6 +18,7 @@ INSERT INTO public.profiles (id, organization_id, role) VALUES
   ('10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000001', 'manager'),
   ('10000000-0000-4000-8000-000000000012', '10000000-0000-4000-8000-000000000001', 'agent'),
   ('10000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000001', 'customer'),
+  ('10000000-0000-4000-8000-000000000014', '10000000-0000-4000-8000-000000000001', 'admin'),
   ('20000000-0000-4000-8000-000000000011', '20000000-0000-4000-8000-000000000002', 'manager');
 
 INSERT INTO public.rag_knowledge_sources
@@ -117,6 +118,18 @@ SELECT is(
   0::bigint,
   'manager cannot update another tenant'
 );
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000014', true);
+SELECT is((SELECT count(*) FROM public.rag_knowledge_sources), 1::bigint,
+  'admin reads own tenant sources');
+SELECT is(
+  (WITH changed AS (
+    UPDATE public.rag_knowledge_sources SET name = name
+    WHERE id = '10000000-0000-4000-8000-000000000101'
+    RETURNING id
+  ) SELECT count(*) FROM changed),
+  1::bigint,
+  'admin manages own tenant source'
+);
 RESET ROLE;
 
 SELECT throws_ok(
@@ -172,6 +185,20 @@ SELECT is(
 );
 UPDATE public.rag_knowledge_sources SET status = 'archived'
 WHERE id = '10000000-0000-4000-8000-000000000101';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
+SELECT is(
+  (SELECT count(*) FROM public.rag_knowledge_chunks
+   WHERE id = '10000000-0000-4000-8000-000000000401'),
+  0::bigint, 'agent direct SELECT excludes archived source'
+);
+SELECT is(
+  (SELECT count(*) FROM public.search_rag_knowledge_authenticated(
+    array_fill(0.001::real, ARRAY[1536])::vector, 8, 0
+  )),
+  0::bigint, 'authenticated RPC excludes archived source'
+);
+RESET ROLE;
 SELECT is(
   (SELECT count(*) FROM public.search_rag_knowledge_backend(
     '10000000-0000-4000-8000-000000000001',
@@ -192,6 +219,225 @@ UPDATE public.rag_knowledge_sources SET status = 'processing'
 WHERE id = '10000000-0000-4000-8000-000000000101';
 UPDATE public.rag_knowledge_sources SET status = 'ready'
 WHERE id = '10000000-0000-4000-8000-000000000101';
+
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_documents
+      SET current_version_id = gen_random_uuid()
+      WHERE id = '10000000-0000-4000-8000-000000000201';
+    SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
+  '23503', 'invalid current version is rejected'
+);
+
+SELECT ok(NOT EXISTS (
+  SELECT 1 FROM information_schema.parameters
+  WHERE specific_schema = 'public'
+    AND specific_name LIKE 'search_rag_knowledge_authenticated_%'
+    AND parameter_mode = 'OUT'
+    AND parameter_name = 'embedding'
+), 'authenticated RPC output omits embedding');
+SELECT ok(NOT EXISTS (
+  SELECT 1 FROM information_schema.parameters
+  WHERE specific_schema = 'public'
+    AND specific_name LIKE 'search_rag_knowledge_backend_%'
+    AND parameter_mode = 'OUT'
+    AND parameter_name = 'embedding'
+), 'backend RPC output omits embedding');
+
+-- Independent lifecycle fixtures prevent terminal deletion tests from
+-- weakening later archival, supersession and retrieval assertions.
+INSERT INTO public.rag_knowledge_sources
+  (id, organization_id, name, source_type, status, created_by)
+VALUES
+  ('10000000-0000-4000-8000-000000000102', '10000000-0000-4000-8000-000000000001',
+   'Supersession fixture', 'manual', 'processing', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000103', '10000000-0000-4000-8000-000000000001',
+   'Source deletion fixture', 'manual', 'processing', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000104', '10000000-0000-4000-8000-000000000001',
+   'Document deletion fixture', 'manual', 'processing', '10000000-0000-4000-8000-000000000011');
+UPDATE public.rag_knowledge_sources SET status = 'ready'
+WHERE id IN (
+  '10000000-0000-4000-8000-000000000102',
+  '10000000-0000-4000-8000-000000000103',
+  '10000000-0000-4000-8000-000000000104'
+);
+INSERT INTO public.rag_knowledge_documents
+  (id, organization_id, source_id, title, document_type, status, created_by)
+VALUES
+  ('10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000102', 'Supersession document',
+   'manual', 'processing', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000203', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000103', 'Source deletion document',
+   'manual', 'processing', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000204', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000104', 'Document deletion document',
+   'manual', 'processing', '10000000-0000-4000-8000-000000000011');
+INSERT INTO public.rag_knowledge_document_versions
+  (id, organization_id, document_id, version_number, content_hash,
+   sanitization_status, ingestion_status, mime_type, size_bytes,
+   approved_for_embedding_at, approved_by, created_by)
+VALUES
+  ('10000000-0000-4000-8000-000000000302', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000202', 1, repeat('c', 64),
+   'approved', 'processing', 'text/plain', 100, now(),
+   '10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000303', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000203', 1, repeat('d', 64),
+   'approved', 'processing', 'text/plain', 100, now(),
+   '10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000011'),
+  ('10000000-0000-4000-8000-000000000304', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000204', 1, repeat('e', 64),
+   'approved', 'processing', 'text/plain', 100, now(),
+   '10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000011');
+INSERT INTO public.rag_knowledge_chunks
+  (id, organization_id, document_id, document_version_id, chunk_index,
+   content, content_hash, embedding_status)
+VALUES
+  ('10000000-0000-4000-8000-000000000402', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000302',
+   0, 'Supersession content.', repeat('f', 64), 'processing'),
+  ('10000000-0000-4000-8000-000000000403', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000203', '10000000-0000-4000-8000-000000000303',
+   0, 'Source deletion content.', repeat('1', 64), 'processing'),
+  ('10000000-0000-4000-8000-000000000404', '10000000-0000-4000-8000-000000000001',
+   '10000000-0000-4000-8000-000000000204', '10000000-0000-4000-8000-000000000304',
+   0, 'Document deletion content.', repeat('2', 64), 'processing');
+UPDATE public.rag_knowledge_chunks
+SET embedding = array_fill(0.001::real, ARRAY[1536])::vector,
+    embedding_model = 'text-embedding-3-small',
+    embedding_dimensions = 1536,
+    embedding_status = 'ready'
+WHERE id IN (
+  '10000000-0000-4000-8000-000000000402',
+  '10000000-0000-4000-8000-000000000403',
+  '10000000-0000-4000-8000-000000000404'
+);
+UPDATE public.rag_knowledge_document_versions SET ingestion_status = 'ready'
+WHERE id IN (
+  '10000000-0000-4000-8000-000000000302',
+  '10000000-0000-4000-8000-000000000303',
+  '10000000-0000-4000-8000-000000000304'
+);
+UPDATE public.rag_knowledge_documents
+SET current_version_id = CASE id
+      WHEN '10000000-0000-4000-8000-000000000202' THEN '10000000-0000-4000-8000-000000000302'::uuid
+      WHEN '10000000-0000-4000-8000-000000000203' THEN '10000000-0000-4000-8000-000000000303'::uuid
+      ELSE '10000000-0000-4000-8000-000000000304'::uuid
+    END,
+    status = 'ready'
+WHERE id IN (
+  '10000000-0000-4000-8000-000000000202',
+  '10000000-0000-4000-8000-000000000203',
+  '10000000-0000-4000-8000-000000000204'
+);
+
+UPDATE public.rag_knowledge_documents SET status = 'archived'
+WHERE id = '10000000-0000-4000-8000-000000000202';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
+SELECT is((SELECT count(*) FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000402'), 0::bigint,
+  'agent direct SELECT excludes archived document');
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_authenticated(
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000202'), 0::bigint,
+  'authenticated RPC excludes archived document');
+RESET ROLE;
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_backend(
+  '10000000-0000-4000-8000-000000000001',
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000202'), 0::bigint,
+  'backend RPC excludes archived document');
+UPDATE public.rag_knowledge_documents SET status = 'processing'
+WHERE id = '10000000-0000-4000-8000-000000000202';
+UPDATE public.rag_knowledge_documents SET status = 'ready'
+WHERE id = '10000000-0000-4000-8000-000000000202';
+
+INSERT INTO public.rag_knowledge_document_versions
+  (id, organization_id, document_id, version_number, content_hash,
+   sanitization_status, ingestion_status, mime_type, size_bytes,
+   approved_for_embedding_at, approved_by, created_by)
+VALUES (
+  '10000000-0000-4000-8000-000000000305', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000202', 2, repeat('3', 64),
+  'approved', 'processing', 'text/plain', 100, now(),
+  '10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000011'
+);
+UPDATE public.rag_knowledge_documents
+SET current_version_id = '10000000-0000-4000-8000-000000000305'
+WHERE id = '10000000-0000-4000-8000-000000000202';
+SELECT ok((SELECT superseded_at IS NOT NULL
+  FROM public.rag_knowledge_document_versions
+  WHERE id = '10000000-0000-4000-8000-000000000302'),
+  'supersession timestamps the former current version');
+SELECT is((SELECT ingestion_status
+  FROM public.rag_knowledge_document_versions
+  WHERE id = '10000000-0000-4000-8000-000000000302'), 'stale',
+  'supersession marks the former current version stale');
+SELECT ok((SELECT embedding_status = 'stale' AND embedding IS NULL
+  FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000402'),
+  'supersession invalidates the former current version chunks');
+
+UPDATE public.rag_knowledge_chunks
+SET embedding = NULL, embedding_status = 'stale'
+WHERE id = '10000000-0000-4000-8000-000000000404';
+SELECT is((SELECT embedding_status FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000404'), 'stale',
+  'direct controlled invalidation marks chunk stale');
+SELECT ok((SELECT embedding IS NULL FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000404'),
+  'direct controlled invalidation clears vector');
+UPDATE public.rag_knowledge_document_versions SET ingestion_status = 'processing'
+WHERE id = '10000000-0000-4000-8000-000000000304';
+UPDATE public.rag_knowledge_chunks SET embedding_status = 'processing'
+WHERE id = '10000000-0000-4000-8000-000000000404';
+UPDATE public.rag_knowledge_chunks
+SET embedding = array_fill(0.001::real, ARRAY[1536])::vector,
+    embedding_model = 'text-embedding-3-small',
+    embedding_dimensions = 1536,
+    embedding_status = 'ready'
+WHERE id = '10000000-0000-4000-8000-000000000404';
+UPDATE public.rag_knowledge_document_versions SET ingestion_status = 'ready'
+WHERE id = '10000000-0000-4000-8000-000000000304';
+
+UPDATE public.rag_knowledge_sources
+SET status = 'deleted', deleted_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000103';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
+SELECT is((SELECT count(*) FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000403'), 0::bigint,
+  'agent direct SELECT excludes deleted source');
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_authenticated(
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000203'), 0::bigint,
+  'authenticated RPC excludes deleted source');
+RESET ROLE;
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_backend(
+  '10000000-0000-4000-8000-000000000001',
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000203'), 0::bigint,
+  'backend RPC excludes deleted source');
+
+UPDATE public.rag_knowledge_documents
+SET status = 'deleted', deleted_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000204';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
+SELECT is((SELECT count(*) FROM public.rag_knowledge_chunks
+  WHERE id = '10000000-0000-4000-8000-000000000404'), 0::bigint,
+  'agent direct SELECT excludes deleted document');
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_authenticated(
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000204'), 0::bigint,
+  'authenticated RPC excludes deleted document');
+RESET ROLE;
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_backend(
+  '10000000-0000-4000-8000-000000000001',
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_id = '10000000-0000-4000-8000-000000000204'), 0::bigint,
+  'backend RPC excludes deleted document');
 
 SELECT throws_ok(
   $$SELECT * FROM public.search_rag_knowledge_authenticated(
@@ -310,6 +556,47 @@ SELECT is(
   'completed', 'embedding job terminal success is completed'
 );
 
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number, status)
+VALUES (
+  '10000000-0000-4000-8000-000000000511', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000305',
+  1, 'pending'
+);
+UPDATE public.rag_embedding_jobs SET status = 'failed', completed_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000511';
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number,
+   retry_of_job_id, status)
+VALUES (
+  '10000000-0000-4000-8000-000000000512', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000305',
+  2, '10000000-0000-4000-8000-000000000511', 'pending'
+);
+UPDATE public.rag_embedding_jobs SET status = 'failed', completed_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000512';
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number,
+   retry_of_job_id, status)
+VALUES (
+  '10000000-0000-4000-8000-000000000513', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000305',
+  3, '10000000-0000-4000-8000-000000000512', 'pending'
+);
+UPDATE public.rag_embedding_jobs SET status = 'processing', started_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000513';
+UPDATE public.rag_embedding_jobs SET status = 'completed', completed_at = now()
+WHERE id = '10000000-0000-4000-8000-000000000513';
+SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
+  WHERE status = 'failed'), 3::bigint, 'multiple failed jobs retain history');
+SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
+  WHERE status = 'completed'), 2::bigint, 'multiple completed jobs retain history');
+SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
+  WHERE retry_of_job_id IS NOT NULL), 3::bigint, 'retry links retain complete history');
+SELECT is((SELECT status FROM public.rag_embedding_jobs
+  WHERE id = '10000000-0000-4000-8000-000000000513'), 'completed',
+  'multi-attempt retry chain reaches completed terminal state');
+
 UPDATE public.rag_knowledge_document_versions
 SET sanitization_status = 'rejected',
     approved_for_embedding_at = NULL,
@@ -347,6 +634,34 @@ SELECT has_constraint(
 SELECT has_constraint(
   'public', 'rag_embedding_jobs', 'rag_jobs_retry_ck',
   'job retry check exists'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_documents', 'rag_documents_source_org_fk',
+  'document source tenant foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_document_versions', 'rag_versions_document_org_fk',
+  'version document tenant foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_chunks', 'rag_chunks_document_org_fk',
+  'chunk document tenant foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_embedding_jobs', 'rag_jobs_version_org_document_fk',
+  'job version tenant and document foreign key exists'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_chunks', 'rag_chunks_embedding_contract_ck',
+  'chunk embedding contract check exists'
+);
+SELECT has_constraint(
+  'public', 'rag_embedding_jobs', 'rag_jobs_status_ck',
+  'job status check exists'
+);
+SELECT has_constraint(
+  'public', 'rag_knowledge_document_versions', 'rag_versions_approval_ck',
+  'version approval check exists'
 );
 
 SELECT * FROM finish();
