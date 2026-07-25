@@ -16,6 +16,17 @@ GRANT EXECUTE ON FUNCTION public.search_rag_knowledge_backend(
   uuid, vector, integer, double precision
 ) TO service_role;
 
+REVOKE ALL ON FUNCTION public.rag_validate_chunk_embedding()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_invalidate_chunks_on_version_change()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_mark_superseded_chunks_stale()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_enforce_state_transition()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rag_enforce_version_transition()
+  FROM PUBLIC, anon, authenticated;
+
 -- Preserve the legacy contract for its known server-side triage consumer, but
 -- close arbitrary organization selection to browser/session roles.
 DO $$
