@@ -30,4 +30,4 @@ The current suite covers bearer fail-closed behavior and rejection of public sta
 
 ## RAG foundation
 
-Vitest validates Zod contracts, the maximum application result count, embedding profile, sanitized approval contract, trusted tenant injection and static migration invariants. `supabase/tests/rag_foundation.sql` is an opt-in pgTAP metadata harness for a disposable Supabase Preview Branch. It must never target production. Runtime RLS, composite-FK rejection and RPC behavior remain a Preview release gate until that harness is executed with synthetic Alpha/Beta actors.
+Vitest validates Zod contracts, the maximum application result count, embedding profile, opaque session-derived tenant context, adapter output/error mapping and static migration invariants. `scripts/test-rag-foundation.ps1` is an opt-in runner that refuses databases whose name does not end in `_rag_preview_test`, creates a synthetic legacy base, applies the real migrations and executes pgTAP tenant/RPC/trigger/grant tests. Two-session SQL scripts cover the sanitization lock scenario. None of these PostgreSQL tests has been executed in this workspace; Preview remains the release gate.

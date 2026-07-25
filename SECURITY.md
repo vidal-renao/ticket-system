@@ -29,9 +29,9 @@ Public registration creates customers only. Staff accounts are created by authen
 
 Do not send secrets, credentials or unnecessary personal data to AI providers. PII scrubbing is a risk-reduction control, not a guarantee. Define provider retention, DPA, region and deletion behavior operationally.
 
-Phase 4A permits only approved manuals, procedures, FAQs, knowledge articles and manually selected, reviewed, anonymized resolutions. Names, contact details, addresses, credentials, tokens, confidential material and unnecessary personal data are prohibited from embedding input. A document version requires an approver and approval timestamp before any chunk can become embedding-ready; the database trigger fails closed.
+Phase 4A permits only approved manuals, procedures, FAQs, knowledge articles and manually selected, reviewed, anonymized resolutions. Names, contact details, addresses, credentials, tokens, confidential material and unnecessary personal data are prohibited from embedding input. Sanitization itself is not implemented. The schema records approval evidence, locks the version while a chunk becomes ready, rejects mutation of ready chunk identity/content/model, and atomically invalidates ready chunks when approval is revoked.
 
-The new RAG tables use composite organization foreign keys as well as forced RLS. Agents have read-only internal knowledge access. Managers/admins manage only their organization. Customers and `anon` receive no grants. Service-role remains server-only and every query must include an explicit trusted organization predicate.
+The new RAG tables use composite organization foreign keys as well as forced RLS. Agents can directly read only current, approved, ready, non-deleted retrieval content. Managers/admins manage drafts/history only in their organization. Customers and `anon` receive no effective access. Trigger helpers are revoked from browser roles. Service-role remains server-only and every backend query must include an explicit tenant predicate derived outside request/tool input.
 
 
 ## Logging

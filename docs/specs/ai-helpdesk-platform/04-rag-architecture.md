@@ -33,3 +33,4 @@ Each evidence item contains document/version/section/chunk identifiers, title an
 
 Phase 4A uses exact cosine search with a relational retrieval-filter index. No ANN index is created until Preview supplies tenant distribution, row count, filtered recall and latency. Official guidance: <https://github.com/pgvector/pgvector#filtering> and <https://supabase.com/docs/guides/ai/vector-indexes>.
 
+Phase 4A.6 makes embedded chunks immutable: changing content, hash, model, dimension, position or version requires a new document version/chunk generation. Approval revocation clears the vector and marks affected processing/ready chunks stale in the same transaction. This is schema enforcement, not evidence that sanitization exists.

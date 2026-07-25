@@ -10,5 +10,4 @@ Workflow tests exercise duplicate/out-of-order events, concurrency, lease expiry
 
 Release gates: zero tenant leaks, zero fabricated citations in adversarial suite, deterministic duplicate handling, approval bypass impossible, acceptable retrieval/latency baseline and documented rollback rehearsal.
 
-Phase 4A adds unit/static coverage and an opt-in Preview pgTAP harness. The Preview matrix must include Alpha/Beta cross-parent FK rejection, agent write denial, customer read denial, manager/admin own-tenant management, authenticated/backend retrieval isolation, obsolete-version exclusion, invalid dimension/threshold/count rejection and proof that outputs omit vectors. Static tests are supporting evidence, not a substitute for PostgreSQL execution.
-
+Phase 4A adds unit/static coverage and a migration-driven opt-in Preview harness. The runner loads a synthetic legacy base, applies the real migrations, exercises Alpha/Beta roles, grants, RPC limits, ready-content immutability, approval invalidation, job history and cross-tenant constraints, then proves re-execution fails fast. Two-session scripts prepare the sanitization race check. Static/mocked tests remain supporting evidence; PostgreSQL execution is still pending.

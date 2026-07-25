@@ -19,3 +19,4 @@ Approved source types, manual-only curated resolutions, strict PII exclusion, ro
 
 Remaining: provider DPA/region/retention, measured retrieval targets, Preview project and migration-history verification, legacy production schema/embedding inventory, and the reviewed cutover/backfill date.
 
+Phase 4A.6 resolves the code-level review findings without resolving runtime metadata. The vector extension schema, applied legacy migrations, function owners/overloads and production dimension remain explicitly unknown until a permitted metadata-only audit.

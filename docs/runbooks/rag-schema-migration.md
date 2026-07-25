@@ -13,9 +13,9 @@ Apply `supabase/migrations/202607250001_rag_foundation_v2.sql` only to an isolat
 
 ## Apply and verify
 
-Use the approved Supabase migration mechanism for Preview. Do not use SQL Editor against production. Apply the retrieval grants migration, run `202607250003_rag_foundation_verification.sql`, then the pgTAP harness in `supabase/tests/rag_foundation.sql`. Add synthetic Organization Alpha/Beta actors only in Preview and remove them after testing.
+Use the approved Supabase migration mechanism for Preview. Do not use SQL Editor against production. The opt-in `scripts/test-rag-foundation.ps1` runner accepts only a database whose name ends in `_rag_preview_test`, creates the synthetic legacy prerequisites, applies both real migration files and runs `supabase/tests/rag_foundation.sql`. Run `docs/sql/rag-foundation-verification.sql` separately as read-only metadata inspection; it is not a migration. Run the paired sanitization concurrency scripts in two sessions.
 
-Verify five tables, vector(1536), named composite FKs/checks/indexes, forced RLS, minimal grants, authenticated RPC without tenant input, backend RPC restricted to service role, deterministic output without embedding, and exclusion of stale/deleted/non-current content.
+Verify five tables, vector(1536), named composite FKs/checks/indexes, forced RLS, minimal grants, authenticated RPC without tenant input, backend RPC restricted to service role, trigger-helper revocations, deterministic output without embedding, ready-content immutability, approval invalidation, job history and exclusion of stale/deleted/non-current content.
 
 ## Rollback
 
