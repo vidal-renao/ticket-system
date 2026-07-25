@@ -33,6 +33,8 @@ Phase 4A permits only approved manuals, procedures, FAQs, knowledge articles and
 
 The new RAG tables use composite organization foreign keys as well as forced RLS. Agents can directly read only current, approved, ready, non-deleted retrieval content. Managers/admins manage drafts/history only in their organization. Customers and `anon` receive no effective access. Trigger helpers are revoked from browser roles. Service-role remains server-only and every backend query must include an explicit tenant predicate derived outside request/tool input.
 
+Source/document archive or soft deletion is enforced as immediate retrieval exclusion, not as a synchronous descendant rewrite. Keeping child chunks physically unchanged avoids lock amplification while every authorized retrieval path still checks parent lifecycle state. Exact fixture cleanup and later compaction are separate operational concerns; neither weakens the retrieval invariant.
+
 
 ## Logging
 
