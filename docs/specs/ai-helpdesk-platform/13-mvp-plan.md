@@ -20,4 +20,4 @@ Each phase requires security review, tests, acceptance criteria, rollback and st
 
 Every phase documents scope, dependencies, migrations, threat changes, unit/contract/RLS/e2e tests, measurable acceptance and rollback rehearsal. A failed tenant, citation or approval invariant is an immediate stop.
 
-Phase 4A.6 corrections are locally implemented but not PostgreSQL-verified. Independent re-review and Preview execution remain mandatory. Phase 4B is not authorized.
+Phase 4A.8 local corrections remove inverse locking and strengthen retrieval, invalidation, retry integrity and disposable-target verification. They are not independently reviewed or PostgreSQL-verified. Independent review remains mandatory before Preview execution; Phase 4B is not authorized.

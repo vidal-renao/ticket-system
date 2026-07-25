@@ -19,7 +19,7 @@
 - Add two-tenant RLS integration tests and core ticket E2E tests.
 - Consolidate SQL migrations into a forward-only managed history.
 - Add a non-destructive, tenant-scoped demo fixture strategy for disposable environments.
-- Independently re-review the Phase 4A.6 corrections, then apply them only to a disposable Supabase Preview test database and execute the migration-driven two-tenant pgTAP/concurrency harness.
+- Independently review the Phase 4A.8 local corrections, then apply them only to a positively identified disposable Supabase Preview test database and execute the migration-driven two-tenant pgTAP/concurrency harness.
 
 ## Medium Term
 

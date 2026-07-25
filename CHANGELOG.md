@@ -9,6 +9,7 @@
 - Corrected the independent-review findings: ready chunk immutability, atomic approval invalidation, retrieval-grade agent RLS, opaque server-only tenant context, session Supabase adapter, trigger grants, job retry history and fail-fast migration preflight.
 - Moved metadata verification outside the migration chain and added an opt-in runner for the real migrations plus synthetic pgTAP/concurrency scenarios. PostgreSQL execution remains pending.
 - Updated Next.js from 15.5.20 to the patched 15.5.21 release without a major upgrade.
+- Removed inverse chunk/version locking, constrained ready invalidation to vector-clearing `stale`, aligned both retrieval RPCs on active-source predicates, hardened retry ancestry and added positively identified local/Preview concurrency harness modes. These local Phase 4A.8 corrections still require independent review before any Preview execution.
 
 All notable changes are documented here. This project follows a simple unreleased-first format.
 

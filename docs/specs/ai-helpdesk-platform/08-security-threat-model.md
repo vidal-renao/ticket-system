@@ -15,7 +15,7 @@ Low confidence or missing evidence yields an abstention. Citations are server-de
 
 Threat review covers spoofed MIME, poisoned KB, prompt injection, stale embeddings, citation forgery, arbitrary tenant UUID, replayed approvals, confused deputy, service-role leakage and audit tampering.
 
-Phase 4A enforces approved source types and internal visibility. Sanitization approval is represented by status, approver and timestamp, but no sanitizer exists yet. A share lock prevents approval revocation racing a chunk-ready transition; revocation atomically invalidates vectors. Ready content is immutable. The phase performs no upload, extraction, provider call or embedding.
+Phase 4A enforces approved source types and internal visibility. Sanitization approval is represented by status, approver and timestamp, but no sanitizer exists yet. Chunk activation performs a non-locking approval check; retrieval always rechecks active source, current document and approved version state. Revocation updates the version before invalidating child chunks in one transaction, avoiding inverse chunk/version lock order. Ready content is immutable except for the controlled ready-to-stale transition that clears its vector. The phase performs no upload, extraction, provider call or embedding.
 
 Composite tenant foreign keys protect parent/child integrity independently of RLS. Customers/anon have no table or RPC access. Authenticated retrieval has no organization argument; backend retrieval is revoked from authenticated/anon and accepts organization only as a trusted server parameter.
 

@@ -13,9 +13,20 @@ Apply `supabase/migrations/202607250001_rag_foundation_v2.sql` only to an isolat
 
 ## Apply and verify
 
-Use the approved Supabase migration mechanism for Preview. Do not use SQL Editor against production. The opt-in `scripts/test-rag-foundation.ps1` runner accepts only a database whose name ends in `_rag_preview_test`, creates the synthetic legacy prerequisites, applies both real migration files and runs `supabase/tests/rag_foundation.sql`. Run `docs/sql/rag-foundation-verification.sql` separately as read-only metadata inspection; it is not a migration. Run the paired sanitization concurrency scripts in two sessions.
+Use the approved Supabase migration mechanism for Preview. Do not use SQL Editor against production. The opt-in runner supports two positively identified targets:
 
-Verify five tables, vector(1536), named composite FKs/checks/indexes, forced RLS, minimal grants, authenticated RPC without tenant input, backend RPC restricted to service role, trigger-helper revocations, deterministic output without embedding, ready-content immutability, approval invalidation, job history and exclusion of stale/deleted/non-current content.
+```powershell
+./scripts/test-rag-foundation.ps1 -TargetMode Local `
+  -DatabaseUrl 'postgresql://...@127.0.0.1/..._rag_preview_test'
+
+./scripts/test-rag-foundation.ps1 -TargetMode SupabasePreview `
+  -VerifiedProjectRef '<independently-verified-preview-ref>' `
+  -DatabaseUrl 'postgresql://...'
+```
+
+Local mode requires a loopback host and the `_rag_preview_test` suffix. Preview mode requires a 20-character verified ref embedded in the database host or user identity. The production ref `focgfmhgfmhmcbywwsej` is rejected in every mode. The runner never logs the connection string, applies both real migrations, executes `supabase/tests/rag_foundation.sql`, proves re-execution fails fast and orchestrates the two-session sanitization race. Run `docs/sql/rag-foundation-verification.sql` separately as read-only metadata inspection; it is not a migration.
+
+Verify five tables, vector(1536), named composite FKs/checks/indexes, forced RLS, minimal grants, authenticated RPC without tenant input, backend RPC restricted to service role, trigger-helper revocations, deterministic output without embedding, controlled ready-to-stale invalidation, active-source parity, approval invalidation, completed/failed job history and exclusion of stale/deleted/non-current content.
 
 ## Rollback
 
