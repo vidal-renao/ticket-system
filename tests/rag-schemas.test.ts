@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  embeddingJobRetryPairSchema,
+  embeddingJobSchema,
   knowledgeChunkSchema,
   knowledgeDocumentVersionSchema,
   retrievalRequestSchema,
@@ -65,5 +67,88 @@ describe("RAG contracts", () => {
     };
     expect(knowledgeDocumentVersionSchema.safeParse(version).success).toBe(false);
   });
-});
 
+  it("uses completed, never ready, as embedding job success", () => {
+    const completed = {
+      id: "10000000-0000-4000-8000-000000000501",
+      organizationId: RAG_FIXTURE_IDS.organizationAlpha,
+      documentId: RAG_FIXTURE_IDS.printerManual,
+      documentVersionId: RAG_FIXTURE_IDS.vpnProcedure,
+      attemptNumber: 1,
+      retryOfJobId: null,
+      status: "completed",
+      attemptCount: 1,
+      lastErrorCode: null,
+      lastErrorMessageSanitized: null,
+      scheduledAt: "2026-07-25T12:00:00.000Z",
+      startedAt: "2026-07-25T12:00:01.000Z",
+      completedAt: "2026-07-25T12:00:02.000Z",
+    };
+    expect(embeddingJobSchema.safeParse(completed).success).toBe(true);
+    expect(embeddingJobSchema.safeParse({ ...completed, status: "ready" }).success).toBe(false);
+  });
+
+  it("enforces attempt and timestamp integrity", () => {
+    const job = {
+      id: "10000000-0000-4000-8000-000000000501",
+      organizationId: RAG_FIXTURE_IDS.organizationAlpha,
+      documentId: RAG_FIXTURE_IDS.printerManual,
+      documentVersionId: RAG_FIXTURE_IDS.vpnProcedure,
+      attemptNumber: 1,
+      retryOfJobId: null,
+      status: "pending",
+      attemptCount: 0,
+      lastErrorCode: null,
+      lastErrorMessageSanitized: null,
+      scheduledAt: "2026-07-25T12:00:00.000Z",
+      startedAt: null,
+      completedAt: null,
+    };
+    expect(embeddingJobSchema.safeParse({ ...job, attemptNumber: 2 }).success).toBe(false);
+    expect(embeddingJobSchema.safeParse({ ...job, status: "processing" }).success).toBe(false);
+    expect(embeddingJobSchema.safeParse({ ...job, status: "failed" }).success).toBe(false);
+    expect(embeddingJobSchema.safeParse({
+      ...job,
+      retryOfJobId: job.id,
+    }).success).toBe(false);
+  });
+
+  it("keeps retries on the same version and immediate attempt chain", () => {
+    const previous = {
+      id: "10000000-0000-4000-8000-000000000501",
+      organizationId: RAG_FIXTURE_IDS.organizationAlpha,
+      documentId: RAG_FIXTURE_IDS.printerManual,
+      documentVersionId: RAG_FIXTURE_IDS.vpnProcedure,
+      attemptNumber: 1,
+      retryOfJobId: null,
+      status: "failed" as const,
+      attemptCount: 1,
+      lastErrorCode: "PROVIDER_TIMEOUT",
+      lastErrorMessageSanitized: "Provider timeout.",
+      scheduledAt: "2026-07-25T12:00:00.000Z",
+      startedAt: "2026-07-25T12:00:01.000Z",
+      completedAt: "2026-07-25T12:00:02.000Z",
+    };
+    const retry = {
+      ...previous,
+      id: "10000000-0000-4000-8000-000000000502",
+      attemptNumber: 2,
+      retryOfJobId: previous.id,
+      status: "pending" as const,
+      attemptCount: 0,
+      lastErrorCode: null,
+      lastErrorMessageSanitized: null,
+      startedAt: null,
+      completedAt: null,
+    };
+    expect(embeddingJobRetryPairSchema.safeParse({ previous, retry }).success).toBe(true);
+    expect(embeddingJobRetryPairSchema.safeParse({
+      previous,
+      retry: { ...retry, documentVersionId: "20000000-0000-4000-8000-000000000301" },
+    }).success).toBe(false);
+    expect(embeddingJobRetryPairSchema.safeParse({
+      previous,
+      retry: { ...retry, attemptNumber: 3 },
+    }).success).toBe(false);
+  });
+});

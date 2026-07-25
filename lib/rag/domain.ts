@@ -10,6 +10,15 @@ export const KNOWLEDGE_LIFECYCLE_STATES = [
 ] as const;
 export const SANITIZATION_STATES = ["pending", "approved", "rejected", "failed"] as const;
 export const EMBEDDING_STATES = ["pending", "processing", "ready", "failed", "stale"] as const;
+export const EMBEDDING_JOB_STATES = [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+  "stale",
+] as const;
+export const ACTIVE_EMBEDDING_JOB_STATES = ["pending", "processing"] as const;
+export const TERMINAL_EMBEDDING_JOB_STATES = ["completed", "failed", "stale"] as const;
 export const KNOWLEDGE_SOURCE_TYPES = [
   "manual",
   "procedure",
@@ -21,6 +30,7 @@ export const KNOWLEDGE_SOURCE_TYPES = [
 export type KnowledgeLifecycleState = (typeof KNOWLEDGE_LIFECYCLE_STATES)[number];
 export type SanitizationState = (typeof SANITIZATION_STATES)[number];
 export type EmbeddingState = (typeof EMBEDDING_STATES)[number];
+export type EmbeddingJobState = (typeof EMBEDDING_JOB_STATES)[number];
 export type KnowledgeSourceType = (typeof KNOWLEDGE_SOURCE_TYPES)[number];
 
 export interface KnowledgeSource {
@@ -79,6 +89,22 @@ export interface KnowledgeChunk {
   embeddingDimensions: 1536 | null;
   embeddingStatus: EmbeddingState;
   deletedAt: string | null;
+}
+
+export interface EmbeddingJob {
+  id: string;
+  organizationId: string;
+  documentId: string;
+  documentVersionId: string;
+  attemptNumber: number;
+  retryOfJobId: string | null;
+  status: EmbeddingJobState;
+  attemptCount: number;
+  lastErrorCode: string | null;
+  lastErrorMessageSanitized: string | null;
+  scheduledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
 }
 
 export interface RetrievalResult {

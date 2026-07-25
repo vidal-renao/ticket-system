@@ -224,7 +224,7 @@ export class AuthenticatedSupabaseKnowledgeAdapter implements KnowledgeDataAdapt
     }));
   }
 
-  async searchBackend(
+  async searchAuthenticated(
     organizationId: string,
     request: RetrievalRequest
   ): Promise<RetrievalResult[]> {

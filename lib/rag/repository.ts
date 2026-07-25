@@ -30,7 +30,7 @@ export interface KnowledgeDataAdapter {
     documentId: string,
     versionId: string
   ): Promise<KnowledgeChunk[]>;
-  searchBackend(
+  searchAuthenticated(
     organizationId: string,
     request: RetrievalRequest
   ): Promise<RetrievalResult[]>;
@@ -89,7 +89,7 @@ export class KnowledgeRepository {
     if (!parsed.success) {
       throw new KnowledgeRepositoryError("INVALID_INPUT", "Retrieval input is invalid.");
     }
-    return this.adapter.searchBackend(this.context.organizationId, parsed.data);
+    return this.adapter.searchAuthenticated(this.context.organizationId, parsed.data);
   }
 
   softDeleteSource(sourceId: string, deletedAt = new Date().toISOString()): Promise<boolean> {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  EMBEDDING_JOB_STATES,
   EMBEDDING_STATES,
   KNOWLEDGE_LIFECYCLE_STATES,
   KNOWLEDGE_SOURCE_TYPES,
@@ -94,3 +95,67 @@ export const retrievalRequestSchema = z.object({
 }).strict();
 
 export type RetrievalRequest = z.infer<typeof retrievalRequestSchema>;
+
+export const embeddingJobSchema = z.object({
+  id: uuid,
+  organizationId: uuid,
+  documentId: uuid,
+  documentVersionId: uuid,
+  attemptNumber: z.number().int().positive(),
+  retryOfJobId: uuid.nullable(),
+  status: z.enum(EMBEDDING_JOB_STATES),
+  attemptCount: z.number().int().min(0).max(10),
+  lastErrorCode: z.string().min(1).max(80).nullable(),
+  lastErrorMessageSanitized: z.string().max(500).nullable(),
+  scheduledAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  completedAt: z.string().datetime().nullable(),
+}).strict().superRefine((value, context) => {
+  if ((value.attemptNumber === 1) !== (value.retryOfJobId === null)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Only the first attempt may omit a retry predecessor.",
+    });
+  }
+  if (value.retryOfJobId === value.id) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "An embedding job cannot retry itself.",
+    });
+  }
+  if (value.status === "processing" && value.startedAt === null) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Processing jobs require a start timestamp.",
+    });
+  }
+  if (
+    (value.status === "completed" || value.status === "failed")
+    && value.completedAt === null
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Completed and failed jobs require a completion timestamp.",
+    });
+  }
+});
+
+export const embeddingJobRetryPairSchema = z.object({
+  previous: embeddingJobSchema,
+  retry: embeddingJobSchema,
+}).strict().superRefine(({ previous, retry }, context) => {
+  if (
+    retry.retryOfJobId !== previous.id
+    || retry.organizationId !== previous.organizationId
+    || retry.documentId !== previous.documentId
+    || retry.documentVersionId !== previous.documentVersionId
+    || retry.attemptNumber !== previous.attemptNumber + 1
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Retries must reference the immediately preceding job for the same version.",
+    });
+  }
+});
+
+export type EmbeddingJobInput = z.infer<typeof embeddingJobSchema>;
