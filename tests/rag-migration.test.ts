@@ -6,6 +6,11 @@ const migration = readFileSync(
   resolve("supabase/migrations/202607250001_rag_foundation_v2.sql"),
   "utf8"
 );
+const grantsMigration = readFileSync(
+  resolve("supabase/migrations/202607250002_rag_retrieval_grants.sql"),
+  "utf8"
+);
+const harnessRunner = readFileSync(resolve("scripts/test-rag-foundation.ps1"), "utf8");
 
 describe("Phase 4A migration contract", () => {
   it("declares the versioned model, vector dimension and tenant-safe keys", () => {
@@ -53,5 +58,59 @@ describe("Phase 4A migration contract", () => {
   it("does not modify the legacy table or RPC", () => {
     expect(migration).not.toMatch(/ALTER TABLE public\.knowledge_chunks/);
     expect(migration).not.toMatch(/CREATE OR REPLACE FUNCTION public\.match_knowledge_chunks/);
+  });
+
+  it("fails fast on partial v2 objects and keeps verification out of migrations", () => {
+    expect(migration).not.toMatch(/CREATE TABLE IF NOT EXISTS public\.rag_/);
+    expect(migration).toContain("RAG_PREFLIGHT_UNEXPECTED_V2_OBJECT");
+    expect(migration).toContain("RAG_PREFLIGHT_UNSUPPORTED_VECTOR_SCHEMA");
+    expect(harnessRunner).toContain("202607250001_rag_foundation_v2.sql");
+    expect(harnessRunner).toContain("202607250002_rag_retrieval_grants.sql");
+    expect(() =>
+      readFileSync(
+        resolve("supabase/migrations/202607250003_rag_foundation_verification.sql"),
+        "utf8"
+      )
+    ).toThrow();
+  });
+
+  it("protects ready content and atomically invalidates revoked approval", () => {
+    expect(migration).toContain("RAG_READY_CHUNK_IS_IMMUTABLE");
+    expect(migration).toContain("RAG_CONTENT_AND_HASH_MUST_CHANGE_TOGETHER");
+    expect(migration).toContain("FOR SHARE");
+    expect(migration).toContain("rag_invalidate_chunks_on_version_change");
+    expect(migration).toContain("embedding_status = 'stale'");
+  });
+
+  it("revokes trigger helper execution and preserves legacy service access", () => {
+    for (const functionName of [
+      "rag_validate_chunk_embedding",
+      "rag_invalidate_chunks_on_version_change",
+      "rag_mark_superseded_chunks_stale",
+      "rag_enforce_state_transition",
+      "rag_enforce_version_transition",
+    ]) {
+      expect(grantsMigration).toContain(`public.${functionName}()`);
+    }
+    expect(grantsMigration).toContain("FROM PUBLIC, anon, authenticated");
+    expect(grantsMigration).toContain("TO service_role");
+  });
+
+  it("retains job history while allowing only one active job", () => {
+    expect(migration).toContain("attempt_number integer");
+    expect(migration).toContain("retry_of_job_id uuid");
+    expect(migration).toContain("rag_jobs_one_active_version_idx");
+    expect(migration).toContain("WHERE status IN ('pending', 'processing')");
+  });
+
+  it("restricts direct agent reads to retrievable rows", () => {
+    expect(migration).toContain("CREATE POLICY rag_chunks_agent_read");
+    expect(migration).toContain("public.current_profile_role() = 'agent'");
+    expect(migration).toContain("document.current_version_id = version.id");
+    expect(migration).toContain("version.sanitization_status = 'approved'");
+    expect(migration).toContain("version.ingestion_status = 'ready'");
+    expect(migration).toContain("embedding_status = 'ready'");
+    expect(migration).toContain("CREATE POLICY rag_chunks_lead_read");
+    expect(migration).not.toContain("rag_chunks_staff_read");
   });
 });
