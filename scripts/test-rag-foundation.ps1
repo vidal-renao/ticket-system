@@ -6,7 +6,7 @@ param(
   [ValidateSet("Local", "SupabasePreview")]
   [string]$TargetMode,
 
-  [string]$VerifiedProjectRef
+  [string]$PreviewBranchName
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,7 +26,7 @@ function Invoke-PsqlFile {
 function Assert-DisposableTarget {
   $uri = [System.Uri]$DatabaseUrl
   if ($DatabaseUrl -match [regex]::Escape($productionProjectRef) `
-      -or $VerifiedProjectRef -eq $productionProjectRef) {
+      -or $PreviewBranchName -eq $productionProjectRef) {
     throw "Refusing RAG database tests: production project is prohibited."
   }
 
@@ -38,18 +38,55 @@ function Assert-DisposableTarget {
     }
   }
   else {
-    if ([string]::IsNullOrWhiteSpace($VerifiedProjectRef) `
-        -or $VerifiedProjectRef -notmatch "^[a-z0-9]{20}$") {
-      throw "Refusing Preview RAG tests: an independently verified project ref is required."
+    if ([string]::IsNullOrWhiteSpace($PreviewBranchName)) {
+      throw "Refusing Preview RAG tests: a branch name is required for metadata lookup."
     }
 
-    $decodedUser = [System.Uri]::UnescapeDataString(($uri.UserInfo -split ":", 2)[0])
-    $identityMatches = $uri.Host -like "*$VerifiedProjectRef*" `
-      -or $decodedUser -eq "postgres.$VerifiedProjectRef" `
-      -or $decodedUser -like "*.$VerifiedProjectRef"
-    if (-not $identityMatches) {
-      throw "Refusing Preview RAG tests: connection identity does not match verified project ref."
+    $metadataJson = & supabase branches get $PreviewBranchName `
+      --project-ref $productionProjectRef --output json 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($metadataJson -join ""))) {
+      throw "Refusing Preview RAG tests: official branch metadata lookup failed."
     }
+    try {
+      $branch = ($metadataJson -join "`n") | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+      throw "Refusing Preview RAG tests: branch metadata is not valid JSON."
+    }
+
+    $requiredFields = @(
+      "name", "project_ref", "parent_project_ref", "is_default",
+      "persistent", "status", "preview_project_status"
+    )
+    foreach ($field in $requiredFields) {
+      if ($null -eq $branch.PSObject.Properties[$field]) {
+        throw "Refusing Preview RAG tests: branch metadata schema is incomplete."
+      }
+    }
+
+    $readyBranchStatuses = @("MIGRATIONS_PASSED", "FUNCTIONS_DEPLOYED")
+    if ($branch.name -ne $PreviewBranchName `
+        -or $branch.parent_project_ref -ne $productionProjectRef `
+        -or $branch.project_ref -eq $productionProjectRef `
+        -or $branch.project_ref -notmatch "^[a-z0-9]{20}$" `
+        -or $branch.is_default -ne $false `
+        -or $branch.persistent -ne $false `
+        -or $branch.status -notin $readyBranchStatuses `
+        -or $branch.preview_project_status -ne "ACTIVE_HEALTHY") {
+      throw "Refusing Preview RAG tests: branch is not a healthy disposable Preview."
+    }
+
+    $verifiedProjectRef = [string]$branch.project_ref
+    $decodedUser = [System.Uri]::UnescapeDataString(($uri.UserInfo -split ":", 2)[0])
+    $hostLabels = $uri.Host -split "\."
+    $userProjectRef = ($decodedUser -split "\.")[-1]
+    $identityMatches = $verifiedProjectRef -in $hostLabels `
+      -or $userProjectRef -eq $verifiedProjectRef
+    if (-not $identityMatches) {
+      throw "Refusing Preview RAG tests: connection identity does not match branch metadata."
+    }
+
+    Write-Output "Verified disposable Preview branch: $($branch.name) [$verifiedProjectRef]"
   }
 
   $databaseName = (& psql --dbname=$DatabaseUrl --tuples-only --no-align `

@@ -78,8 +78,13 @@ describe("Phase 4A migration contract", () => {
     expect(harnessRunner).toContain('[ValidateSet("Local", "SupabasePreview")]');
     expect(harnessRunner).toContain('"_rag_preview_test$"');
     expect(harnessRunner).toContain('"focgfmhgfmhmcbywwsej"');
-    expect(harnessRunner).toContain("VerifiedProjectRef");
-    expect(harnessRunner).toContain("connection identity does not match verified project ref");
+    expect(harnessRunner).toContain("supabase branches get");
+    expect(harnessRunner).toContain("--project-ref $productionProjectRef --output json");
+    expect(harnessRunner).toContain("parent_project_ref");
+    expect(harnessRunner).toContain("preview_project_status");
+    expect(harnessRunner).toContain('"ACTIVE_HEALTHY"');
+    expect(harnessRunner).toContain('"MIGRATIONS_PASSED", "FUNCTIONS_DEPLOYED"');
+    expect(harnessRunner).toContain("connection identity does not match branch metadata");
     expect(harnessRunner).toContain("127.0.0.1");
   });
 
