@@ -2,6 +2,7 @@
 BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '8s';
+SET LOCAL search_path = pg_catalog, public, extensions;
 UPDATE public.rag_knowledge_document_versions
 SET sanitization_status = 'rejected',
     approved_for_embedding_at = NULL,

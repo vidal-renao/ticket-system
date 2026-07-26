@@ -2,6 +2,7 @@
 BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '8s';
+SET LOCAL search_path = pg_catalog, public, extensions;
 UPDATE public.rag_knowledge_chunks
 SET embedding = array_fill(0.001::real, ARRAY[1536])::vector,
     embedding_model = 'text-embedding-3-small',
