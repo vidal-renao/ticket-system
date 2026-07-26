@@ -113,8 +113,11 @@ describe("RAG contracts", () => {
     }).success).toBe(false);
   });
 
-  it("keeps retries on the same version and immediate attempt chain", () => {
-    const previous = {
+  describe("embedding job retry contract (mirrors SQL RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT)", () => {
+    const organizationBeta = "20000000-0000-4000-8000-000000000002";
+    const otherVersion = "20000000-0000-4000-8000-000000000301";
+
+    const basePrevious = {
       id: "10000000-0000-4000-8000-000000000501",
       organizationId: RAG_FIXTURE_IDS.organizationAlpha,
       documentId: RAG_FIXTURE_IDS.printerManual,
@@ -129,11 +132,11 @@ describe("RAG contracts", () => {
       startedAt: "2026-07-25T12:00:01.000Z",
       completedAt: "2026-07-25T12:00:02.000Z",
     };
-    const retry = {
-      ...previous,
+    const baseRetry = {
+      ...basePrevious,
       id: "10000000-0000-4000-8000-000000000502",
       attemptNumber: 2,
-      retryOfJobId: previous.id,
+      retryOfJobId: basePrevious.id,
       status: "pending" as const,
       attemptCount: 0,
       lastErrorCode: null,
@@ -141,14 +144,76 @@ describe("RAG contracts", () => {
       startedAt: null,
       completedAt: null,
     };
-    expect(embeddingJobRetryPairSchema.safeParse({ previous, retry }).success).toBe(true);
-    expect(embeddingJobRetryPairSchema.safeParse({
-      previous,
-      retry: { ...retry, documentVersionId: "20000000-0000-4000-8000-000000000301" },
-    }).success).toBe(false);
-    expect(embeddingJobRetryPairSchema.safeParse({
-      previous,
-      retry: { ...retry, attemptNumber: 3 },
-    }).success).toBe(false);
+
+    it("accepts a retry chained onto a failed predecessor", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: { ...basePrevious, status: "failed" },
+        retry: baseRetry,
+      }).success).toBe(true);
+    });
+
+    it("accepts a retry chained onto a stale predecessor", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: { ...basePrevious, status: "stale" },
+        retry: baseRetry,
+      }).success).toBe(true);
+    });
+
+    it("rejects a pending predecessor", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: { ...basePrevious, status: "pending", completedAt: null },
+        retry: baseRetry,
+      }).success).toBe(false);
+    });
+
+    it("rejects a processing predecessor", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: { ...basePrevious, status: "processing", completedAt: null },
+        retry: baseRetry,
+      }).success).toBe(false);
+    });
+
+    it("rejects a completed predecessor", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: { ...basePrevious, status: "completed" },
+        retry: baseRetry,
+      }).success).toBe(false);
+    });
+
+    it("rejects a predecessor from a different tenant", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: basePrevious,
+        retry: { ...baseRetry, organizationId: organizationBeta },
+      }).success).toBe(false);
+    });
+
+    it("rejects a predecessor from a different document version", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: basePrevious,
+        retry: { ...baseRetry, documentVersionId: otherVersion },
+      }).success).toBe(false);
+    });
+
+    it("rejects a non-consecutive attempt number", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: basePrevious,
+        retry: { ...baseRetry, attemptNumber: 3 },
+      }).success).toBe(false);
+    });
+
+    it("rejects a retry that names the wrong predecessor id", () => {
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: basePrevious,
+        retry: { ...baseRetry, retryOfJobId: "10000000-0000-4000-8000-000000000599" },
+      }).success).toBe(false);
+    });
+
+    it("rejects a retry that references itself", () => {
+      const selfReferential = { ...baseRetry, id: basePrevious.id, retryOfJobId: basePrevious.id };
+      expect(embeddingJobRetryPairSchema.safeParse({
+        previous: basePrevious,
+        retry: selfReferential,
+      }).success).toBe(false);
+    });
   });
 });

@@ -156,6 +156,17 @@ export const embeddingJobRetryPairSchema = z.object({
       message: "Retries must reference the immediately preceding job for the same version.",
     });
   }
+  // Mirrors the SQL contract (RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT):
+  // a retry may only follow a predecessor that has actually finished
+  // unsuccessfully. A pending/processing predecessor is still active work
+  // (and the one-active-job-per-version index would reject a second one
+  // anyway); a completed predecessor has nothing to retry.
+  if (previous.status !== "failed" && previous.status !== "stale") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Retries may only follow a failed or stale predecessor.",
+    });
+  }
 });
 
 export type EmbeddingJobInput = z.infer<typeof embeddingJobSchema>;
