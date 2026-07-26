@@ -342,7 +342,7 @@ CREATE OR REPLACE FUNCTION public.rag_validate_chunk_embedding()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   version_sanitization text;
@@ -441,7 +441,7 @@ CREATE OR REPLACE FUNCTION public.rag_invalidate_chunks_on_version_change()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF OLD.sanitization_status = 'approved'
@@ -470,7 +470,7 @@ CREATE OR REPLACE FUNCTION public.rag_mark_superseded_chunks_stale()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF NEW.current_version_id IS DISTINCT FROM OLD.current_version_id
@@ -504,7 +504,7 @@ CREATE OR REPLACE FUNCTION public.rag_enforce_state_transition()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN
@@ -573,7 +573,7 @@ CREATE OR REPLACE FUNCTION public.rag_enforce_version_transition()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF NEW.organization_id IS DISTINCT FROM OLD.organization_id
@@ -609,7 +609,7 @@ CREATE OR REPLACE FUNCTION public.rag_validate_embedding_job_retry()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   predecessor_attempt integer;
@@ -659,7 +659,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF match_count < 1 OR match_count > 20 THEN
@@ -720,7 +720,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 SECURITY INVOKER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
   IF trusted_organization_id IS NULL THEN
