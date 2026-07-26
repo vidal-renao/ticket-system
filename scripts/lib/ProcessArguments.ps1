@@ -159,7 +159,7 @@ function Invoke-ManagedProcessCapture {
   try {
     $process = Start-Process -FilePath $FilePath -ArgumentList $argumentString `
       -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
-      -WindowStyle Hidden -Wait -PassThru
+      -NoNewWindow -Wait -PassThru
     $stdout = if (Test-Path -LiteralPath $stdoutPath) { Get-Content -LiteralPath $stdoutPath -Raw } else { '' }
     $stderr = if (Test-Path -LiteralPath $stderrPath) { Get-Content -LiteralPath $stderrPath -Raw } else { '' }
     return [PSCustomObject]@{
@@ -193,7 +193,7 @@ function Start-ManagedProcessToFiles {
   try {
     $process = Start-Process -FilePath $FilePath -ArgumentList $argumentString `
       -RedirectStandardOutput $StandardOutputPath -RedirectStandardError $StandardErrorPath `
-      -WindowStyle Hidden -PassThru
+      -NoNewWindow -PassThru
   }
   finally {
     Restore-ManagedProcessEnvironment -PreviousValues $previous
