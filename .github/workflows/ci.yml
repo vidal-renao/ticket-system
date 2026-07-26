@@ -144,15 +144,13 @@ jobs:
           fi
           echo "OK: loopback host, no production ref."
 
-      - name: Bootstrap the legacy schema fixture (roles, auth.uid(), organizations/profiles)
-        env:
-          PGPASSWORD: ${{ steps.creds.outputs.password }}
-        run: |
-          psql --no-psqlrc --set=ON_ERROR_STOP=1 \
-            "postgresql://postgres@127.0.0.1:5432/ci_rag_preview_test" \
-            --file=supabase/tests/fixtures/rag_legacy_base.sql
-
       - name: Run the RAG Foundation harness (real migrations, 100 pgTAP assertions, 3x two-connection concurrency)
+        # scripts/test-rag-foundation.ps1 -TargetMode Local already applies
+        # supabase/tests/fixtures/rag_legacy_base.sql as its own first step
+        # (see the harness's own $files list) -- a separate bootstrap step
+        # here would apply it twice and fail on the second attempt
+        # ("relation organizations already exists"), which is exactly what
+        # the first real run of this job caught.
         env:
           PGPASSWORD: ${{ steps.creds.outputs.password }}
         run: |
