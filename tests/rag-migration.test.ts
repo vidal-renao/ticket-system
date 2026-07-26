@@ -11,6 +11,8 @@ const grantsMigration = readFileSync(
   "utf8"
 );
 const harnessRunner = readFileSync(resolve("scripts/test-rag-foundation.ps1"), "utf8");
+const previewIdentityLib = readFileSync(resolve("scripts/lib/PreviewIdentity.ps1"), "utf8");
+const processArgumentsLib = readFileSync(resolve("scripts/lib/ProcessArguments.ps1"), "utf8");
 
 describe("Phase 4A migration contract", () => {
   it("declares the versioned model, vector dimension and tenant-safe keys", () => {
@@ -84,12 +86,55 @@ describe("Phase 4A migration contract", () => {
     expect(harnessRunner).toContain("preview_project_status");
     expect(harnessRunner).toContain('"ACTIVE_HEALTHY"');
     expect(harnessRunner).toContain('"MIGRATIONS_PASSED", "FUNCTIONS_DEPLOYED"');
-    expect(harnessRunner).toContain("connection identity does not match branch metadata");
-    expect(harnessRunner).toContain("127.0.0.1");
+    expect(harnessRunner).toContain("Test-PreviewConnectionIdentity");
+    expect(harnessRunner).toContain("Refusing Preview RAG tests: $($identity.Reason)");
+    expect(harnessRunner).toContain("Test-LocalLoopbackHost");
+  });
+
+  it("requires every extractable connection identity to agree with the verified branch, not just one", () => {
+    // Regression guard for the "hostMatches -or usernameMatches" bug: a
+    // connection whose host and username named two different projects
+    // used to pass as long as either one matched.
+    expect(previewIdentityLib).not.toMatch(/-or\s+userProjectRef\s+-eq\s+\$verifiedProjectRef/);
+    expect(previewIdentityLib).toContain("Get-HostProjectRef");
+    expect(previewIdentityLib).toContain("Get-UserProjectRef");
+    expect(previewIdentityLib).toContain("Host project ref does not match the verified Preview branch.");
+    expect(previewIdentityLib).toContain("Username project ref does not match the verified Preview branch.");
+    expect(previewIdentityLib).toContain("Host and username project refs contradict each other.");
+    expect(previewIdentityLib).toContain("No project ref could be extracted from the connection URL.");
+    expect(previewIdentityLib).toContain("Verified project ref is production.");
+  });
+
+  it("recognizes bracketed IPv6 loopback instead of only literal string forms", () => {
+    // System.Uri normalizes "[::1]" to "[0000:...:0001]" in .Host, which
+    // never equals a literal "::1" allow-list entry -- IsLoopback is the
+    // syntactic (no DNS) check that actually handles every loopback form.
+    expect(previewIdentityLib).toContain("$Uri.IsLoopback");
+    expect(previewIdentityLib).not.toMatch(/@\("localhost",\s*"127\.0\.0\.1",\s*"::1"\)/);
+  });
+
+  it("never builds a native process command line by string concatenation", () => {
+    expect(processArgumentsLib).toContain("ConvertTo-Win32QuotedArgument");
+    expect(processArgumentsLib).toContain("New-ProcessArguments");
+    expect(processArgumentsLib).toContain("UseShellExecute");
+    for (const fn of ["Invoke-ManagedProcess", "Invoke-ManagedProcessCapture", "Start-ManagedProcessToFiles"]) {
+      expect(processArgumentsLib).toContain(fn);
+    }
+    // The historical bug: Start-Process -ArgumentList <string[]> joins the
+    // array with bare spaces internally, silently re-splitting any
+    // unquoted element that itself contains a space (e.g. --file under a
+    // directory named "VIDAL ECOSYSTEM"). Every Start-Process call here
+    // must pass a single already-quoted string instead.
+    const bareArrayCall = /-ArgumentList\s+@\(/;
+    expect(processArgumentsLib).not.toMatch(bareArrayCall);
+    expect(harnessRunner).not.toMatch(bareArrayCall);
+    expect(processArgumentsLib).toContain("New-PsqlConnectionArguments");
+    expect(processArgumentsLib).toContain("PGPASSWORD");
+    expect(processArgumentsLib).not.toContain("--dbname=$DatabaseUrl");
   });
 
   it("orchestrates two database sessions and asserts lock outcomes", () => {
-    expect(harnessRunner).toContain("Start-Process");
+    expect(harnessRunner).toContain("Start-ManagedProcessToFiles");
     expect(harnessRunner).toContain("LOCK_ACQUIRED");
     expect(harnessRunner).toContain("--set=VERBOSITY=verbose");
     expect(harnessRunner).toContain("\\b(40P01|55P03|57014)\\b");

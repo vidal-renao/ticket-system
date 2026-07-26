@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 SET search_path = pg_catalog, public, extensions;
 BEGIN;
-SELECT plan(82);
+SELECT plan(100);
 
 SELECT has_table('public', 'rag_knowledge_sources', 'sources table');
 SELECT has_table('public', 'rag_knowledge_documents', 'documents table');
@@ -175,6 +175,29 @@ SELECT throws_ok(
   '23514', 'ready chunk cannot return to processing'
 );
 
+-- Each identity column is mutated in isolation (nothing else in the SET
+-- clause changes) so each assertion can only be explained by
+-- rag_validate_chunk_embedding's RAG_READY_CHUNK_IS_IMMUTABLE guard, not
+-- by any other check in the same trigger.
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET organization_id = '20000000-0000-4000-8000-000000000002'
+    WHERE id = '10000000-0000-4000-8000-000000000401'$$,
+  '23514', 'RAG_READY_CHUNK_IS_IMMUTABLE', 'ready organization_id mutation is rejected'
+);
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET document_id = '10000000-0000-4000-8000-000000000202'
+    WHERE id = '10000000-0000-4000-8000-000000000401'$$,
+  '23514', 'RAG_READY_CHUNK_IS_IMMUTABLE', 'ready document_id mutation is rejected'
+);
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_chunks
+    SET chunk_index = 1
+    WHERE id = '10000000-0000-4000-8000-000000000401'$$,
+  '23514', 'RAG_READY_CHUNK_IS_IMMUTABLE', 'ready chunk_index mutation is rejected'
+);
+
 SELECT is(
   (SELECT count(*) FROM public.search_rag_knowledge_backend(
     '10000000-0000-4000-8000-000000000001',
@@ -331,6 +354,44 @@ WHERE id IN (
   '10000000-0000-4000-8000-000000000204'
 );
 
+-- A real, existing version row is not enough -- it must belong to the
+-- document being updated. Version 303 genuinely exists but belongs to
+-- document 203, not 201, isolating rag_documents_current_version_fk's
+-- (current_version_id, organization_id, id) -> (id, organization_id,
+-- document_id) composite from a plain "does this id exist at all" check.
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_documents
+      SET current_version_id = '10000000-0000-4000-8000-000000000303'
+      WHERE id = '10000000-0000-4000-8000-000000000201';
+    SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
+  '23503', 'current version belonging to another document is rejected'
+);
+
+SET LOCAL ROLE service_role;
+INSERT INTO public.rag_knowledge_documents
+  (id, organization_id, source_id, title, document_type, status, created_by)
+VALUES (
+  '20000000-0000-4000-8000-000000000205', '20000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000101', 'Cross-tenant version fixture',
+  'faq', 'processing', '20000000-0000-4000-8000-000000000011'
+);
+INSERT INTO public.rag_knowledge_document_versions
+  (id, organization_id, document_id, version_number, content_hash,
+   sanitization_status, ingestion_status, mime_type, size_bytes, created_by)
+VALUES (
+  '20000000-0000-4000-8000-000000000306', '20000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000205', 1, repeat('9', 64),
+  'pending', 'pending', 'text/plain', 100, '20000000-0000-4000-8000-000000000011'
+);
+RESET ROLE;
+SELECT throws_ok(
+  $$UPDATE public.rag_knowledge_documents
+      SET current_version_id = '20000000-0000-4000-8000-000000000306'
+      WHERE id = '10000000-0000-4000-8000-000000000201';
+    SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
+  '23503', 'current version belonging to another tenant is rejected'
+);
+
 UPDATE public.rag_knowledge_documents SET status = 'archived'
 WHERE id = '10000000-0000-4000-8000-000000000202';
 SET LOCAL ROLE authenticated;
@@ -378,6 +439,18 @@ SELECT ok((SELECT embedding_status = 'stale' AND embedding IS NULL
   FROM public.rag_knowledge_chunks
   WHERE id = '10000000-0000-4000-8000-000000000402'),
   'supersession invalidates the former current version chunks');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_authenticated(
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_version_id = '10000000-0000-4000-8000-000000000302'), 0::bigint,
+  'authenticated retrieval never returns a superseded, non-current version');
+RESET ROLE;
+SELECT is((SELECT count(*) FROM public.search_rag_knowledge_backend(
+  '10000000-0000-4000-8000-000000000001',
+  array_fill(0.001::real, ARRAY[1536])::vector, 20, 0)
+  WHERE document_version_id = '10000000-0000-4000-8000-000000000302'), 0::bigint,
+  'backend retrieval never returns a superseded, non-current version');
 
 UPDATE public.rag_knowledge_chunks
 SET embedding = NULL, embedding_status = 'stale'
@@ -458,6 +531,23 @@ SELECT throws_ok(
   '22023', 'threshold bound'
 );
 
+-- Full grant matrix for both retrieval RPCs: PUBLIC and anon must be able
+-- to execute neither the browser-facing nor the backend-only RPC; the
+-- browser-facing RPC additionally excludes plain authenticated only for
+-- the backend function (authenticated legitimately executes its own RPC,
+-- exercised throughout this file), and only service_role reaches backend.
+SELECT ok(NOT has_function_privilege('public',
+  'public.search_rag_knowledge_authenticated(vector,integer,double precision)', 'EXECUTE'),
+  'PUBLIC cannot execute authenticated retrieval');
+SELECT ok(NOT has_function_privilege('anon',
+  'public.search_rag_knowledge_authenticated(vector,integer,double precision)', 'EXECUTE'),
+  'anon cannot execute authenticated retrieval');
+SELECT ok(NOT has_function_privilege('public',
+  'public.search_rag_knowledge_backend(uuid,vector,integer,double precision)', 'EXECUTE'),
+  'PUBLIC cannot execute backend retrieval');
+SELECT ok(NOT has_function_privilege('anon',
+  'public.search_rag_knowledge_backend(uuid,vector,integer,double precision)', 'EXECUTE'),
+  'anon cannot execute backend retrieval');
 SELECT ok(NOT has_function_privilege('authenticated',
   'public.search_rag_knowledge_backend(uuid,vector,integer,double precision)', 'EXECUTE'),
   'authenticated cannot execute backend retrieval');
@@ -507,17 +597,18 @@ VALUES (
   2, '10000000-0000-4000-8000-000000000501', 'pending'
 );
 SELECT is((SELECT count(*) FROM public.rag_embedding_jobs), 2::bigint, 'completed job history and retry coexist');
+-- Isolated from rag_jobs_number_uq and the INSERT-only retry trigger by
+-- construction: this UPDATE keeps job 501's attempt_number (1) unchanged
+-- (so the per-version attempt-number uniqueness is never re-evaluated
+-- against a new value) and UPDATE never fires rag_jobs_validate_retry_trg
+-- (BEFORE INSERT only). Job 502 (attempt 2) is already 'pending' for the
+-- same version, so the only thing that can reject reactivating job 501
+-- into 'processing' is rag_jobs_one_active_version_idx.
 SELECT throws_ok(
-  $$INSERT INTO public.rag_embedding_jobs
-    (id, organization_id, document_id, document_version_id, attempt_number,
-     retry_of_job_id, status)
-    VALUES (
-      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
-      '10000000-0000-4000-8000-000000000201',
-      '10000000-0000-4000-8000-000000000301', 2,
-      '10000000-0000-4000-8000-000000000501', 'processing'
-    )$$,
-  '23505', 'only one active job per version'
+  $$UPDATE public.rag_embedding_jobs
+    SET status = 'processing', started_at = now()
+    WHERE id = '10000000-0000-4000-8000-000000000501'$$,
+  '23505', 'only one active job per version (isolated to the partial unique index)'
 );
 SELECT throws_ok(
   $$INSERT INTO public.rag_embedding_jobs
@@ -530,7 +621,7 @@ SELECT throws_ok(
       '10000000-0000-4000-8000-000000000301', 3,
       '10000000-0000-4000-8000-000000000599', 'pending'
     )$$,
-  '23514', 'retry cannot reference itself'
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry cannot reference itself'
 );
 SELECT throws_ok(
   $$INSERT INTO public.rag_embedding_jobs
@@ -542,18 +633,117 @@ SELECT throws_ok(
       '10000000-0000-4000-8000-000000000301', 3,
       '10000000-0000-4000-8000-000000000501', 'pending'
     )$$,
-  '23514', 'retry must reference immediately preceding attempt'
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry must reference immediately preceding attempt'
 );
+
+-- Each predecessor-status/tenant/version scenario below uses its own
+-- otherwise job-free document_version (302 or 304) so setting up the
+-- predecessor fixture itself never collides with rag_jobs_one_active_version_idx,
+-- keeping every rejection attributable to exactly one invariant.
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number, status)
+VALUES (
+  '10000000-0000-4000-8000-000000000521', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000202', '10000000-0000-4000-8000-000000000302',
+  1, 'pending'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000202',
+      '10000000-0000-4000-8000-000000000302', 2,
+      '10000000-0000-4000-8000-000000000521', 'pending'
+    )$$,
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry cannot follow a pending predecessor'
+);
+
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number, status, started_at)
+VALUES (
+  '10000000-0000-4000-8000-000000000531', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000204', '10000000-0000-4000-8000-000000000304',
+  1, 'processing', now()
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000204',
+      '10000000-0000-4000-8000-000000000304', 2,
+      '10000000-0000-4000-8000-000000000531', 'pending'
+    )$$,
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry cannot follow a processing predecessor'
+);
+
+-- Job 501 is a genuinely terminal ('failed') predecessor, but these two
+-- retries misdescribe which version/tenant it belongs to, so the
+-- trigger's own (id, organization_id, document_version_id) lookup finds
+-- no row at all -- the same invariant as an outright invalid predecessor.
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '20000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000201',
+      '10000000-0000-4000-8000-000000000301', 2,
+      '10000000-0000-4000-8000-000000000501', 'pending'
+    )$$,
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry predecessor from another tenant is rejected'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000202',
+      '10000000-0000-4000-8000-000000000305', 2,
+      '10000000-0000-4000-8000-000000000501', 'pending'
+    )$$,
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry predecessor from another document version is rejected'
+);
+
 UPDATE public.rag_embedding_jobs
 SET status = 'processing', started_at = now()
 WHERE id = '10000000-0000-4000-8000-000000000502';
-UPDATE public.rag_embedding_jobs
-SET status = 'completed', completed_at = now()
-WHERE id = '10000000-0000-4000-8000-000000000502';
+SELECT lives_ok(
+  $$UPDATE public.rag_embedding_jobs
+    SET status = 'completed', completed_at = now()
+    WHERE id = '10000000-0000-4000-8000-000000000502'$$,
+  'a retry chained onto a failed predecessor reaches completed'
+);
 SELECT is(
   (SELECT status FROM public.rag_embedding_jobs
    WHERE id = '10000000-0000-4000-8000-000000000502'),
   'completed', 'embedding job terminal success is completed'
+);
+
+-- A retry may equally follow a 'stale' predecessor (a version invalidated
+-- out from under an in-flight job), not only a 'failed' one.
+INSERT INTO public.rag_embedding_jobs
+  (id, organization_id, document_id, document_version_id, attempt_number, status, completed_at)
+VALUES (
+  '10000000-0000-4000-8000-000000000541', '10000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000203', '10000000-0000-4000-8000-000000000303',
+  1, 'stale', now()
+);
+SELECT lives_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      '10000000-0000-4000-8000-000000000542', '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000203',
+      '10000000-0000-4000-8000-000000000303', 2,
+      '10000000-0000-4000-8000-000000000541', 'pending'
+    )$$,
+  'a retry chained onto a stale predecessor is accepted'
 );
 
 INSERT INTO public.rag_embedding_jobs
@@ -587,12 +777,30 @@ UPDATE public.rag_embedding_jobs SET status = 'processing', started_at = now()
 WHERE id = '10000000-0000-4000-8000-000000000513';
 UPDATE public.rag_embedding_jobs SET status = 'completed', completed_at = now()
 WHERE id = '10000000-0000-4000-8000-000000000513';
+-- No job is active for version 305 at this point (511/512 failed, 513
+-- just completed), so rag_jobs_one_active_version_idx cannot be the
+-- cause here; attempt_number 4 is also unused for this version, so
+-- rag_jobs_number_uq cannot be either -- only the predecessor-status
+-- check in the retry trigger can explain the rejection.
+SELECT throws_ok(
+  $$INSERT INTO public.rag_embedding_jobs
+    (id, organization_id, document_id, document_version_id, attempt_number,
+     retry_of_job_id, status)
+    VALUES (
+      gen_random_uuid(), '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000202',
+      '10000000-0000-4000-8000-000000000305', 4,
+      '10000000-0000-4000-8000-000000000513', 'pending'
+    )$$,
+  '23514', 'RAG_RETRY_REQUIRES_PREVIOUS_TERMINAL_ATTEMPT', 'retry cannot follow a completed predecessor'
+);
 SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
   WHERE status = 'failed'), 3::bigint, 'multiple failed jobs retain history');
 SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
   WHERE status = 'completed'), 2::bigint, 'multiple completed jobs retain history');
 SELECT is((SELECT count(*) FROM public.rag_embedding_jobs
-  WHERE retry_of_job_id IS NOT NULL), 3::bigint, 'retry links retain complete history');
+  WHERE retry_of_job_id IS NOT NULL), 4::bigint,
+  'retry links retain complete history (three prior chains plus the stale-predecessor chain)');
 SELECT is((SELECT status FROM public.rag_embedding_jobs
   WHERE id = '10000000-0000-4000-8000-000000000513'), 'completed',
   'multi-attempt retry chain reaches completed terminal state');
