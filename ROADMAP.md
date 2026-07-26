@@ -19,6 +19,7 @@
 - Add two-tenant RLS integration tests and core ticket E2E tests.
 - Consolidate SQL migrations into a forward-only managed history.
 - Add a non-destructive, tenant-scoped demo fixture strategy for disposable environments.
+- Independently review the Phase 4A.8 local corrections, then apply them only to a positively identified disposable Supabase Preview test database and execute the migration-driven two-tenant pgTAP/concurrency harness.
 
 ## Medium Term
 
@@ -27,6 +28,8 @@
 - Move deferred AI/email work to a durable queue with retries and idempotency.
 - Implement retention jobs and auditable data-subject workflows.
 - Add accessibility and performance budgets with measured Lighthouse reports.
+- Implement Phase 4B extraction/sanitization/chunking only after independent re-review and successful Preview PostgreSQL validation of Phase 4A.
+
 
 ## Future Ideas
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Phase 4A
+
+- Added an additive, versioned `rag_*` knowledge schema with tenant-safe composite relationships, forced RLS and explicit grants.
+- Added separate authenticated and server-only exact-cosine retrieval RPC contracts without changing the legacy RAG table/RPC.
+- Added typed knowledge-domain validation, a trusted-tenant repository boundary, synthetic fixtures and schema/security contract tests.
+- Added Preview migration, verification and rollback guidance. No migration has been applied.
+- Corrected the independent-review findings: ready chunk immutability, atomic approval invalidation, retrieval-grade agent RLS, opaque server-only tenant context, session Supabase adapter, trigger grants, job retry history and fail-fast migration preflight.
+- Moved metadata verification outside the migration chain and added an opt-in runner for the real migrations plus synthetic pgTAP/concurrency scenarios. PostgreSQL execution remains pending.
+- Updated Next.js from 15.5.20 to the patched 15.5.21 release without a major upgrade.
+- Removed inverse chunk/version locking, constrained ready invalidation to vector-clearing `stale`, aligned both retrieval RPCs on active-source predicates, hardened retry ancestry and added positively identified local/Preview concurrency harness modes. These local Phase 4A.8 corrections still require independent review before any Preview execution.
+- Finalized the local Preview harness gate: official CLI branch identity is checked before database access, concurrency uses a SQL barrier across three iterations, pgTAP covers 82 lifecycle/job/security assertions, and the application exposes a strict `completed` embedding-job contract. PostgreSQL execution remains pending final independent review.
+
 All notable changes are documented here. This project follows a simple unreleased-first format.
 
 ## Unreleased

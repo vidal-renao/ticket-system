@@ -1,0 +1,13 @@
+# Testing strategy
+
+Unit tests cover chunking determinism, hashes, confidence/policy gates, state transitions, idempotency and error classification. Contract tests validate every MCP input/output/error schema and backward compatibility.
+
+Database tests prove RLS and explicit service-role predicates with two organizations, cross-tenant IDs, joins, RPCs and deleted/superseded content. Migration tests run from empty and representative prior schema and verify rollback/runbook assumptions.
+
+RAG tests use curated multilingual gold sets for recall, citation correctness, grounding, abstention, stale versions and prompt injection. No production PII enters fixtures. Provider adapters use recorded/synthetic responses; live evaluations are isolated and budgeted.
+
+Workflow tests exercise duplicate/out-of-order events, concurrency, lease expiry, transient/permanent errors, dead letters, cancellation, approval expiry and external delivery ambiguity. UI accessibility and role-based end-to-end tests cover each dashboard state.
+
+Release gates: zero tenant leaks, zero fabricated citations in adversarial suite, deterministic duplicate handling, approval bypass impossible, acceptable retrieval/latency baseline and documented rollback rehearsal.
+
+Phase 4A adds unit/static coverage and a migration-driven opt-in disposable-database harness. Local mode requires loopback (matched via `System.Uri.IsLoopback`, so `localhost`, `127.0.0.1` and a bracketed `::1` all work) and a guarded database suffix; Preview mode resolves official branch metadata before database access, proves the target is a healthy disposable child, and requires every project ref extractable from the connection URL (host, username, or both) to agree with that child ref — not just one of them. The runner applies the real migrations, executes 100 assertions across Alpha/Beta roles, authenticated/backend/PUBLIC/anon RPC grants, lifecycle exclusion (including non-current superseded versions), RLS, archival, supersession, constraints, ready-content immutability isolated per identity column, approval invalidation, embedding-job retry validation (predecessor status, tenant, version and attempt-sequence, mirrored by `embeddingJobRetryPairSchema` at the application layer) and multi-attempt job history, then proves re-execution fails fast. It repeats a real two-connection race three times, launching the second session only after the first emits a unique lock-acquired barrier, and fails on deadlock, lock/statement timeout, process timeout or an invalid committed state. Static/mocked tests remain supporting evidence; PostgreSQL execution is still pending.

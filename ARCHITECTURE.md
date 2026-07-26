@@ -52,3 +52,13 @@ Operational status and administrator review are separate fields. `routing_overri
 ## Target Direction
 
 Move tenant-aware data access behind typed repositories, consolidate forward-only migrations, use a durable background queue for AI/email work, and add integration tests against disposable Supabase environments.
+
+## Phase 4A RAG Foundation
+
+The additive `rag_*` model is the canonical target for new knowledge work. It separates approved sources, logical documents, immutable versions, sanitized chunks and embedding jobs. The legacy `knowledge_chunks` table and `match_knowledge_chunks` RPC remain untouched until Preview metadata and a future backfill prove a safe cutover.
+
+Authenticated retrieval derives organization from the current profile. Backend retrieval accepts organization only across an internal server boundary and is executable only by `service_role`; MCP tool schemas never expose that parameter. Both paths filter organization, active source, current approved version and active ready chunks inside SQL before exact cosine ordering. Retrieval safety does not depend on cross-row locks: concurrent approval revocation is an idempotent version-to-chunks invalidation, and every retrieval rechecks the committed parent state.
+
+Archiving or soft-deleting a source/document makes it immediately non-retrievable through both RLS and retrieval RPC predicates. Phase 4A intentionally does not cascade a physical stale update through all descendant chunks for those lifecycle operations, avoiding large lock-amplifying updates; a later reviewed cleanup or reindex process may compact those rows. Version supersession and approval revocation still clear affected vectors because those transitions own embedding validity directly.
+
+The Ticket System implementation exposes only `createKnowledgeRepositoryForCurrentUser()`. It derives its opaque tenant context from the authenticated Supabase session and profile in server-only modules. The MCP backend-context factory remains an MCP-owned contract and is not simulated here. A real session-client adapter calls only `search_rag_knowledge_authenticated`; no v2 backend RPC consumer exists yet.
