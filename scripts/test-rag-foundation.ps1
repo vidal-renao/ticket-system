@@ -13,28 +13,42 @@ $ErrorActionPreference = "Stop"
 $productionProjectRef = "focgfmhgfmhmcbywwsej"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
+. (Join-Path $PSScriptRoot "lib/PreviewIdentity.ps1")
+. (Join-Path $PSScriptRoot "lib/ProcessArguments.ps1")
+
+$uri = [System.Uri]$DatabaseUrl
+# Connection is rebuilt without an embedded password so no psql invocation
+# below ever carries a credential in its command-line arguments; the
+# password (if any) travels only through a per-process environment
+# override. Never print $DatabaseUrl, $connection or $psqlEnvironment.
+$connection = New-PsqlConnectionArguments -Uri $uri
+$psqlEnvironment = @{}
+if ($null -ne $connection.Password) {
+  $psqlEnvironment["PGPASSWORD"] = $connection.Password
+}
+
 function Invoke-PsqlFile {
   param([Parameter(Mandatory = $true)][string]$RelativePath)
 
   $absolutePath = Join-Path $repoRoot $RelativePath
-  & psql --dbname=$DatabaseUrl --set=ON_ERROR_STOP=1 --file=$absolutePath
-  if ($LASTEXITCODE -ne 0) {
+  $arguments = @("--no-psqlrc", "--set=ON_ERROR_STOP=1") + $connection.Arguments + @("--file=$absolutePath")
+  $exitCode = Invoke-ManagedProcess -FilePath "psql" -ArgumentList $arguments `
+    -EnvironmentOverrides $psqlEnvironment
+  if ($exitCode -ne 0) {
     throw "RAG test step failed: $RelativePath"
   }
 }
 
 function Assert-DisposableTarget {
-  $uri = [System.Uri]$DatabaseUrl
   if ($DatabaseUrl -match [regex]::Escape($productionProjectRef) `
       -or $PreviewBranchName -eq $productionProjectRef) {
     throw "Refusing RAG database tests: production project is prohibited."
   }
 
   if ($TargetMode -eq "Local") {
-    $localHosts = @("localhost", "127.0.0.1", "::1")
-    $urlDatabaseName = $uri.AbsolutePath.TrimStart("/")
-    if ($uri.Host -notin $localHosts -or $urlDatabaseName -notmatch "_rag_preview_test$") {
-      throw "Refusing local RAG tests: require loopback host and _rag_preview_test database."
+    $urlDatabaseName = [System.Uri]::UnescapeDataString($uri.AbsolutePath.TrimStart("/"))
+    if (-not (Test-LocalLoopbackHost -Uri $uri) -or $urlDatabaseName -notmatch "_rag_preview_test$") {
+      throw "Refusing local RAG tests: require loopback host (localhost, 127.0.0.1 or ::1) and _rag_preview_test database."
     }
   }
   else {
@@ -76,24 +90,29 @@ function Assert-DisposableTarget {
       throw "Refusing Preview RAG tests: branch is not a healthy disposable Preview."
     }
 
-    $verifiedProjectRef = [string]$branch.project_ref
+    # Every identity extractable from the connection URL (host, username,
+    # or both) must agree with the verified branch metadata -- replaces
+    # the previous "hostMatches -or usernameMatches" logic, which accepted
+    # a connection whose host and username named two DIFFERENT projects as
+    # long as either one happened to match. See scripts/lib/PreviewIdentity.ps1.
     $decodedUser = [System.Uri]::UnescapeDataString(($uri.UserInfo -split ":", 2)[0])
-    $hostLabels = $uri.Host -split "\."
-    $userProjectRef = ($decodedUser -split "\.")[-1]
-    $identityMatches = $verifiedProjectRef -in $hostLabels `
-      -or $userProjectRef -eq $verifiedProjectRef
-    if (-not $identityMatches) {
-      throw "Refusing Preview RAG tests: connection identity does not match branch metadata."
+    $identity = Test-PreviewConnectionIdentity -HostName $uri.Host -UserName $decodedUser `
+      -VerifiedProjectRef ([string]$branch.project_ref) -ProductionProjectRef $productionProjectRef
+    if (-not $identity.IsValid) {
+      throw "Refusing Preview RAG tests: $($identity.Reason)"
     }
 
-    Write-Output "Verified disposable Preview branch: $($branch.name) [$verifiedProjectRef]"
+    Write-Output "Verified disposable Preview branch: $($branch.name) [$([string]$branch.project_ref)]"
   }
 
-  $databaseName = (& psql --dbname=$DatabaseUrl --tuples-only --no-align `
-    --set=ON_ERROR_STOP=1 --command="select current_database()" 2>$null).Trim()
-  if ($LASTEXITCODE -ne 0) {
+  $probe = Invoke-ManagedProcessCapture -FilePath "psql" -EnvironmentOverrides $psqlEnvironment -ArgumentList (
+    @("--no-psqlrc", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1") + $connection.Arguments +
+    @("--command=select current_database()")
+  )
+  if ($probe.ExitCode -ne 0) {
     throw "Refusing RAG database tests: target identity query failed."
   }
+  $databaseName = $probe.StdOut.Trim()
   if ($TargetMode -eq "Local" -and $databaseName -notmatch "_rag_preview_test$") {
     throw "Refusing local RAG tests: connected database identity is not disposable."
   }
@@ -117,19 +136,13 @@ function Invoke-ConcurrencyIteration {
 
     $stdoutPath = Join-Path $tempRoot "rag-$barrierId-$Name.stdout"
     $stderrPath = Join-Path $tempRoot "rag-$barrierId-$Name.stderr"
-    $process = Start-Process -FilePath "psql" -ArgumentList @(
-      "--dbname=$DatabaseUrl",
-      "--set=ON_ERROR_STOP=1",
-      "--set=VERBOSITY=verbose",
-      "--set=barrier_id=$barrierId",
-      "--file=$SqlFile"
-    ) -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
-      -WindowStyle Hidden -PassThru
-    return [PSCustomObject]@{
-      Process = $process
-      StdoutPath = $stdoutPath
-      StderrPath = $stderrPath
-    }
+    $arguments = @(
+      "--no-psqlrc", "--set=ON_ERROR_STOP=1", "--set=VERBOSITY=verbose",
+      "--set=barrier_id=$barrierId"
+    ) + $connection.Arguments + @("--file=$SqlFile")
+    return Start-ManagedProcessToFiles -FilePath "psql" -ArgumentList $arguments `
+      -StandardOutputPath $stdoutPath -StandardErrorPath $stderrPath `
+      -EnvironmentOverrides $psqlEnvironment
   }
 
   $sessionA = $null
@@ -182,9 +195,7 @@ function Invoke-ConcurrencyIteration {
   finally {
     foreach ($session in @($sessionA, $sessionB)) {
       if ($null -ne $session) {
-        if (-not $session.Process.HasExited) {
-          $session.Process.Kill($true)
-        }
+        Stop-ManagedProcessToFiles -Handle $session
         Remove-Item -LiteralPath $session.StdoutPath -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $session.StderrPath -Force -ErrorAction SilentlyContinue
       }
@@ -218,9 +229,11 @@ foreach ($relativePath in $files) {
   Invoke-PsqlFile $relativePath
 }
 
-& psql --dbname=$DatabaseUrl --set=ON_ERROR_STOP=1 `
-  --file=(Join-Path $repoRoot "supabase/migrations/202607250001_rag_foundation_v2.sql") 2>$null
-if ($LASTEXITCODE -eq 0) {
+$reapply = Invoke-ManagedProcessCapture -FilePath "psql" -EnvironmentOverrides $psqlEnvironment -ArgumentList (
+  @("--no-psqlrc", "--set=ON_ERROR_STOP=1") + $connection.Arguments +
+  @("--file=$(Join-Path $repoRoot "supabase/migrations/202607250001_rag_foundation_v2.sql")")
+)
+if ($reapply.ExitCode -eq 0) {
   throw "Expected migration re-execution to fail fast, but it succeeded."
 }
 
