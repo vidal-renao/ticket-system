@@ -181,7 +181,14 @@ function Invoke-ConcurrencyIteration {
       }
     }
     if (-not $markerObserved) {
-      throw "RAG concurrency barrier was not observed."
+      $diagStdout = if (Test-Path -LiteralPath $sessionA.StdoutPath) {
+        Get-Content -LiteralPath $sessionA.StdoutPath -Raw
+      } else { "<no stdout file>" }
+      $diagStderr = if (Test-Path -LiteralPath $sessionA.StderrPath) {
+        Get-Content -LiteralPath $sessionA.StderrPath -Raw
+      } else { "<no stderr file>" }
+      $diagExit = if ($sessionA.Process.HasExited) { $sessionA.Process.ExitCode } else { "<still running>" }
+      throw "RAG concurrency barrier was not observed. HasExited=$($sessionA.Process.HasExited) ExitCode=$diagExit StdOut=[$diagStdout] StdErr=[$diagStderr]"
     }
 
     $sessionB = Start-PsqlSession -Name "b" -SqlFile $sessionBPath
