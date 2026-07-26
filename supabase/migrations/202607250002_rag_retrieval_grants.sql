@@ -2,6 +2,14 @@
 -- Applied after the additive v2 model; no data is changed.
 BEGIN;
 
+-- Supabase projects have "extensions" in the platform-wide default
+-- search_path, so `vector` resolves there without this; a plain
+-- PostgreSQL session (e.g. a disposable CI database) does not carry that
+-- convention, so the bare `vector` type references below would otherwise
+-- fail to resolve in a fresh session. Matches the SET LOCAL already used
+-- by 202607250001_rag_foundation_v2.sql.
+SET LOCAL search_path = pg_catalog, public, extensions;
+
 REVOKE ALL ON FUNCTION public.search_rag_knowledge_authenticated(
   vector, integer, double precision
 ) FROM PUBLIC, anon;
