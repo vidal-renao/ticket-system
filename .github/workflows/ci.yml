@@ -118,9 +118,12 @@ jobs:
           docker exec rag-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgvector postgresql-17-pgtap"
 
-      - name: Install psql client on the runner (pwsh ships preinstalled on ubuntu-latest)
+      - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server; ubuntu-latest's default repo only has an older client)
         run: |
           set -euo pipefail
+          sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends postgresql-client-17
 
