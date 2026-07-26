@@ -625,14 +625,22 @@ SELECT is((SELECT count(*) FROM public.rag_embedding_jobs), 2::bigint, 'complete
 -- (so the per-version attempt-number uniqueness is never re-evaluated
 -- against a new value) and UPDATE never fires rag_jobs_validate_retry_trg
 -- (BEFORE INSERT only). Job 502 (attempt 2) is already 'pending' for the
--- same version, so the only thing that can reject reactivating job 501
--- into 'processing' is rag_jobs_one_active_version_idx.
+-- same version, so the intent is that only rag_jobs_one_active_version_idx
+-- can reject reactivating job 501 into 'processing' -- but real execution
+-- showed rag_enforce_state_transition also fires on this UPDATE and
+-- independently rejects 'failed' -> 'processing' as RAG_INVALID_JOB_TRANSITION
+-- ('failed' is terminal; only 'pending' -> 'processing' is a legal
+-- transition into that state), so the state-transition trigger is
+-- disabled for just this one statement to isolate the partial index
+-- specifically, as the comment above always intended.
+ALTER TABLE public.rag_embedding_jobs DISABLE TRIGGER rag_jobs_state_transition_trg;
 SELECT throws_ok(
   $$UPDATE public.rag_embedding_jobs
     SET status = 'processing', started_at = now()
     WHERE id = '10000000-0000-4000-8000-000000000501'$$,
   '23505', NULL, 'only one active job per version (isolated to the partial unique index)'
 );
+ALTER TABLE public.rag_embedding_jobs ENABLE TRIGGER rag_jobs_state_transition_trg;
 SELECT throws_ok(
   $$INSERT INTO public.rag_embedding_jobs
     (id, organization_id, document_id, document_version_id, attempt_number,
@@ -854,44 +862,119 @@ SELECT throws_ok(
     )$$,
   '23503', NULL, 'cross-tenant parent reference is rejected'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_chunks', 'rag_chunks_version_org_document_fk',
+-- pgTAP has no general-purpose "does this named constraint exist"
+-- function (confirmed against pgTAP's own documentation) -- only
+-- type-specific helpers (has_pk, has_fk, col_has_check, ...) that don't
+-- take an arbitrary constraint name. A direct pg_constraint lookup by
+-- name works for every constraint type uniformly.
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_chunks'
+      AND constraint_row.conname = 'rag_chunks_version_org_document_fk'
+  ),
   'chunk version foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_embedding_jobs', 'rag_jobs_retry_fk',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_embedding_jobs'
+      AND constraint_row.conname = 'rag_jobs_retry_fk'
+  ),
   'job retry foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_embedding_jobs', 'rag_jobs_retry_ck',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_embedding_jobs'
+      AND constraint_row.conname = 'rag_jobs_retry_ck'
+  ),
   'job retry check exists'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_documents', 'rag_documents_source_org_fk',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_documents'
+      AND constraint_row.conname = 'rag_documents_source_org_fk'
+  ),
   'document source tenant foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_document_versions', 'rag_versions_document_org_fk',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_document_versions'
+      AND constraint_row.conname = 'rag_versions_document_org_fk'
+  ),
   'version document tenant foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_chunks', 'rag_chunks_document_org_fk',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_chunks'
+      AND constraint_row.conname = 'rag_chunks_document_org_fk'
+  ),
   'chunk document tenant foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_embedding_jobs', 'rag_jobs_version_org_document_fk',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_embedding_jobs'
+      AND constraint_row.conname = 'rag_jobs_version_org_document_fk'
+  ),
   'job version tenant and document foreign key exists'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_chunks', 'rag_chunks_embedding_contract_ck',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_chunks'
+      AND constraint_row.conname = 'rag_chunks_embedding_contract_ck'
+  ),
   'chunk embedding contract check exists'
 );
-SELECT has_constraint(
-  'public', 'rag_embedding_jobs', 'rag_jobs_status_ck',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_embedding_jobs'
+      AND constraint_row.conname = 'rag_jobs_status_ck'
+  ),
   'job status check exists'
 );
-SELECT has_constraint(
-  'public', 'rag_knowledge_document_versions', 'rag_versions_approval_ck',
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint constraint_row
+    JOIN pg_class relation ON relation.oid = constraint_row.conrelid
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'rag_knowledge_document_versions'
+      AND constraint_row.conname = 'rag_versions_approval_ck'
+  ),
   'version approval check exists'
 );
 
