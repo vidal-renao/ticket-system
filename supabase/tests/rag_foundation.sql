@@ -8,7 +8,23 @@ SELECT has_table('public', 'rag_knowledge_documents', 'documents table');
 SELECT has_table('public', 'rag_knowledge_document_versions', 'versions table');
 SELECT has_table('public', 'rag_knowledge_chunks', 'chunks table');
 SELECT has_table('public', 'rag_embedding_jobs', 'jobs table');
-SELECT col_type_is('public', 'rag_knowledge_chunks', 'embedding', 'vector(1536)');
+-- The pgTAP helper for this check has a (schema, table, column, type)
+-- overload and a no-schema (table, column, type, description) overload
+-- with the identical (text, text, text, text) signature; with unadorned
+-- string literals PostgreSQL can silently resolve to the wrong one --
+-- exactly what happened here in real execution (pgTAP reported "Column
+-- public.rag_knowledge_chunks does not exist", the telltale sign the
+-- no-schema/description overload matched instead). A direct pg_attribute
+-- query has no such ambiguity.
+SELECT is(
+  (SELECT format_type(attribute.atttypid, attribute.atttypmod)
+   FROM pg_attribute attribute
+   WHERE attribute.attrelid = 'public.rag_knowledge_chunks'::regclass
+     AND attribute.attname = 'embedding'
+     AND NOT attribute.attisdropped),
+  'vector(1536)',
+  'chunks.embedding is vector(1536)'
+);
 
 SET LOCAL ROLE service_role;
 INSERT INTO public.organizations (id, name, slug) VALUES

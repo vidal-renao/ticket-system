@@ -510,18 +510,28 @@ BEGIN
   IF NEW.organization_id IS DISTINCT FROM OLD.organization_id THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_ORGANIZATION_IS_IMMUTABLE';
   END IF;
-  IF TG_TABLE_NAME IN ('rag_knowledge_sources', 'rag_knowledge_documents')
-     AND NEW.created_by IS DISTINCT FROM OLD.created_by THEN
-    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_CREATOR_IS_IMMUTABLE';
+  -- created_by/document_id/document_version_id/attempt_number/retry_of_job_id
+  -- exist on only some of the three tables this shared trigger serves.
+  -- NEW/OLD are polymorphic `record`s here, and referencing a field that
+  -- does not exist on the actual bound row type is a resolution error
+  -- PostgreSQL raises regardless of AND short-circuiting (short-circuit
+  -- evaluation applies to already-resolved operand VALUES, not to whether
+  -- a field reference resolves at all) -- so each table-specific field
+  -- access must live inside its own nested IF, never combined into one
+  -- AND with the TG_TABLE_NAME guard.
+  IF TG_TABLE_NAME IN ('rag_knowledge_sources', 'rag_knowledge_documents') THEN
+    IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
+      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_CREATOR_IS_IMMUTABLE';
+    END IF;
   END IF;
-  IF TG_TABLE_NAME = 'rag_embedding_jobs'
-     AND (
-       NEW.document_id IS DISTINCT FROM OLD.document_id
+  IF TG_TABLE_NAME = 'rag_embedding_jobs' THEN
+    IF NEW.document_id IS DISTINCT FROM OLD.document_id
        OR NEW.document_version_id IS DISTINCT FROM OLD.document_version_id
        OR NEW.attempt_number IS DISTINCT FROM OLD.attempt_number
        OR NEW.retry_of_job_id IS DISTINCT FROM OLD.retry_of_job_id
-     ) THEN
-    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_JOB_IDENTITY_IS_IMMUTABLE';
+    THEN
+      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RAG_JOB_IDENTITY_IS_IMMUTABLE';
+    END IF;
   END IF;
 
   IF TG_OP = 'UPDATE' AND OLD.status = 'deleted' AND NEW.status <> 'deleted' THEN
