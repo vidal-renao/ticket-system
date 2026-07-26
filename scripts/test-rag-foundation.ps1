@@ -140,9 +140,25 @@ function Invoke-ConcurrencyIteration {
       "--no-psqlrc", "--set=ON_ERROR_STOP=1", "--set=VERBOSITY=verbose",
       "--set=barrier_id=$barrierId"
     ) + $connection.Arguments + @("--file=$SqlFile")
-    return Start-ManagedProcessToFiles -FilePath "psql" -ArgumentList $arguments `
-      -StandardOutputPath $stdoutPath -StandardErrorPath $stderrPath `
-      -EnvironmentOverrides $psqlEnvironment
+    # psql fully buffers stdout by default once it isn't a terminal (i.e.
+    # always, here, since it's redirected to a file for barrier polling),
+    # so \echo LOCK_ACQUIRED can sit in that buffer well past when the
+    # polling loop below needs to see it. stdbuf -oL forces line
+    # buffering so the marker is flushed to disk as soon as it's
+    # printed. Windows has no stdbuf; on Windows PowerShell's own
+    # Start-Process-based redirection has not shown this problem, so the
+    # wrapper is applied only where it is both available and needed.
+    if ($env:OS -eq "Windows_NT") {
+      return Start-ManagedProcessToFiles -FilePath "psql" -ArgumentList $arguments `
+        -StandardOutputPath $stdoutPath -StandardErrorPath $stderrPath `
+        -EnvironmentOverrides $psqlEnvironment
+    }
+    else {
+      $stdbufArguments = @("-oL", "--", "psql") + $arguments
+      return Start-ManagedProcessToFiles -FilePath "stdbuf" -ArgumentList $stdbufArguments `
+        -StandardOutputPath $stdoutPath -StandardErrorPath $stderrPath `
+        -EnvironmentOverrides $psqlEnvironment
+    }
   }
 
   $sessionA = $null
