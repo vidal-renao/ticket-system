@@ -20,6 +20,16 @@ BEGIN
 END;
 $$;
 
+-- A real Supabase project grants USAGE on "extensions" to these roles as
+-- part of its own platform bootstrap (so vector/pgcrypto/etc. types and
+-- functions are usable by client-facing roles); a plain PostgreSQL
+-- session does not carry that convention, and without it PostgreSQL
+-- reports the type as not existing at all rather than a permission
+-- error once a non-superuser role tries to resolve something in that
+-- schema (confirmed in real execution: "type vector does not exist"
+-- under SET LOCAL ROLE authenticated).
+GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS uuid
 LANGUAGE sql STABLE
