@@ -97,11 +97,24 @@ SELECT is(
   1::bigint,
   'authenticated retrieval is tenant scoped'
 );
-SELECT throws_ok(
-  $$UPDATE public.rag_knowledge_chunks
-    SET content = 'Agent mutation', content_hash = repeat('d', 64)$$,
-  '42501', 'agent cannot update chunks'
-);
+-- authenticated has table-level UPDATE granted (needed for the
+-- manager/admin rag_chunks_lead_update policy to function at all); an
+-- agent's UPDATE is not grant-rejected, it is RLS-filtered to zero
+-- matching rows (rag_chunks_lead_update's USING clause requires
+-- manager/admin), so this is a row-count assertion, not an exception --
+-- confirmed in real execution: an expectation of a thrown permission
+-- error here never actually threw ("caught: no exception").
+-- PostgreSQL requires a data-modifying WITH to be the statement's own
+-- top level -- it cannot be nested inside a pgTAP assertion's argument.
+-- \gset runs the WITH...UPDATE...RETURNING as its own top-level
+-- statement and captures the count into a psql variable for the
+-- following assertion.
+WITH changed AS (
+  UPDATE public.rag_knowledge_chunks
+  SET content = 'Agent mutation', content_hash = repeat('d', 64)
+  RETURNING id
+) SELECT count(*) AS agent_chunk_update_count FROM changed \gset
+SELECT is(:agent_chunk_update_count::bigint, 0::bigint, 'agent cannot update chunks');
 SELECT throws_ok(
   $$INSERT INTO public.rag_knowledge_sources
     (organization_id, name, source_type, created_by)
@@ -110,7 +123,7 @@ SELECT throws_ok(
       'Agent source', 'manual',
       '10000000-0000-4000-8000-000000000012'
     )$$,
-  '42501', 'agent cannot insert sources'
+  '42501', NULL, 'agent cannot insert sources'
 );
 
 SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000013', true);
@@ -125,70 +138,64 @@ SELECT is(
   0::bigint,
   'manager cannot read another tenant'
 );
-SELECT is(
-  (WITH changed AS (
-    UPDATE public.rag_knowledge_sources SET name = 'Cross-tenant update'
-    WHERE id = '10000000-0000-4000-8000-000000000101'
-    RETURNING id
-  ) SELECT count(*) FROM changed),
-  0::bigint,
-  'manager cannot update another tenant'
-);
+WITH changed AS (
+  UPDATE public.rag_knowledge_sources SET name = 'Cross-tenant update'
+  WHERE id = '10000000-0000-4000-8000-000000000101'
+  RETURNING id
+) SELECT count(*) AS manager_cross_tenant_update_count FROM changed \gset
+SELECT is(:manager_cross_tenant_update_count::bigint, 0::bigint, 'manager cannot update another tenant');
 SELECT set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000014', true);
 SELECT is((SELECT count(*) FROM public.rag_knowledge_sources), 1::bigint,
   'admin reads own tenant sources');
-SELECT is(
-  (WITH changed AS (
-    UPDATE public.rag_knowledge_sources SET name = name
-    WHERE id = '10000000-0000-4000-8000-000000000101'
-    RETURNING id
-  ) SELECT count(*) FROM changed),
-  1::bigint,
-  'admin manages own tenant source'
-);
+WITH changed AS (
+  UPDATE public.rag_knowledge_sources SET name = name
+  WHERE id = '10000000-0000-4000-8000-000000000101'
+  RETURNING id
+) SELECT count(*) AS admin_own_tenant_update_count FROM changed \gset
+SELECT is(:admin_own_tenant_update_count::bigint, 1::bigint, 'admin manages own tenant source');
 RESET ROLE;
 
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET content = 'Changed', content_hash = repeat('c', 64)
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready content mutation is rejected'
+  '23514', NULL, 'ready content mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET content_hash = repeat('c', 64)
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready hash mutation is rejected'
+  '23514', NULL, 'ready hash mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET embedding_model = 'other'
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready model mutation is rejected'
+  '23514', NULL, 'ready model mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET embedding_dimensions = NULL
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready dimension mutation is rejected'
+  '23514', NULL, 'ready dimension mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET embedding = array_fill(0.002::real, ARRAY[1536])::vector
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready vector mutation is rejected'
+  '23514', NULL, 'ready vector mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET document_version_id = gen_random_uuid()
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready version mutation is rejected'
+  '23514', NULL, 'ready version mutation is rejected'
 );
 SELECT throws_ok(
   $$UPDATE public.rag_knowledge_chunks
     SET embedding_status = 'processing'
     WHERE id = '10000000-0000-4000-8000-000000000401'$$,
-  '23514', 'ready chunk cannot return to processing'
+  '23514', NULL, 'ready chunk cannot return to processing'
 );
 
 -- Each identity column is mutated in isolation (nothing else in the SET
@@ -264,7 +271,7 @@ SELECT throws_ok(
       SET current_version_id = gen_random_uuid()
       WHERE id = '10000000-0000-4000-8000-000000000201';
     SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
-  '23503', 'invalid current version is rejected'
+  '23503', NULL, 'invalid current version is rejected'
 );
 
 SELECT ok(NOT EXISTS (
@@ -380,7 +387,7 @@ SELECT throws_ok(
       SET current_version_id = '10000000-0000-4000-8000-000000000303'
       WHERE id = '10000000-0000-4000-8000-000000000201';
     SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
-  '23503', 'current version belonging to another document is rejected'
+  '23503', NULL, 'current version belonging to another document is rejected'
 );
 
 SET LOCAL ROLE service_role;
@@ -405,7 +412,7 @@ SELECT throws_ok(
       SET current_version_id = '20000000-0000-4000-8000-000000000306'
       WHERE id = '10000000-0000-4000-8000-000000000201';
     SET CONSTRAINTS rag_documents_current_version_fk IMMEDIATE$$,
-  '23503', 'current version belonging to another tenant is rejected'
+  '23503', NULL, 'current version belonging to another tenant is rejected'
 );
 
 UPDATE public.rag_knowledge_documents SET status = 'archived'
@@ -532,19 +539,19 @@ SELECT throws_ok(
   $$SELECT * FROM public.search_rag_knowledge_authenticated(
     array_fill(0.001::real, ARRAY[1536])::vector, 0, 0.5
   )$$,
-  '22023', 'match count lower bound'
+  '22023', NULL, 'match count lower bound'
 );
 SELECT throws_ok(
   $$SELECT * FROM public.search_rag_knowledge_authenticated(
     array_fill(0.001::real, ARRAY[1536])::vector, 21, 0.5
   )$$,
-  '22023', 'match count upper bound'
+  '22023', NULL, 'match count upper bound'
 );
 SELECT throws_ok(
   $$SELECT * FROM public.search_rag_knowledge_authenticated(
     array_fill(0.001::real, ARRAY[1536])::vector, 3, 1.1
   )$$,
-  '22023', 'threshold bound'
+  '22023', NULL, 'threshold bound'
 );
 
 -- Full grant matrix for both retrieval RPCs: PUBLIC and anon must be able
@@ -624,7 +631,7 @@ SELECT throws_ok(
   $$UPDATE public.rag_embedding_jobs
     SET status = 'processing', started_at = now()
     WHERE id = '10000000-0000-4000-8000-000000000501'$$,
-  '23505', 'only one active job per version (isolated to the partial unique index)'
+  '23505', NULL, 'only one active job per version (isolated to the partial unique index)'
 );
 SELECT throws_ok(
   $$INSERT INTO public.rag_embedding_jobs
@@ -845,7 +852,7 @@ SELECT throws_ok(
       '20000000-0000-4000-8000-000000000101',
       'Cross tenant', 'faq', '10000000-0000-4000-8000-000000000011'
     )$$,
-  '23503', 'cross-tenant parent reference is rejected'
+  '23503', NULL, 'cross-tenant parent reference is rejected'
 );
 SELECT has_constraint(
   'public', 'rag_knowledge_chunks', 'rag_chunks_version_org_document_fk',
