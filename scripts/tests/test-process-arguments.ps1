@@ -2,10 +2,11 @@
 # Invoke-ManagedProcessCapture. Exercises the exact same argument
 # construction (New-ProcessArguments -> Start-Process -ArgumentList
 # <single pre-quoted string>) the RAG harness uses for `psql --file=<path>`,
-# but launches powershell.exe against an inert echo script instead -- psql
-# is not installed in this environment and this test intentionally never
-# depends on it. No production, no Supabase, no network access; the only
-# side effect is one temp directory, removed at the end.
+# but launches a PowerShell child process against an inert echo script
+# instead -- psql is not guaranteed available everywhere this test runs
+# (e.g. before scripts/lib is exercised in CI) and this test intentionally
+# never depends on it. No production, no Supabase, no network access; the
+# only side effect is one temp directory, removed at the end.
 #
 # The child writes what it received to a result file (UTF8) instead of
 # stdout, deliberately sidestepping Windows console output-encoding
@@ -43,7 +44,10 @@ Set-Content -LiteralPath $resultFile -Encoding UTF8 -Value $lines
   Set-Content -LiteralPath $targetFile -Value "select 1;"
   $fileArgument = "--file=$targetFile"
 
-  $result = Invoke-ManagedProcessCapture -FilePath "powershell.exe" -ArgumentList @(
+  # "powershell.exe" only exists on Windows; PowerShell Core on Linux/macOS
+  # (used by GitHub-hosted ubuntu-latest runners) ships as "pwsh" instead.
+  $childExe = if ($env:OS -eq "Windows_NT") { "powershell.exe" } else { "pwsh" }
+  $result = Invoke-ManagedProcessCapture -FilePath $childExe -ArgumentList @(
     "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
     "-File", $childScriptPath, $resultPath, $fileArgument
   )
