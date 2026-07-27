@@ -39,6 +39,11 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS customer_type   TEXT,
   ADD COLUMN IF NOT EXISTS reference_code  TEXT,
+  -- phone is documented in docs/migration_v1_final.sql's original CREATE
+  -- TABLE but was never actually present on production's profiles table
+  -- (confirmed via information_schema before this migration was applied) --
+  -- added here defensively rather than assumed pre-existing.
+  ADD COLUMN IF NOT EXISTS phone           TEXT,
   ADD COLUMN IF NOT EXISTS address         TEXT,
   ADD COLUMN IF NOT EXISTS city            TEXT,
   ADD COLUMN IF NOT EXISTS postal_code     TEXT,
