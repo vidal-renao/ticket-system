@@ -6,6 +6,7 @@
 - DE/EN/ES interface.
 - AI triage, translation, response suggestions and optional RAG.
 - Customer-only public registration and admin-managed staff accounts.
+- Immutable per-role public reference codes (`VRE-*`), individual/company customer typing, separate admin onboarding flows with invitation-based access, and self-service profile/logo management (Phase 4A.14).
 - Security baseline, tests and CI.
 - Shared ticket access policy with customer ownership regression tests.
 - Distinct customer and third-party waiting states across active workflows.

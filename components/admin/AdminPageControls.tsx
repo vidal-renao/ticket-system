@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { UserPlus, Building2, Tags } from "lucide-react";
+import { useRouter } from "@/i18n/navigation";
+import { UserPlus, User, Building2, Tags } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CreateUserModal, type Team } from "@/components/admin/CreateUserModal";
 import { toast } from "sonner";
@@ -14,13 +14,7 @@ interface AdminPageControlsProps {
 export function AdminPageControls({ teams }: AdminPageControlsProps) {
   const router = useRouter();
   const [open, setOpen]                   = useState(false);
-  const [defaultType, setDefaultType]     = useState<"agent" | "customer">("agent");
   const [seeding, setSeeding]             = useState(false);
-
-  function openModal(type: "agent" | "customer") {
-    setDefaultType(type);
-    setOpen(true);
-  }
 
   function handleSuccess() {
     router.refresh();
@@ -47,7 +41,7 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => openModal("agent")}
+          onClick={() => setOpen(true)}
           className="w-full whitespace-nowrap sm:w-auto"
         >
           <UserPlus className="w-3.5 h-3.5" />
@@ -56,7 +50,16 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => openModal("customer")}
+          onClick={() => router.push("/admin/customers/individual/new")}
+          className="w-full whitespace-nowrap sm:w-auto"
+        >
+          <User className="w-3.5 h-3.5" />
+          New Individual Customer
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => router.push("/admin/customers/company/new")}
           className="w-full whitespace-nowrap sm:w-auto"
         >
           <Building2 className="w-3.5 h-3.5" />
@@ -77,7 +80,6 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
 
       <CreateUserModal
         open={open}
-        defaultType={defaultType}
         teams={teams}
         onClose={() => setOpen(false)}
         onSuccess={handleSuccess}

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Phase 4A.14
+
+- Added `profiles.reference_code` (immutable, crypto-random, `VRE-<ADM|MGR|EMP|CUS|COM>-XXXX-XXXX`, collision-retry trigger) and `profiles.customer_type` (`individual`/`company`), plus new self-service profile columns (`address`, `city`, `postal_code`, `country`, `website`, `contact_person`, `logo_url`) and matching column grants.
+- Added an additive backfill migration assigning the canonical Vidal Real Estate tenant to the 10 profiles positively identified as legitimate individual customers, excluding 3 ambiguous cross-project accounts.
+- Added a `logos` Storage bucket mirroring the existing `avatars` bucket's public/folder-scoped-RLS pattern.
+- Added `/api/admin/customers/individual` and `/api/admin/customers/company`: separate onboarding routes, Zod schemas and invitation-based (`inviteUserByEmail`) provisioning for individual vs. company customers, replacing the single generic agent/customer toggle in `CreateUserModal` (now agent-only).
+- Extended `/settings` with a self-service personal-details form and (for company customers) a logo upload, rather than duplicating a new profile route.
+- Extended the admin user-management panel with individual/company/incomplete-profile filters and reference-code display.
+- Added an `identity-foundation` CI job (ephemeral PostgreSQL 17.6 + pgTAP, same isolation model as `rag-foundation`) running 42 real assertions against the new schema.
+- See DECISIONS.md ADR-015.
+
 ## Unreleased — Phase 4A
 
 - Added an additive, versioned `rag_*` knowledge schema with tenant-safe composite relationships, forced RLS and explicit grants.
