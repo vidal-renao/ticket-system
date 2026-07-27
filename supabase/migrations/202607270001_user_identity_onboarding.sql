@@ -18,7 +18,8 @@
 --     DROP COLUMN IF EXISTS customer_type,
 --     DROP COLUMN IF EXISTS address, DROP COLUMN IF EXISTS city,
 --     DROP COLUMN IF EXISTS postal_code, DROP COLUMN IF EXISTS country,
---     DROP COLUMN IF EXISTS website, DROP COLUMN IF EXISTS contact_person;
+--     DROP COLUMN IF EXISTS website, DROP COLUMN IF EXISTS contact_person,
+--     DROP COLUMN IF EXISTS logo_url;
 --   DELETE FROM storage.objects WHERE bucket_id = 'logos';
 --   DELETE FROM storage.buckets WHERE id = 'logos';
 -- ============================================================================
@@ -43,7 +44,8 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS postal_code     TEXT,
   ADD COLUMN IF NOT EXISTS country         TEXT,
   ADD COLUMN IF NOT EXISTS website         TEXT,
-  ADD COLUMN IF NOT EXISTS contact_person  TEXT;
+  ADD COLUMN IF NOT EXISTS contact_person  TEXT,
+  ADD COLUMN IF NOT EXISTS logo_url        TEXT;
 
 -- ----------------------------------------------------------------------------
 -- 2. customer_type backfill (evidence-based: a real customers_info.company_name
@@ -266,7 +268,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_customer_type
 --    customer_type and reference_code are intentionally NOT granted: they
 --    stay admin/service-role-only, consistent with role/organization_id.
 -- ----------------------------------------------------------------------------
-GRANT UPDATE (full_name, phone, locale, address, city, postal_code, country, website, contact_person)
+GRANT UPDATE (full_name, phone, locale, address, city, postal_code, country, website, contact_person, logo_url)
   ON public.profiles TO authenticated;
 
 -- ----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Building2, Eye, EyeOff, Loader2, Plus, ShieldCheck, UserPlus, X } from "lucide-react";
+import { Eye, EyeOff, Loader2, Plus, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { toast } from "sonner";
@@ -14,7 +14,6 @@ export interface Team {
 
 interface CreateUserModalProps {
   open: boolean;
-  defaultType?: "agent" | "customer";
   teams: Team[];
   onClose: () => void;
   onSuccess: () => void;
@@ -24,9 +23,13 @@ const input =
   "min-h-11 w-full rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-surface-500)] focus:border-[var(--color-brand-400)] focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-500)]/20";
 const label = "mb-1.5 block text-xs font-semibold text-[var(--color-text-secondary)]";
 
+// Employee/agent onboarding only. Customer onboarding (individual or
+// company) is a separate, dedicated flow -- see
+// /admin/customers/individual/new and /admin/customers/company/new -- with
+// its own routes, Zod schemas and Server Actions (Phase 4A.14 ADR-015),
+// rather than a second type-toggle branch bolted onto this modal.
 export function CreateUserModal({
   open,
-  defaultType = "agent",
   teams,
   onClose,
   onSuccess,
@@ -36,16 +39,12 @@ export function CreateUserModal({
   const fieldId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
-  const [type, setType] = useState<"agent" | "customer">(defaultType);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [teamId, setTeamId] = useState("");
   const [specialty, setSpecialty] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [taxId, setTaxId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localTeams, setLocalTeams] = useState<Team[]>(teams);
@@ -59,19 +58,16 @@ export function CreateUserModal({
 
   useEffect(() => {
     if (!open) return;
-    setType(defaultType);
     setName("");
     setEmail("");
     setPassword("");
     setShowPwd(false);
     setTeamId("");
     setSpecialty("");
-    setCompanyName("");
-    setIndustry("");
     setError(null);
     setCreatingTeam(false);
     setNewTeamName("");
-  }, [open, defaultType]);
+  }, [open]);
 
   async function handleCreateTeam() {
     const trimmed = newTeamName.trim();
@@ -155,16 +151,9 @@ export function CreateUserModal({
           name,
           email,
           password,
-          type,
-          ...(type === "agent" && {
-            team_id: teamId || undefined,
-            specialty: specialty || undefined,
-          }),
-          ...(type === "customer" && {
-            company_name: companyName,
-            industry: industry || undefined,
-            tax_id: taxId.trim() || undefined,
-          }),
+          type: "agent",
+          team_id: teamId || undefined,
+          specialty: specialty || undefined,
         }),
       });
       const data = await response.json();
@@ -176,7 +165,7 @@ export function CreateUserModal({
       toast.success(
         adopted > 0
           ? `Employee created — inherited ${adopted} unassigned ticket${adopted === 1 ? "" : "s"} from the backlog`
-          : `${type === "agent" ? "Employee" : "Company"} created successfully`
+          : "Employee created successfully"
       );
       onSuccess();
       onClose();
@@ -188,12 +177,6 @@ export function CreateUserModal({
   }
 
   if (!open) return null;
-
-  const isAgent = type === "agent";
-  const title = isAgent ? "New employee" : "New company";
-  const description = isAgent
-    ? "Create a specialist account and define how work is routed."
-    : "Create a customer account and its company profile.";
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/70 p-0 backdrop-blur-sm sm:p-4">
@@ -225,10 +208,10 @@ export function CreateUserModal({
                   Identity provisioning
                 </p>
                 <h2 id={titleId} className="mt-1 text-lg font-semibold text-[var(--color-text-primary)] sm:text-xl">
-                  {title}
+                  New employee
                 </h2>
                 <p id={descriptionId} className="mt-1 max-w-lg text-xs leading-5 text-[var(--color-text-muted)] sm:text-sm">
-                  {description}
+                  Create a specialist account and define how work is routed.
                 </p>
               </div>
             </div>
@@ -244,31 +227,6 @@ export function CreateUserModal({
 
           <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-              <div
-                className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-[var(--color-surface-700)] bg-[var(--color-surface-800)] p-1"
-                aria-label="Account type"
-              >
-                {(["agent", "customer"] as const).map((accountType) => {
-                  const selected = type === accountType;
-                  return (
-                    <button
-                      key={accountType}
-                      type="button"
-                      onClick={() => setType(accountType)}
-                      aria-pressed={selected}
-                      className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors ${
-                        selected
-                          ? "bg-[var(--color-brand-600)] text-white shadow-sm"
-                          : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-700)] hover:text-[var(--color-text-secondary)]"
-                      }`}
-                    >
-                      {accountType === "agent" ? <UserPlus className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
-                      {accountType === "agent" ? "Employee" : "Company"}
-                    </button>
-                  );
-                })}
-              </div>
-
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor={`${fieldId}-name`} className={label}>Full name</label>
@@ -324,132 +282,78 @@ export function CreateUserModal({
                   <PasswordStrengthMeter password={password} className="mt-2" />
                 </div>
 
-                {isAgent ? (
-                  <>
-                    <div>
-                      <label htmlFor={`${fieldId}-team`} className={label}>Team</label>
-                      <select
-                        id={`${fieldId}-team`}
-                        value={creatingTeam ? "__create__" : teamId}
-                        onChange={(event) => {
-                          if (event.target.value === "__create__") {
-                            setCreatingTeam(true);
-                            setTeamId("");
-                          } else {
-                            setCreatingTeam(false);
-                            setTeamId(event.target.value);
+                <div>
+                  <label htmlFor={`${fieldId}-team`} className={label}>Team</label>
+                  <select
+                    id={`${fieldId}-team`}
+                    value={creatingTeam ? "__create__" : teamId}
+                    onChange={(event) => {
+                      if (event.target.value === "__create__") {
+                        setCreatingTeam(true);
+                        setTeamId("");
+                      } else {
+                        setCreatingTeam(false);
+                        setTeamId(event.target.value);
+                      }
+                    }}
+                    className={input}
+                  >
+                    <option value="">No team assigned</option>
+                    {localTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    <option value="__create__">+ Create new team…</option>
+                  </select>
+                  {creatingTeam && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        autoFocus
+                        value={newTeamName}
+                        onChange={(event) => setNewTeamName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleCreateTeam();
                           }
                         }}
-                        className={input}
-                      >
-                        <option value="">No team assigned</option>
-                        {localTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-                        <option value="__create__">+ Create new team…</option>
-                      </select>
-                      {creatingTeam && (
-                        <div className="mt-2 flex gap-2">
-                          <input
-                            autoFocus
-                            value={newTeamName}
-                            onChange={(event) => setNewTeamName(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                handleCreateTeam();
-                              }
-                            }}
-                            placeholder="e.g. VPN & Remote Access"
-                            className={input}
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleCreateTeam}
-                            disabled={teamSaving || !newTeamName.trim()}
-                          >
-                            {teamSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label htmlFor={`${fieldId}-specialty`} className={label}>
-                        Routing specialty <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
-                      </label>
-                      <select
-                        id={`${fieldId}-specialty`}
-                        value={specialty}
-                        onChange={(event) => setSpecialty(event.target.value)}
-                        className={input}
-                      >
-                        <option value="">Default to team name</option>
-                        <option value="hardware">Hardware</option>
-                        <option value="software">Software</option>
-                        <option value="networking">Networking</option>
-                        <option value="security">Security</option>
-                        <option value="billing">Billing</option>
-                        <option value="email">Email & Communication</option>
-                        <option value="printing">Printer & Peripherals</option>
-                        <option value="vpn">VPN & Remote Access</option>
-                        <option value="m365">Microsoft 365</option>
-                        <option value="active_directory">Active Directory & Accounts</option>
-                        <option value="backup">Backup & Recovery</option>
-                        <option value="mobile">Mobile Devices</option>
-                        <option value="other">General Support</option>
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label htmlFor={`${fieldId}-company`} className={label}>Company name</label>
-                      <input
-                        id={`${fieldId}-company`}
-                        required
-                        autoComplete="organization"
-                        value={companyName}
-                        onChange={(event) => setCompanyName(event.target.value)}
-                        placeholder="Acme AG"
+                        placeholder="e.g. VPN & Remote Access"
                         className={input}
                       />
-                    </div>
-                    <div>
-                      <label htmlFor={`${fieldId}-industry`} className={label}>
-                        Industry <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
-                      </label>
-                      <select
-                        id={`${fieldId}-industry`}
-                        value={industry}
-                        onChange={(event) => setIndustry(event.target.value)}
-                        className={input}
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCreateTeam}
+                        disabled={teamSaving || !newTeamName.trim()}
                       >
-                        <option value="">Select industry</option>
-                        <option value="Technology & IT">Technology & IT</option>
-                        <option value="Finance & Banking">Finance & Banking</option>
-                        <option value="Healthcare">Healthcare</option>
-                        <option value="Manufacturing">Manufacturing</option>
-                        <option value="Real Estate">Real Estate</option>
-                        <option value="Retail & Commerce">Retail & Commerce</option>
-                        <option value="Construction">Construction</option>
-                        <option value="Education">Education</option>
-                        <option value="Hospitality & Tourism">Hospitality & Tourism</option>
-                        <option value="Other">Other</option>
-                      </select>
+                        {teamSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      </Button>
                     </div>
-                    <div>
-                      <label htmlFor={`${fieldId}-taxid`} className={label}>
-                        CIF/NIF <span className="font-normal text-[var(--color-text-muted)]">(optional — auto-generated if empty)</span>
-                      </label>
-                      <input
-                        id={`${fieldId}-taxid`}
-                        value={taxId}
-                        onChange={(event) => setTaxId(event.target.value)}
-                        placeholder="B1234567X"
-                        className={input}
-                      />
-                    </div>
-                  </>
-                )}
+                  )}
+                </div>
+                <div>
+                  <label htmlFor={`${fieldId}-specialty`} className={label}>
+                    Routing specialty <span className="font-normal text-[var(--color-text-muted)]">(optional)</span>
+                  </label>
+                  <select
+                    id={`${fieldId}-specialty`}
+                    value={specialty}
+                    onChange={(event) => setSpecialty(event.target.value)}
+                    className={input}
+                  >
+                    <option value="">Default to team name</option>
+                    <option value="hardware">Hardware</option>
+                    <option value="software">Software</option>
+                    <option value="networking">Networking</option>
+                    <option value="security">Security</option>
+                    <option value="billing">Billing</option>
+                    <option value="email">Email & Communication</option>
+                    <option value="printing">Printer & Peripherals</option>
+                    <option value="vpn">VPN & Remote Access</option>
+                    <option value="m365">Microsoft 365</option>
+                    <option value="active_directory">Active Directory & Accounts</option>
+                    <option value="backup">Backup & Recovery</option>
+                    <option value="mobile">Mobile Devices</option>
+                    <option value="other">General Support</option>
+                  </select>
+                </div>
               </div>
 
               {error && (
@@ -464,7 +368,7 @@ export function CreateUserModal({
                 Cancel
               </Button>
               <Button type="submit" className="flex-1 sm:ml-auto sm:flex-none" disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isAgent ? "Create employee" : "Create company"}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create employee"}
               </Button>
             </footer>
           </form>

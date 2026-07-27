@@ -31,7 +31,7 @@ export default async function AdminUsersPage({
   const [{ data: profilesRaw }, { data: teamsRaw }, { data: authUsers }] = await Promise.all([
     svc
       .from("profiles")
-      .select("id, full_name, role, specialty, availability_status, is_active, avatar_url")
+      .select("id, full_name, role, specialty, availability_status, is_active, avatar_url, customer_type, reference_code, organization_id")
       .eq("organization_id", orgId)
       .order("role")
       .order("full_name"),

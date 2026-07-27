@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { CreateUserModal } from "@/components/admin/CreateUserModal";
 import {
-  UserPlus, Building2, Search, Pencil, Trash2, CheckCircle2,
-  XCircle, ChevronDown, ChevronUp, Loader2,
+  UserPlus, User, Building2, Search, Pencil, Trash2, CheckCircle2,
+  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +22,9 @@ interface UserRow {
   avatar_url: string | null;
   company_name: string | null;
   email: string | null;
+  customer_type: "individual" | "company" | null;
+  reference_code: string | null;
+  organization_id: string | null;
 }
 
 interface Team {
@@ -43,7 +46,20 @@ const ROLE_COLORS: Record<string, string> = {
   customer: "text-green-300 bg-green-500/10 border-green-500/20",
 };
 
-type FilterRole = "all" | "agent" | "manager" | "admin" | "customer";
+type FilterRole =
+  | "all"
+  | "agent"
+  | "manager"
+  | "admin"
+  | "customer_individual"
+  | "customer_company"
+  | "incomplete";
+
+function isIncompleteProfile(u: UserRow): boolean {
+  if (!u.organization_id) return true;
+  if (u.role === "customer" && !u.customer_type) return true;
+  return false;
+}
 
 export function UserManagementPanel({
   users: initialUsers,
@@ -56,7 +72,6 @@ export function UserManagementPanel({
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<FilterRole>("all");
   const [createOpen, setCreateOpen] = useState(false);
-  const [createType, setCreateType] = useState<"agent" | "customer">("agent");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
   const [editSpecialty, setEditSpecialty] = useState("");
@@ -64,7 +79,13 @@ export function UserManagementPanel({
   const [sortAsc, setSortAsc] = useState(true);
 
   const filtered = users
-    .filter((u) => filterRole === "all" || u.role === filterRole)
+    .filter((u) => {
+      if (filterRole === "all") return true;
+      if (filterRole === "incomplete") return isIncompleteProfile(u);
+      if (filterRole === "customer_individual") return u.role === "customer" && u.customer_type === "individual";
+      if (filterRole === "customer_company") return u.role === "customer" && u.customer_type === "company";
+      return u.role === filterRole;
+    })
     .filter((u) => {
       const q = search.toLowerCase();
       return !q || (u.full_name ?? "").toLowerCase().includes(q) ||
@@ -144,11 +165,13 @@ export function UserManagementPanel({
           aria-label="Filter users by role"
           className={`${inputCls} w-full`}
         >
-          <option value="all">All roles</option>
-          <option value="admin">Admin</option>
-          <option value="manager">Manager</option>
-          <option value="agent">Agent</option>
-          <option value="customer">Customer</option>
+          <option value="all">All</option>
+          <option value="admin">Admins</option>
+          <option value="manager">Managers</option>
+          <option value="agent">Employees/agents</option>
+          <option value="customer_individual">Individual customers</option>
+          <option value="customer_company">Companies</option>
+          <option value="incomplete">Incomplete profiles</option>
         </select>
         <button
           type="button"
@@ -159,11 +182,14 @@ export function UserManagementPanel({
           {sortAsc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           Name
         </button>
-        <div className="col-span-2 grid grid-cols-2 gap-2 sm:ml-auto sm:flex sm:items-center">
-          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => { setCreateType("agent"); setCreateOpen(true); }}>
+        <div className="col-span-2 grid grid-cols-3 gap-2 sm:ml-auto sm:flex sm:items-center">
+          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => setCreateOpen(true)}>
             <UserPlus className="w-3.5 h-3.5" /> New Employee
           </Button>
-          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => { setCreateType("customer"); setCreateOpen(true); }}>
+          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => router.push("/admin/customers/individual/new")}>
+            <User className="w-3.5 h-3.5" /> New Individual Customer
+          </Button>
+          <Button size="sm" variant="secondary" className="w-full whitespace-nowrap sm:w-auto" onClick={() => router.push("/admin/customers/company/new")}>
             <Building2 className="w-3.5 h-3.5" /> New Company
           </Button>
         </div>
@@ -236,10 +262,22 @@ export function UserManagementPanel({
                 </div>
               ) : (
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Badge className={ROLE_COLORS[u.role] ?? ""}>{u.role}</Badge>
+                  <Badge className={ROLE_COLORS[u.role] ?? ""}>
+                    {u.role === "customer" && u.customer_type ? u.customer_type : u.role}
+                  </Badge>
                   <span className="rounded-lg border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-2 py-1 text-[11px] text-[var(--color-text-muted)]">
                     {u.company_name ?? u.specialty ?? "No specialty"}
                   </span>
+                  {u.reference_code && (
+                    <span className="rounded-lg border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-2 py-1 font-mono text-[11px] text-[var(--color-text-muted)]">
+                      {u.reference_code}
+                    </span>
+                  )}
+                  {isIncompleteProfile(u) && (
+                    <span className="flex items-center gap-1 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-300">
+                      <AlertTriangle className="h-3 w-3" /> Incomplete
+                    </span>
+                  )}
                   <span className={`ml-auto flex items-center gap-1 text-xs ${u.is_active !== false ? "text-green-400" : "text-[var(--color-text-muted)]"}`}>
                     {u.is_active !== false ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
                     {u.is_active !== false ? "Active" : "Inactive"}
@@ -339,7 +377,16 @@ export function UserManagementPanel({
                         <option value="customer">Customer</option>
                       </select>
                     ) : (
-                      <Badge className={ROLE_COLORS[u.role] ?? ""}>{u.role}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge className={ROLE_COLORS[u.role] ?? ""}>
+                          {u.role === "customer" && u.customer_type ? u.customer_type : u.role}
+                        </Badge>
+                        {isIncompleteProfile(u) && (
+                          <span title="Incomplete profile" className="flex items-center gap-1 rounded border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300">
+                            <AlertTriangle className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="hidden md:table-cell px-4 py-3">
@@ -433,7 +480,6 @@ export function UserManagementPanel({
 
       <CreateUserModal
         open={createOpen}
-        defaultType={createType}
         teams={teams}
         onClose={() => setCreateOpen(false)}
         onSuccess={() => router.refresh()}

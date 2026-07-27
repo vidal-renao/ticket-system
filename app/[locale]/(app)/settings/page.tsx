@@ -7,6 +7,8 @@ import { getOrgSettings } from "@/app/actions/org-settings";
 import { PIIScrubbingToggle } from "@/components/settings/PIIScrubbingToggle";
 import { OrgCodeDisplay } from "@/components/settings/OrgCodeDisplay";
 import { CustomerProfileForm } from "@/components/settings/CustomerProfileForm";
+import { PersonalDetailsForm } from "@/components/settings/PersonalDetailsForm";
+import { LogoUpload } from "@/components/settings/LogoUpload";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 import { AvatarUpload } from "@/components/settings/AvatarUpload";
@@ -37,7 +39,9 @@ export default async function SettingsPage({
   const svc = createServiceClientStatic();
   let { data: profile, error: profileError } = await svc
     .from("profiles")
-    .select("role, organization_id, full_name, avatar_url, availability_status")
+    .select(
+      "role, organization_id, full_name, avatar_url, availability_status, customer_type, reference_code, phone, locale, address, city, postal_code, country, website, contact_person, logo_url"
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -86,7 +90,8 @@ export default async function SettingsPage({
     business_details: string;
     tax_id: string;
   } | null = null;
-  if (isCustomer) {
+  const isCompanyCustomer = isCustomer && profile.customer_type === "company";
+  if (isCompanyCustomer) {
     const { data } = await svc
       .from("customers_info")
       .select("company_name, industry, business_details, tax_id")
@@ -130,7 +135,6 @@ export default async function SettingsPage({
     agentTeamName = team?.name ?? null;
   }
 
-  const employeeId = user.id.slice(0, 8).toUpperCase();
   const lastLogin = user.last_sign_in_at
     ? new Date(user.last_sign_in_at).toLocaleString(locale === "de" ? "de-CH" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
     : "—";
@@ -161,17 +165,25 @@ export default async function SettingsPage({
               <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Email</p>
               <p className="text-sm text-[var(--color-text-primary)]">{user.email}</p>
             </div>
+            {isCompanyCustomer && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">CIF/NIF</p>
+                <p className="text-sm font-mono text-[var(--color-text-primary)]">{customerInfo?.tax_id || "—"}</p>
+              </div>
+            )}
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">
-                {isCustomer ? "CIF/NIF" : "Employee ID"}
-              </p>
-              <p className="text-sm font-mono text-[var(--color-text-primary)]">
-                {isCustomer ? customerInfo?.tax_id || "—" : employeeId}
-              </p>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Reference code</p>
+              <p className="text-sm font-mono text-[var(--color-text-primary)]">{profile.reference_code ?? "—"}</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Role</p>
-              <p className="text-sm capitalize text-[var(--color-text-primary)]">{profile.role}</p>
+              <p className="text-sm capitalize text-[var(--color-text-primary)]">
+                {profile.role}{isCustomer && profile.customer_type ? ` · ${profile.customer_type}` : ""}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Organization</p>
+              <p className="text-sm text-[var(--color-text-primary)]">Vidal Real Estate</p>
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-0.5">Last login</p>
@@ -184,6 +196,33 @@ export default async function SettingsPage({
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── PERSONAL DETAILS (self-service editable) ── */}
+      <Card className="mb-5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <UserCircle2 className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+            <span className="text-sm font-medium text-[var(--color-text-secondary)]">Personal details</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <PersonalDetailsForm
+            initial={{
+              full_name: profile.full_name,
+              phone: profile.phone ?? null,
+              locale: profile.locale ?? null,
+              address: profile.address ?? null,
+              city: profile.city ?? null,
+              postal_code: profile.postal_code ?? null,
+              country: profile.country ?? null,
+              website: profile.website ?? null,
+              contact_person: profile.contact_person ?? null,
+            }}
+            showAddress={isCustomer}
+            showCompanyContact={isCompanyCustomer}
+          />
         </CardContent>
       </Card>
 
@@ -264,8 +303,8 @@ export default async function SettingsPage({
         </>
       )}
 
-      {/* ── CUSTOMER: Company Profile ── */}
-      {isCustomer && (
+      {/* ── CUSTOMER (company only): business/fiscal profile ── */}
+      {isCompanyCustomer && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -275,8 +314,13 @@ export default async function SettingsPage({
               </span>
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-xs text-[var(--color-text-muted)] mb-4 leading-relaxed">
+          <CardContent className="space-y-4">
+            <LogoUpload
+              userId={user.id}
+              companyName={customerInfo?.company_name || profile.full_name || "Company"}
+              currentUrl={profile.logo_url ?? null}
+            />
+            <p className="text-xs text-[var(--color-text-muted)] mb-4 leading-relaxed border-t border-[var(--color-surface-700)] pt-4">
               {t("companyProfileDesc")}
             </p>
             <CustomerProfileForm initial={customerInfo} />

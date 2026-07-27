@@ -5,7 +5,7 @@
 SET search_path = pg_catalog, public, extensions;
 
 BEGIN;
-SELECT plan(41);
+SELECT plan(42);
 
 -- ---------------------------------------------------------------------------
 -- rve_role_code() mapping
@@ -194,6 +194,10 @@ SELECT lives_ok(
 SELECT lives_ok(
   $$ UPDATE public.profiles SET address = 'Bahnhofstrasse 1', city = 'Basel', postal_code = '4001', country = 'CH' WHERE id = '00000000-0000-4000-8000-000000000003' $$,
   'authenticated can update their own address fields'
+);
+SELECT lives_ok(
+  $$ UPDATE public.profiles SET logo_url = 'https://example.test/logos/00000000-0000-4000-8000-000000000004/logo.png' WHERE id = '00000000-0000-4000-8000-000000000003' $$,
+  'authenticated can update their own logo_url'
 );
 SELECT throws_ok(
   $$ UPDATE public.profiles SET customer_type = 'company' WHERE id = '00000000-0000-4000-8000-000000000003' $$,

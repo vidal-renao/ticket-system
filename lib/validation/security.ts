@@ -58,6 +58,56 @@ export const customerProfileSchema = z.object({
   tax_id: z.string().trim().max(80, "Tax ID must be 80 characters or fewer"),
 });
 
+// Self-service editable fields (Phase 4A.14 §7-8): the only fields any
+// authenticated user may change about themselves, besides their password.
+// Deliberately excludes email, role, organization_id, customer_type and
+// reference_code -- those are never accepted from a profile-editing form.
+export const selfServiceProfileSchema = z.object({
+  full_name: z.string().trim().min(1, "Full name is required").max(200).optional(),
+  phone: z.string().trim().max(40).optional(),
+  locale: z.enum(["de", "fr", "it", "en"]).optional(),
+  address: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(120).optional(),
+  postal_code: z.string().trim().max(20).optional(),
+  country: z.string().trim().max(2).optional(),
+  website: z.string().trim().max(300).url("Must be a valid URL").optional().or(z.literal("")),
+  contact_person: z.string().trim().max(200).optional(),
+});
+
+// Phase 4A.14 §18: admin-created individual customer. Deliberately has NO
+// company/tenant/role/code fields -- those are server-imposed, never
+// accepted from this (or any) request body.
+export const createIndividualCustomerSchema = z.object({
+  first_name: z.string().trim().min(1, "First name is required").max(100),
+  last_name: z.string().trim().min(1, "Last name is required").max(100),
+  email: z.string().trim().email("Valid email is required"),
+  phone: z.string().trim().max(40).optional(),
+  address: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(120).optional(),
+  postal_code: z.string().trim().max(20).optional(),
+  country: z.string().trim().max(2).optional(),
+  locale: z.enum(["de", "fr", "it", "en"]).default("de"),
+  admin_notes: z.string().trim().max(1000).optional(),
+});
+
+// Phase 4A.14 §19: admin-created company customer. Deliberately has NO
+// tenant/role/code/customer_type fields -- those are server-imposed.
+export const createCompanyCustomerSchema = z.object({
+  legal_name: z.string().trim().min(1, "Legal / registered name is required").max(200),
+  trade_name: z.string().trim().max(200).optional(),
+  contact_email: z.string().trim().email("Valid email is required"),
+  contact_person: z.string().trim().min(1, "Contact person is required").max(200),
+  phone: z.string().trim().max(40).optional(),
+  address: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(120).optional(),
+  postal_code: z.string().trim().max(20).optional(),
+  country: z.string().trim().max(2).optional(),
+  website: z.string().trim().max(300).url("Must be a valid URL").optional().or(z.literal("")),
+  locale: z.enum(["de", "fr", "it", "en"]).default("de"),
+  tax_id: z.string().trim().max(80).optional(),
+  admin_notes: z.string().trim().max(1000).optional(),
+});
+
 export function normalizeSupabaseErrorMessage(error: { message?: string | null; code?: string | null } | null | undefined) {
   const message = error?.message?.toLowerCase() ?? "";
   const code = error?.code ?? "";

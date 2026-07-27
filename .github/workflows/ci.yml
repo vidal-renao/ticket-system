@@ -249,6 +249,7 @@ jobs:
           DB_URL="postgresql://postgres@127.0.0.1:5433/ci_identity_ci_test"
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/identity_legacy_base.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202607270001_user_identity_onboarding.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202607270002_user_identity_backfill_organization.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/user_identity.sql | tee identity-pgtap.log
           # psql prefixes NOTICE/output lines with leading whitespace, so
           # "not ok" must be matched without anchoring to column 0 (a bug

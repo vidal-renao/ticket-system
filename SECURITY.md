@@ -17,6 +17,15 @@ Identity is provided by Supabase Auth. Authorization is enforced in Route Handle
 
 Public registration creates customers only. Staff accounts are created by authenticated organization administrators.
 
+## Identity, Reference Codes and Onboarding (Phase 4A.14)
+
+- Every profile carries an immutable, server-generated `reference_code` (`VRE-<ADM|MGR|EMP|CUS|COM>-XXXX-XXXX`, crypto-random via `pgcrypto.gen_random_bytes`, collision-retry, ambiguity-free alphabet). It is never accepted from a client, never editable via any form, and a database trigger blocks any `UPDATE` that changes an already-set value, for every role including `service_role`.
+- `profiles.customer_type` (`individual`/`company`) has no `UPDATE` grant for `authenticated` — converting a customer between types is a future, explicit, service-role-only operation, not a self-service action.
+- `organization_id`, `role`, `customer_type` and `reference_code` are never read from a request body by `/api/admin/customers/individual` or `/api/admin/customers/company`; both routes resolve the canonical tenant server-side via `organizations.slug = 'vidal-real-estate'` and impose role/type unconditionally. See DECISIONS.md ADR-015.
+- Self-service profile edits (`/settings`) are restricted at the database column-grant level to `full_name, phone, locale, address, city, postal_code, country, website, contact_person, logo_url` — email, role, tenant, customer_type and reference_code have no `UPDATE` grant for `authenticated`, so a tampered client request cannot widen what it can change.
+- Company logos use a new `logos` Storage bucket, deliberately mirroring the existing `avatars` bucket's already-reviewed pattern (public read, folder-scoped RLS keyed to `auth.uid()`) rather than a new mechanism. Upload also verifies the real file signature (magic bytes) client-side before upload, since `File.type` is client-asserted and not authoritative.
+- New customer onboarding uses `supabase.auth.admin.inviteUserByEmail` — no admin ever sees a temporary password for a customer account (agent/employee onboarding is unchanged and still uses an admin-set temporary password).
+
 ## Multi-Tenancy
 
 - Prefer session clients and RLS.
