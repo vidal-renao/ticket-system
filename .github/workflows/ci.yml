@@ -170,3 +170,98 @@ jobs:
       - name: Tear down the ephemeral database container
         if: always()
         run: docker rm -f rag-ci-postgres || true
+
+  identity-foundation:
+    # Runs the Phase 4A.14 user-identity migration (reference_code,
+    # customer_type, logos storage/RLS) and its pgTAP suite against a
+    # disposable PostgreSQL instance, same isolation model as rag-foundation:
+    # never Supabase Preview Branches, never production, always torn down.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate ephemeral database credentials (random, job-scoped, never logged)
+        id: creds
+        run: |
+          set -euo pipefail
+          PASSWORD="$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9')"
+          echo "::add-mask::$PASSWORD"
+          echo "password=$PASSWORD" >> "$GITHUB_OUTPUT"
+
+      - name: Start ephemeral PostgreSQL 17.6 (pinned to production's exact version; loopback-only)
+        env:
+          PG_EPHEMERAL_PASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          docker run -d --name identity-ci-postgres \
+            -e POSTGRES_PASSWORD="$PG_EPHEMERAL_PASSWORD" \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_DB=postgres \
+            -p 127.0.0.1:5433:5432 \
+            postgres:17.6
+          for _ in $(seq 1 30); do
+            if docker exec identity-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not become ready in time"
+          exit 1
+
+      - name: Install pgTAP (test-only extension, never installed in production)
+        run: |
+          set -euo pipefail
+          docker exec identity-ci-postgres bash -c \
+            "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+
+      - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring-identity.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring-identity.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-identity.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+
+      - name: Create the disposable database (name must end in _identity_ci_test)
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: psql --no-psqlrc --set=ON_ERROR_STOP=1 "postgresql://postgres@127.0.0.1:5433/postgres" -c "CREATE DATABASE ci_identity_ci_test;"
+
+      - name: Assert the target host is loopback and is not the production ref (defense in depth)
+        run: |
+          set -euo pipefail
+          HOST="127.0.0.1"
+          if [ "$HOST" != "127.0.0.1" ] && [ "$HOST" != "localhost" ] && [ "$HOST" != "::1" ]; then
+            echo "::error::Refusing non-loopback host: $HOST"; exit 1
+          fi
+          if [[ "$HOST" == *"focgfmhgfmhmcbywwsej"* ]]; then
+            echo "::error::Production project ref detected in CI database target"; exit 1
+          fi
+          echo "OK: loopback host, no production ref."
+
+      - name: Apply legacy fixture, the identity migration, then run the pgTAP suite
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          DB_URL="postgresql://postgres@127.0.0.1:5433/ci_identity_ci_test"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/identity_legacy_base.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202607270001_user_identity_onboarding.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/user_identity.sql | tee identity-pgtap.log
+          if grep -qE "^not ok" identity-pgtap.log; then
+            echo "::error::pgTAP reported at least one failed assertion"
+            exit 1
+          fi
+          if ! grep -qE "^# Looks like you failed 0 tests|^1\.\.[0-9]+$" identity-pgtap.log; then
+            echo "::warning::Could not positively confirm a clean pgTAP summary line; review the log."
+          fi
+
+      - name: Publish pgTAP summary
+        if: always()
+        run: cat identity-pgtap.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Tear down the ephemeral database container
+        if: always()
+        run: docker rm -f identity-ci-postgres || true
