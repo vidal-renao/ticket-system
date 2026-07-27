@@ -250,13 +250,20 @@ jobs:
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/identity_legacy_base.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202607270001_user_identity_onboarding.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/user_identity.sql | tee identity-pgtap.log
-          if grep -qE "^not ok" identity-pgtap.log; then
+          # psql prefixes NOTICE/output lines with leading whitespace, so
+          # "not ok" must be matched without anchoring to column 0 (a bug
+          # caught here in real CI: an earlier ^not ok anchor let 3 real
+          # pgTAP failures through as a green job).
+          if grep -qE "not ok [0-9]" identity-pgtap.log; then
             echo "::error::pgTAP reported at least one failed assertion"
+            grep -E "not ok [0-9]|# Failed test" identity-pgtap.log
             exit 1
           fi
-          if ! grep -qE "^# Looks like you failed 0 tests|^1\.\.[0-9]+$" identity-pgtap.log; then
-            echo "::warning::Could not positively confirm a clean pgTAP summary line; review the log."
+          if ! grep -qE "^\s*1\.\.[0-9]+\s*$" identity-pgtap.log; then
+            echo "::error::No pgTAP plan line found -- the suite may not have run at all"
+            exit 1
           fi
+          echo "OK: pgTAP plan line found and no failed assertions."
 
       - name: Publish pgTAP summary
         if: always()

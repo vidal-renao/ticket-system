@@ -70,11 +70,17 @@ DO $$ BEGIN
     SELECT 1 FROM pg_constraint
     WHERE conname = 'profiles_customer_type_check' AND conrelid = 'public.profiles'::regclass
   ) THEN
+    -- customer_type IS NULL is always allowed -- both as the permanent state
+    -- for non-customer roles, and as the transitional state for a customer
+    -- profile between the bare row handle_new_user() creates and the app's
+    -- follow-up upsert that classifies it individual/company. Once it IS
+    -- set, though, it must be a valid value and the profile must actually
+    -- be a customer.
     ALTER TABLE public.profiles
       ADD CONSTRAINT profiles_customer_type_check
       CHECK (
-        (role = 'customer' AND customer_type IN ('individual', 'company'))
-        OR (role <> 'customer' AND customer_type IS NULL)
+        customer_type IS NULL
+        OR (role = 'customer' AND customer_type IN ('individual', 'company'))
       );
   END IF;
 END $$;

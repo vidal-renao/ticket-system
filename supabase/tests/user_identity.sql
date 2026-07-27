@@ -5,7 +5,7 @@
 SET search_path = pg_catalog, public, extensions;
 
 BEGIN;
-SELECT plan(37);
+SELECT plan(41);
 
 -- ---------------------------------------------------------------------------
 -- rve_role_code() mapping
@@ -29,11 +29,17 @@ SELECT ok(
 -- ---------------------------------------------------------------------------
 -- customer_type CHECK constraint
 -- ---------------------------------------------------------------------------
-SELECT throws_ok(
+SELECT lives_ok(
   $$ INSERT INTO public.profiles (id, organization_id, role, customer_type)
      VALUES ('00000000-0000-4000-8000-000000000001', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', NULL) $$,
+  'a customer profile with no customer_type yet is accepted (transitional state matching handle_new_user()''s bare insert)'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO public.profiles (id, organization_id, role, customer_type)
+     VALUES ('00000000-0000-4000-8000-000000000013', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'not-a-real-type') $$,
   '23514', NULL,
-  'a customer profile with no customer_type violates the CHECK constraint'
+  'a customer profile with an invalid customer_type value violates the CHECK constraint'
 );
 
 SELECT throws_ok(
@@ -88,27 +94,44 @@ SELECT ok(
 );
 
 -- ---------------------------------------------------------------------------
--- Two-step signup: bare row (handle_new_user shape), then role assigned
--- later via UPDATE -- the reference_code must be generated on that UPDATE,
--- not left permanently NULL.
+-- Two-step signup: bare customer row (handle_new_user shape, customer_type
+-- still NULL, so reference_code is left NULL too) -- then the app's
+-- follow-up upsert sets customer_type, and *that* UPDATE is what generates
+-- the reference_code. Profile 000000000001 was inserted earlier as exactly
+-- this bare shape.
+-- ---------------------------------------------------------------------------
+SELECT is(
+  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000001'),
+  NULL,
+  'the bare customer row (customer_type still NULL) has no reference_code yet'
+);
+SELECT lives_ok(
+  $$ UPDATE public.profiles SET customer_type = 'individual' WHERE id = '00000000-0000-4000-8000-000000000001' $$,
+  'the follow-up upsert setting customer_type succeeds'
+);
+SELECT ok(
+  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000001') ~ '^VRE-CUS-',
+  'reference_code was generated on the customer_type-setting UPDATE, once the role/type became resolvable'
+);
+
+-- ---------------------------------------------------------------------------
+-- Immutability -- including across a role change (a promotion does NOT get
+-- a new code; the identifier is permanent, not a reflection of current role)
 -- ---------------------------------------------------------------------------
 SELECT lives_ok(
   $$ INSERT INTO public.profiles (id, organization_id, role)
      VALUES ('00000000-0000-4000-8000-000000000008', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'agent') $$,
-  'bare agent row (simulating a handle_new_user-created default) inserts cleanly'
+  'a fresh agent profile inserts cleanly and gets an EMP code immediately'
 );
 SELECT lives_ok(
   $$ UPDATE public.profiles SET role = 'manager' WHERE id = '00000000-0000-4000-8000-000000000008' $$,
   'promoting the profile to manager via UPDATE succeeds'
 );
 SELECT ok(
-  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000008') ~ '^VRE-MGR-',
-  'reference_code was assigned on the role-change UPDATE, with the new role''s prefix'
+  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000008') ~ '^VRE-EMP-',
+  'reference_code keeps its original EMP prefix after the promotion -- immutable, not role-reactive'
 );
 
--- ---------------------------------------------------------------------------
--- Immutability
--- ---------------------------------------------------------------------------
 SELECT throws_ok(
   $$ UPDATE public.profiles SET reference_code = 'VRE-MGR-ZZZZ-ZZZZ' WHERE id = '00000000-0000-4000-8000-000000000008' $$,
   'P0001', 'RVE_REFERENCE_CODE_IMMUTABLE: reference_code cannot be changed once set',
@@ -120,7 +143,7 @@ SELECT lives_ok(
   'updating an unrelated column on a profile with an existing reference_code still succeeds'
 );
 SELECT ok(
-  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000008') ~ '^VRE-MGR-',
+  (SELECT reference_code FROM public.profiles WHERE id = '00000000-0000-4000-8000-000000000008') ~ '^VRE-EMP-',
   'reference_code is unchanged after the unrelated-column update'
 );
 
