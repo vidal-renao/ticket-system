@@ -42,6 +42,55 @@ export function AppShell({
   const supabase = createClient();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Rail sizing is CSS-driven from data-sidebar on <html> (set pre-paint in
+  // app/layout.tsx). This state only mirrors it for labels and ARIA.
+  const [collapsed, setCollapsed] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    setCollapsed(document.documentElement.dataset.sidebar === "collapsed");
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setIsDesktop(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((previous) => {
+      const next = !previous;
+      document.documentElement.dataset.sidebar = next ? "collapsed" : "expanded";
+      try {
+        localStorage.setItem("hd_sidebar", next ? "collapsed" : "expanded");
+      } catch {
+        // Private mode: the rail still toggles for this session.
+      }
+      return next;
+    });
+  }
+
+  // Mobile drawer: Escape closes it and the page behind it does not scroll.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [mobileMenuOpen]);
+
+  // Off-canvas and closed: keep the hidden nav out of the tab order.
+  const drawerHidden = !isDesktop && !mobileMenuOpen;
 
   // Liveness heartbeat: keeps profiles.last_seen_at fresh so presence shown
   // across the app reflects who is actually connected.
@@ -150,6 +199,8 @@ export function AppShell({
             onClick={() => setMobileMenuOpen((open) => !open)}
             className="w-10 h-10 rounded-lg border border-[var(--color-surface-600)] text-[var(--color-text-secondary)] flex items-center justify-center"
             aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="app-sidebar"
           >
             {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
@@ -190,6 +241,10 @@ export function AppShell({
         onSignOut={handleSignOut}
         onGoHome={handleGoHome}
         onNavigate={() => setMobileMenuOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapsed}
+        id="app-sidebar"
+        inert={drawerHidden || undefined}
         className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 lg:static lg:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}

@@ -36,6 +36,11 @@ const THEME_BOOT_SCRIPT = `
       ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
       : mode;
     document.documentElement.setAttribute("data-theme", resolved);
+    // Sidebar rail state, applied here so a collapsed rail never flashes open.
+    document.documentElement.setAttribute(
+      "data-sidebar",
+      localStorage.getItem("hd_sidebar") === "collapsed" ? "collapsed" : "expanded"
+    );
     var b = Number(localStorage.getItem("hd_brightness") || "50");
     if (isFinite(b) && b !== 50) {
       document.documentElement.style.setProperty("--hd-brightness-bg", b >= 50 ? "#ffffff" : "#000000");
