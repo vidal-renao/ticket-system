@@ -15,14 +15,23 @@
 SET search_path = pg_catalog, public, extensions;
 
 BEGIN;
-SELECT plan(18);
+SELECT plan(19);
 
 -- ---------------------------------------------------------------------------
 -- Helper: run a statement as a given actor and report what happened.
 --
--- Returns 'rows=N' on success (so an RLS-silenced no-op update cannot pass as
--- a success) or the SQLSTATE on failure. The role is reset on both paths, so a
--- role switch never leaks into pgTAP's own temp tables.
+-- Returns 'rows=N' on success or the SQLSTATE on failure. Two details matter:
+--
+--   * The row count is reported rather than a bare boolean, because an update
+--     silenced by RLS affects zero rows and would otherwise read as a pass.
+--   * Every attempt is undone before returning, via a marker exception that
+--     rolls the subtransaction back. Without it each assertion would inherit
+--     the previous one's mutations and a later "customer may not close" test
+--     would compare 'closed' against 'closed', find nothing changed and pass
+--     while asserting nothing.
+--
+-- The role is reset on both paths so a role switch never leaks into pgTAP's
+-- own temp tables.
 -- ---------------------------------------------------------------------------
 CREATE FUNCTION pg_temp.attempt(p_actor uuid, p_sql text)
 RETURNS text
@@ -44,9 +53,12 @@ BEGIN
     EXECUTE p_sql;
     GET DIAGNOSTICS affected = ROW_COUNT;
     RESET ROLE;
-    RETURN 'rows=' || affected;
+    RAISE EXCEPTION USING ERRCODE = '40000', MESSAGE = 'ci-undo:' || affected;
   EXCEPTION WHEN others THEN
     RESET ROLE;
+    IF SQLSTATE = '40000' AND SQLERRM LIKE 'ci-undo:%' THEN
+      RETURN 'rows=' || split_part(SQLERRM, ':', 2);
+    END IF;
     RETURN SQLSTATE;
   END;
 END;
@@ -114,13 +126,13 @@ SELECT is(
 -- `NULL <> 'customer'` is NULL rather than TRUE. Asserting the premise keeps
 -- the two behavioural tests below honest.
 -- ---------------------------------------------------------------------------
-SELECT is(
-  public.current_profile_role(), NULL,
+SELECT ok(
+  public.current_profile_role() IS NULL,
   'current_profile_role() is NULL when there is no end-user JWT'
 );
 
-SELECT is(
-  (NULL::text <> 'customer'), NULL,
+SELECT ok(
+  (NULL::text <> 'customer') IS NULL,
   'the original <> test yields NULL, not TRUE, which is what let the guard misfire'
 );
 
