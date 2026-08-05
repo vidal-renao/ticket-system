@@ -18,6 +18,8 @@
 - Added `tickets_customer_update_guard`, which keeps a customer's direct writes to priority and metadata, matching what the application already allows.
 - Revoked `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` on `tickets` and `ticket_comments` from `anon`; no unauthenticated flow writes either table.
 - The pre-existing `ticket_comments` INSERT policy is now reachable: the authenticated role had never been granted `INSERT`, so the policy had no effect.
+- Fixed `tickets_customer_update_guard` applying the customer rule to every caller. It tested `current_profile_role() <> 'customer'`, which is NULL rather than TRUE on the service_role connection all application writes use, so the restricted branch ran for admins too and any write touching a guarded column failed — commenting (via `applySlaAssessment`) and closing a ticket included. The guard now restricts only a positively identified customer; under service_role, where no end-user identity reaches the database at all, the rule stays where it already lives and is stricter: the API routes, which are also the only layer that can tell a legitimate customer transition (resolution sign-off, reopen) from an illegitimate one.
+- Added a `tickets-write-policies` CI job (ephemeral PostgreSQL 17.6 + pgTAP) running 18 assertions over both migrations, exercising the service_role and customer paths that the original JWT-only verification missed.
 
 ### Changed
 
