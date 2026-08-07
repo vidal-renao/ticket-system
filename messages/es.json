@@ -205,7 +205,11 @@
     "confirmButton": "Confirmar — todo correcto",
     "confirmDone": "¡Gracias! Ticket cerrado.",
     "reopenHint": "¿No está resuelto?",
-    "autoCloseNote": "Sin respuesta, el ticket se cierra automáticamente 48h después de la resolución."
+    "autoCloseNote": "Sin respuesta, el ticket se cierra automáticamente 48h después de la resolución.",
+    "aiReanalyze": "Reanalizar con IA",
+    "aiReanalyzing": "Analizando…",
+    "aiReanalyzeDone": "Triaje IA completado",
+    "aiReanalyzeFailed": "No se pudo reanalizar"
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",

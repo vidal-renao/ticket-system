@@ -205,7 +205,11 @@
     "confirmButton": "Confirm — all good",
     "confirmDone": "Thank you! Ticket closed.",
     "reopenHint": "Issue not resolved?",
-    "autoCloseNote": "Without a response, the ticket closes automatically 48h after resolution."
+    "autoCloseNote": "Without a response, the ticket closes automatically 48h after resolution.",
+    "aiReanalyze": "Re-run AI triage",
+    "aiReanalyzing": "Running…",
+    "aiReanalyzeDone": "AI triage completed",
+    "aiReanalyzeFailed": "Could not re-run AI triage"
   },
   "aiChat": {
     "title": "AI Support Assistant",
