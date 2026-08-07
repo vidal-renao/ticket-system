@@ -33,4 +33,9 @@ next-env.d.ts
 
 # Vercel
 .vercel
-.env*.local
+
+# Local env files. The broad glob also covers suffixless variants such as
+# .env.production, which .env*.local misses; the negation keeps the tracked
+# .env.local.example visible, since the glob would otherwise shadow it.
+.env*
+!.env*.example
