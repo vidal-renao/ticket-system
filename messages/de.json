@@ -96,7 +96,9 @@
     "signOut": "Abmelden",
     "home": "Startseite",
     "inbox": "Posteingang",
-    "history": "Verlauf"
+    "history": "Verlauf",
+    "collapseSidebar": "Menü einklappen",
+    "expandSidebar": "Menü ausklappen"
   },
   "tickets": {
     "myTickets": "Meine Anfragen",
@@ -373,5 +375,118 @@
     "noTickets": "Keine Anfragen entsprechen Ihren Filtern",
     "totalShowing": "{count} Anfragen",
     "clearFilters": "Filter zurücksetzen"
+  },
+  "ops": {
+    "title": "Live-Betriebskonsole",
+    "org": "Org",
+    "swissDsg": "Swiss DSG",
+    "fromDashboard": "Live-Betriebskonsole",
+    "fromDashboardHint": "SLA, Ticketfluss und Audit-Zustellung in Echtzeit",
+    "realtime": {
+      "live": "Realtime verbunden",
+      "connecting": "Verbindung wird aufgebaut…",
+      "reconnecting": "Neuverbindung…",
+      "offline": "Realtime getrennt",
+      "lastEvent": "letztes Ereignis"
+    },
+    "tabs": {
+      "overview": "Übersicht",
+      "tickets": "Anfragen",
+      "activity": "Aktivität"
+    },
+    "kpi": {
+      "compliance": "Compliance",
+      "active": "Aktiv",
+      "unassigned": "Ohne Routing",
+      "inProgress": "In Bearbeitung",
+      "waiting": "Wartend",
+      "resolved": "Gelöst",
+      "closed": "Geschlossen",
+      "slaBreached": "SLA-Verstöße",
+      "critical": "Kritisch",
+      "awaitingReview": "Prüfung offen",
+      "total": "Gesamt"
+    },
+    "charts": {
+      "status": "Status der Anfragen",
+      "priority": "Priorität",
+      "flow": "Monatsfluss · erstellt vs. gelöst",
+      "created": "Erstellt",
+      "resolved": "Gelöst",
+      "noData": "Noch keine Daten"
+    },
+    "status": {
+      "new": "Neu",
+      "assigned": "Zugewiesen",
+      "in_progress": "In Bearbeitung",
+      "waiting_customer": "Wartet auf Kunde",
+      "waiting_third_party": "Wartet auf Dritte",
+      "resolved": "Gelöst",
+      "closed": "Geschlossen"
+    },
+    "priority": {
+      "critical": "Kritisch",
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
+    },
+    "table": {
+      "searchPlaceholder": "Referenz, Titel, Kategorie suchen…",
+      "allStatuses": "Alle Status",
+      "allPriorities": "Alle Prioritäten",
+      "ref": "Ref",
+      "title": "Titel",
+      "status": "Status",
+      "priority": "Priorität",
+      "assignee": "Zugewiesen an",
+      "created": "Erstellt",
+      "sla": "SLA",
+      "breach": "Verstoß",
+      "ok": "ok",
+      "empty": "Keine Anfrage entspricht diesen Filtern",
+      "unassigned": "Nicht zugewiesen",
+      "unknownActor": "Unbekannt",
+      "actions": "Verwaltung",
+      "open": "In Anfragen öffnen"
+    },
+    "feed": {
+      "title": "Lebenszyklus · Live-Aktivität",
+      "recent": "Letzte Aktivität",
+      "empty": "Noch keine Aktivität",
+      "internal": "intern",
+      "ai": "KI"
+    },
+    "event": {
+      "created": "Erstellt",
+      "first_response": "Erste Antwort",
+      "status": "Statuswechsel",
+      "resolved": "Gelöst",
+      "closed": "Geschlossen",
+      "sla_breach": "SLA-Verstoß",
+      "comment": "Kommentar",
+      "audit": "Audit",
+      "removed": "Entfernt"
+    },
+    "audit": {
+      "title": "SLA-Audit · Zustellung",
+      "refresh": "Aktualisieren",
+      "never": "Noch keine Zustellung erfasst",
+      "lastDelivery": "Letzte Zustellung",
+      "status": "Status",
+      "providerConfirmed": "vom Anbieter bestätigt",
+      "schedule": "Zeitplan",
+      "daily": "täglich 06:00 UTC",
+      "compliance30d": "Compliance · 30 T"
+    },
+    "ai": {
+      "title": "KI-Triage-Signal",
+      "empty": "Keine KI-Analyse für die aktuellen Anfragen",
+      "analyzed": "Analysiert",
+      "avgConfidence": "Ø Konfidenz"
+    },
+    "footer": {
+      "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
+      "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    }
   }
 }

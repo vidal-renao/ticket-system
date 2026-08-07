@@ -96,7 +96,9 @@
     "signOut": "Sign out",
     "home": "Home",
     "inbox": "Inbox",
-    "history": "History"
+    "history": "History",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "tickets": {
     "myTickets": "My Tickets",
@@ -373,5 +375,118 @@
     "noTickets": "No tickets match your filters",
     "totalShowing": "{count} tickets",
     "clearFilters": "Clear filters"
+  },
+  "ops": {
+    "title": "Live Operations Console",
+    "org": "Org",
+    "swissDsg": "Swiss DSG",
+    "fromDashboard": "Live operations console",
+    "fromDashboardHint": "Real-time SLA, ticket flow and audit delivery",
+    "realtime": {
+      "live": "Realtime connected",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "offline": "Realtime offline",
+      "lastEvent": "last event"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "tickets": "Tickets",
+      "activity": "Activity"
+    },
+    "kpi": {
+      "compliance": "Compliance",
+      "active": "Active",
+      "unassigned": "Unrouted",
+      "inProgress": "In progress",
+      "waiting": "Waiting",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "slaBreached": "SLA breaches",
+      "critical": "Critical",
+      "awaitingReview": "Awaiting review",
+      "total": "Total"
+    },
+    "charts": {
+      "status": "Ticket status",
+      "priority": "Priority",
+      "flow": "Monthly flow · created vs resolved",
+      "created": "Created",
+      "resolved": "Resolved",
+      "noData": "No data yet"
+    },
+    "status": {
+      "new": "New",
+      "assigned": "Assigned",
+      "in_progress": "In progress",
+      "waiting_customer": "Waiting for customer",
+      "waiting_third_party": "Waiting for third party",
+      "resolved": "Resolved",
+      "closed": "Closed"
+    },
+    "priority": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "table": {
+      "searchPlaceholder": "Search reference, title, category…",
+      "allStatuses": "All statuses",
+      "allPriorities": "All priorities",
+      "ref": "Ref",
+      "title": "Title",
+      "status": "Status",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "created": "Created",
+      "sla": "SLA",
+      "breach": "breach",
+      "ok": "ok",
+      "empty": "No ticket matches these filters",
+      "unassigned": "Unassigned",
+      "unknownActor": "Unknown",
+      "actions": "Manage",
+      "open": "Open in tickets"
+    },
+    "feed": {
+      "title": "Lifecycle · live activity",
+      "recent": "Recent activity",
+      "empty": "No activity yet",
+      "internal": "internal",
+      "ai": "AI"
+    },
+    "event": {
+      "created": "Created",
+      "first_response": "First response",
+      "status": "Status change",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "sla_breach": "SLA breach",
+      "comment": "Comment",
+      "audit": "Audit",
+      "removed": "Removed"
+    },
+    "audit": {
+      "title": "SLA audit · delivery",
+      "refresh": "Refresh",
+      "never": "No delivery recorded yet",
+      "lastDelivery": "Last delivery",
+      "status": "Status",
+      "providerConfirmed": "provider confirmed",
+      "schedule": "Schedule",
+      "daily": "daily 06:00 UTC",
+      "compliance30d": "Compliance · 30 d"
+    },
+    "ai": {
+      "title": "AI triage signal",
+      "empty": "No AI analysis for the current tickets",
+      "analyzed": "Analyzed",
+      "avgConfidence": "Avg confidence"
+    },
+    "footer": {
+      "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
+      "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    }
   }
 }

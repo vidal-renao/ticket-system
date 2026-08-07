@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Live operations console
+
+- Added `/ops`, a manager/admin-only live operations console: KPI ribbon, canonical-status donut, priority and monthly-flow charts, filterable ticket table and a merged lifecycle activity feed, all fed by Supabase Realtime (`postgres_changes` on `tickets`, `ticket_comments`, `ticket_audit_logs`). Agents and customers are redirected to `/dashboard`, which now links to the console.
+- Added migration `202608010001_dashboard_realtime.sql`: adds the three tables to the `supabase_realtime` publication (idempotent, additive — the publication is shared with other applications in this project). `REPLICA IDENTITY` is unchanged; the console consumes INSERT/UPDATE only and treats a newly set `deleted_at` as a removal.
+- Added `/api/audit`: the only browser-facing door to `public.audit_runs` (a `service_role`-only view), gated to an authenticated manager/admin and scoped to their own organization. Compliance percentages are parsed from the delivered report subject, which is where the pipeline records them.
+- Realtime subscribes with the user's JWT, so RLS remains the authorization boundary for the stream; channel drops are retried with backoff and a snapshot resync closes the gap.
+- Each `/ops` row links to `/tickets/[id]`; ticket management (close, assign, edit) stays on the existing screen rather than being duplicated in the console.
+
+### Fixed
+
+- Typing in a ticket comment box no longer logs "tried to push 'presence' before joining": the indicator created a new presence channel on every keystroke and pushed to it before the join completed. It now reuses the subscribed channel and only tracks once the channel reports `SUBSCRIBED`.
+
+### Security
+
+- Added the missing `UPDATE` policy on `public.tickets` plus the `UPDATE`/`INSERT` privileges the authenticated role never had. The application was never blocked by this — every ticket write runs server-side with `service_role` after its own role and organization checks — but the database itself was permissive-by-absence. Scope matches the read policy: customers their own tickets, agents their assigned ones, managers/admins the whole organization. No `DELETE` policy: deletion here is an `UPDATE` of `deleted_at`.
+- Added `tickets_customer_update_guard`, which keeps a customer's direct writes to priority and metadata, matching what the application already allows.
+- Revoked `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` on `tickets` and `ticket_comments` from `anon`; no unauthenticated flow writes either table.
+- The pre-existing `ticket_comments` INSERT policy is now reachable: the authenticated role had never been granted `INSERT`, so the policy had no effect.
+- Fixed `tickets_customer_update_guard` applying the customer rule to every caller. It tested `current_profile_role() <> 'customer'`, which is NULL rather than TRUE on the service_role connection all application writes use, so the restricted branch ran for admins too and any write touching a guarded column failed — commenting (via `applySlaAssessment`) and closing a ticket included. The guard now restricts only a positively identified customer; under service_role, where no end-user identity reaches the database at all, the rule stays where it already lives and is stricter: the API routes, which are also the only layer that can tell a legitimate customer transition (resolution sign-off, reopen) from an illegitimate one.
+- Added a `tickets-write-policies` CI job (ephemeral PostgreSQL 17.6 + pgTAP) running 18 assertions over both migrations, exercising the service_role and customer paths that the original JWT-only verification missed.
+
+### Changed
+
+- The application sidebar collapses to an icon rail above `lg` (persisted per device, applied before first paint so it never flashes open) and stays an off-canvas drawer below it. The drawer now closes on Escape, locks background scroll, and is removed from the tab order while off-canvas.
+
 ## Unreleased — Phase 4A.14
 
 - Added `profiles.reference_code` (immutable, crypto-random, `VRE-<ADM|MGR|EMP|CUS|COM>-XXXX-XXXX`, collision-retry trigger) and `profiles.customer_type` (`individual`/`company`), plus new self-service profile columns (`address`, `city`, `postal_code`, `country`, `website`, `contact_person`, `logo_url`) and matching column grants.

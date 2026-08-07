@@ -55,6 +55,13 @@ export function TicketComments({
   const [suggesting, setSuggesting] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The presence channel is created once and reused: track()/untrack() push on
+  // an existing socket, so re-creating a channel per keystroke both leaked
+  // channels and pushed before the join completed.
+  const presenceChannelRef = useRef<ReturnType<
+    ReturnType<typeof createClient>["channel"]
+  > | null>(null);
+  const presenceReadyRef = useRef(false);
 
   // Realtime: presence-based typing indicator
   useEffect(() => {
@@ -62,6 +69,8 @@ export function TicketComments({
     const presenceChannel = supabase.channel(`ticket-typing-${ticketId}`, {
       config: { presence: { key: currentUserId } },
     });
+    presenceChannelRef.current = presenceChannel;
+    presenceReadyRef.current = false;
 
     presenceChannel
       .on("presence", { event: "sync" }, () => {
@@ -72,26 +81,33 @@ export function TicketComments({
           .filter(Boolean) as string[];
         setTypingUsers(names);
       })
-      .subscribe();
+      .subscribe((status) => {
+        // Presence may only be pushed once the channel has actually joined.
+        presenceReadyRef.current = status === "SUBSCRIBED";
+      });
 
-    return () => { supabase.removeChannel(presenceChannel); };
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      presenceReadyRef.current = false;
+      presenceChannelRef.current = null;
+      supabase.removeChannel(presenceChannel);
+    };
   }, [ticketId, currentUserId]);
+
+  function setTyping(isTyping: boolean) {
+    const channel = presenceChannelRef.current;
+    // Not joined yet (or already torn down): skip silently — the typing
+    // indicator is cosmetic and must never break the comment box.
+    if (!channel || !presenceReadyRef.current) return;
+    void (isTyping ? channel.track({ name: "someone" }) : channel.untrack());
+  }
 
   function handleTyping(value: string) {
     setContent(value);
-    const supabase = createClient();
-    const presenceChannel = supabase.channel(`ticket-typing-${ticketId}`, {
-      config: { presence: { key: currentUserId } },
-    });
-    if (value.trim()) {
-      presenceChannel.track({ name: "someone" });
-    } else {
-      presenceChannel.untrack();
-    }
+    setTyping(Boolean(value.trim()));
+
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => {
-      presenceChannel.untrack();
-    }, 3000);
+    typingTimerRef.current = setTimeout(() => setTyping(false), 3000);
   }
 
   // Realtime: subscribe to new comments on this ticket

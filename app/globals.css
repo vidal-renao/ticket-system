@@ -245,3 +245,49 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── App sidebar: collapsible rail ───────────────────────────────────────────
+   The width is driven by data-sidebar on <html>, set before first paint by the
+   boot script in app/layout.tsx. Server and client render identical markup and
+   the collapsed rail never flashes open. Below lg the sidebar is an off-canvas
+   drawer and always keeps its full width. Motion is handled by the global
+   prefers-reduced-motion reset at the top of this file. */
+.app-sidebar {
+  width: 15rem;
+  transition: width 180ms ease;
+}
+
+@media (min-width: 1024px) {
+  :root[data-sidebar="collapsed"] .app-sidebar {
+    width: 4.5rem;
+  }
+
+  :root[data-sidebar="collapsed"] .app-sidebar__label,
+  :root[data-sidebar="collapsed"] .app-sidebar__identity,
+  :root[data-sidebar="collapsed"] .app-sidebar__wide-only,
+  :root[data-sidebar="collapsed"] .app-sidebar__dot {
+    display: none;
+  }
+
+  :root[data-sidebar="collapsed"] .app-sidebar__brand {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  :root[data-sidebar="collapsed"] .app-sidebar__row {
+    justify-content: center;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  :root[data-sidebar="collapsed"] .app-sidebar__badge {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.5rem;
+    margin-left: 0;
+  }
+
+  :root[data-sidebar="collapsed"] .app-sidebar__collapse-icon {
+    transform: rotate(180deg);
+  }
+}

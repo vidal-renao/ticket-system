@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   PlusCircle,
   Users,
+  Radio,
 } from "lucide-react";
 import { formatTicketRef } from "@/lib/utils";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
@@ -96,6 +97,7 @@ async function AdminDashboard({
   prefix: string;
 }) {
   const t = await getTranslations("dashboard");
+  const tOps = await getTranslations("ops");
   const svc = createServiceClientStatic();
 
   if (!orgId) {
@@ -201,13 +203,31 @@ async function AdminDashboard({
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
-          {t("title")}
-        </h1>
-        <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
-          {t("subtitle")}
-        </p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-[var(--color-text-primary)]">
+            {t("title")}
+          </h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
+            {t("subtitle")}
+          </p>
+        </div>
+
+        {/* This dashboard is role-scoped; /ops is the organization-wide live console. */}
+        <Link
+          href={`${prefix}/ops`}
+          className="flex items-center gap-3 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] px-4 py-2.5 transition-colors hover:border-[var(--color-brand-400)]/50"
+        >
+          <Radio className="w-4 h-4 text-emerald-400" />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-[var(--color-text-primary)]">
+              {tOps("fromDashboard")}
+            </span>
+            <span className="block text-xs text-[var(--color-text-muted)]">
+              {tOps("fromDashboardHint")}
+            </span>
+          </span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
