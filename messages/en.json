@@ -209,7 +209,8 @@
     "aiReanalyze": "Re-run AI triage",
     "aiReanalyzing": "Running…",
     "aiReanalyzeDone": "AI triage completed",
-    "aiReanalyzeFailed": "Could not re-run AI triage"
+    "aiReanalyzeFailed": "Could not re-run AI triage",
+    "presenceOnline": "{name} is online"
   },
   "aiChat": {
     "title": "AI Support Assistant",
@@ -491,6 +492,9 @@
     "footer": {
       "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    },
+    "presence": {
+      "online": "{name} is online"
     }
   }
 }

@@ -209,7 +209,8 @@
     "aiReanalyze": "Reanalizar con IA",
     "aiReanalyzing": "Analizando…",
     "aiReanalyzeDone": "Triaje IA completado",
-    "aiReanalyzeFailed": "No se pudo reanalizar"
+    "aiReanalyzeFailed": "No se pudo reanalizar",
+    "presenceOnline": "{name} está en línea"
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",
@@ -491,6 +492,9 @@
     "footer": {
       "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    },
+    "presence": {
+      "online": "{name} está en línea"
     }
   }
 }

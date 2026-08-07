@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatTicketRef } from "@/lib/utils";
 import type { OpsEvent, OpsEventKind } from "@/lib/ops/types";
+import { PresenceDot } from "@/components/presence/PresenceDot";
 import { EmptyState, MonoText, Tag } from "./primitives";
 import { EVENT_COLOR, MONO, OPS, PRIORITY_COLOR } from "./tokens";
 
@@ -141,7 +142,13 @@ export function OpsActivityFeed({
                   </p>
                 )}
 
-                <MonoText className="mt-1 block text-[11.5px]" style={{ color: OPS.faint }}>
+                <MonoText className="mt-1 flex items-center gap-1.5 text-[11.5px]" style={{ color: OPS.faint }}>
+                  {actor && (
+                    <PresenceDot
+                      userId={event.actorId}
+                      label={t("presence.online", { name: actor })}
+                    />
+                  )}
                   {actor ? `${actor} · ` : ""}
                   {new Date(event.at).toLocaleString(locale, {
                     day: "2-digit",

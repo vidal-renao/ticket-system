@@ -9,6 +9,7 @@ import type { TicketPriority } from "@/lib/supabase/types";
 import type { CanonicalTicketStatus } from "@/lib/ticket-lifecycle";
 import { OPS_CANONICAL_STATUSES, OPS_PRIORITIES, canonicalOf, type OpsFilters } from "@/lib/ops/derive";
 import type { OpsTicket } from "@/lib/ops/types";
+import { PresenceDot } from "@/components/presence/PresenceDot";
 import { MonoText, Tag } from "./primitives";
 import { MONO, OPS, PRIORITY_COLOR, STATUS_COLOR } from "./tokens";
 
@@ -192,7 +193,13 @@ export function OpsTicketTable({
                     />
                   </td>
                   <td className="px-3 py-2" style={{ color: OPS.muted }}>
-                    {ticket.assigned_to ? authorName(ticket.assigned_to) : t("table.unassigned")}
+                    <span className="inline-flex items-center gap-1.5">
+                      {ticket.assigned_to ? authorName(ticket.assigned_to) : t("table.unassigned")}
+                      <PresenceDot
+                        userId={ticket.assigned_to}
+                        label={t("presence.online", { name: authorName(ticket.assigned_to) })}
+                      />
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <MonoText style={{ color: OPS.muted }}>{formatDate(ticket.created_at)}</MonoText>
