@@ -113,7 +113,9 @@ export function OpsCharts({
   }));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    // Two across once there is room, three only on very wide screens: the
+    // charts now share the row with the pinned activity column.
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
       <Panel title={t("charts.status")}>
         {statusData.length === 0 ? (
           <EmptyState text={t("charts.noData")} />

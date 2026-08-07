@@ -391,29 +391,40 @@ export function OpsConsole({
       <main className="flex flex-col gap-4 pt-4">
         {tab === "overview" && (
           <>
-            <OpsCharts kpis={kpis} flow={flow} animate={animate} />
-            <OpsAuditPanel
-              audit={audit}
-              locale={locale}
-              refreshing={refreshingAudit}
-              onRefresh={() => void refreshAudit()}
-            />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <OpsAiPanel
-                analyses={initialData.aiAnalysis}
-                tickets={tickets}
-                localePrefix={localePrefix}
-              />
-              <Panel title={t("feed.recent")}>
-                <OpsActivityFeed
-                  events={events.slice(0, 6)}
+            {/* The feed is the only part that moves on its own, so it leads:
+                first in the DOM (so it stacks on top on narrow screens) and
+                pinned to the right column on desktop, where it stays in view
+                while the rest of the page scrolls. */}
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <aside className="lg:col-start-2 lg:row-start-1 lg:sticky lg:top-4 lg:self-start">
+                <Panel title={t("feed.recent")}>
+                  <div className="max-h-[22rem] overflow-y-auto lg:max-h-[calc(100dvh-13rem)]">
+                    <OpsActivityFeed
+                      events={events.slice(0, 14)}
+                      locale={locale}
+                      localePrefix={localePrefix}
+                      authorName={authorName}
+                      animate={animate}
+                      now={now}
+                    />
+                  </div>
+                </Panel>
+              </aside>
+
+              <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-1">
+                <OpsCharts kpis={kpis} flow={flow} animate={animate} />
+                <OpsAuditPanel
+                  audit={audit}
                   locale={locale}
-                  localePrefix={localePrefix}
-                  authorName={authorName}
-                  animate={animate}
-                  now={now}
+                  refreshing={refreshingAudit}
+                  onRefresh={() => void refreshAudit()}
                 />
-              </Panel>
+                <OpsAiPanel
+                  analyses={initialData.aiAnalysis}
+                  tickets={tickets}
+                  localePrefix={localePrefix}
+                />
+              </div>
             </div>
           </>
         )}
