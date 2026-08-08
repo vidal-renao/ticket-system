@@ -164,7 +164,14 @@
     "aiReanalyzing": "Läuft…",
     "aiReanalyzeDone": "KI-Triage abgeschlossen",
     "aiReanalyzeFailed": "KI-Triage konnte nicht erneut ausgeführt werden",
-    "presenceOnline": "{name} ist online"
+    "presenceOnline": "{name} ist online",
+    "assignedTo": "Zuständig",
+    "unassigned": "Nicht zugewiesen",
+    "presence": {
+      "online": "Online",
+      "busy": "Beschäftigt",
+      "offline": "Offline"
+    }
   },
   "aiChat": {
     "title": "KI-Support-Assistent",

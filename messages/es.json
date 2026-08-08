@@ -210,7 +210,14 @@
     "aiReanalyzing": "Analizando…",
     "aiReanalyzeDone": "Triaje IA completado",
     "aiReanalyzeFailed": "No se pudo reanalizar",
-    "presenceOnline": "{name} está en línea"
+    "presenceOnline": "{name} está en línea",
+    "assignedTo": "Responsable",
+    "unassigned": "Sin asignar",
+    "presence": {
+      "online": "En línea",
+      "busy": "Ocupado",
+      "offline": "Desconectado"
+    }
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",

@@ -210,7 +210,14 @@
     "aiReanalyzing": "Running…",
     "aiReanalyzeDone": "AI triage completed",
     "aiReanalyzeFailed": "Could not re-run AI triage",
-    "presenceOnline": "{name} is online"
+    "presenceOnline": "{name} is online",
+    "assignedTo": "Assigned to",
+    "unassigned": "Unassigned",
+    "presence": {
+      "online": "Online",
+      "busy": "Busy",
+      "offline": "Offline"
+    }
   },
   "aiChat": {
     "title": "AI Support Assistant",
