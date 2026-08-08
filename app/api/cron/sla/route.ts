@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClientStatic } from "@/lib/supabase/server";
 import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
 import { verifyBearerSecret } from "@/lib/security/bearer-auth";
+import { recoverMissingTriage } from "@/lib/ai/triage-recovery";
 import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +39,17 @@ export async function GET(request: Request) {
 
   const autoClosed = await autoCloseConfirmedResolutions(svc);
 
+  // Tickets whose creation-time triage never landed are picked up here, so a
+  // dropped background task self-heals on the next run instead of leaving the
+  // ticket reading "Processing…" forever.
+  const triageRecovery = await recoverMissingTriage(svc);
+
   return NextResponse.json({
     ok: true,
     assessed,
     breached,
     autoClosed,
+    triageRecovery,
   });
 }
 

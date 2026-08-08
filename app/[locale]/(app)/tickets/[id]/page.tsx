@@ -8,6 +8,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { TicketComments } from "@/components/tickets/TicketComments";
 import { AITriagePanel } from "@/components/ai/AITriagePanel";
+import { ReanalyzeButton } from "@/components/tickets/ReanalyzeButton";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
 import { SlaCountdown } from "@/components/tickets/SlaCountdown";
 import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
@@ -293,6 +294,10 @@ export default async function TicketDetailPage({
               <CardContent className="py-3">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] mb-1">{t("aiTriage")}</p>
                 <p className="text-xs text-[var(--color-text-muted)]">{t("aiProcessing")}</p>
+                {/* Triage runs as a background task at creation; if it never
+                    landed the cron sweep retries within the hour, and an admin
+                    can force it from here. */}
+                {profile.role === "admin" && <ReanalyzeButton ticketId={ticket.id} />}
               </CardContent>
             </Card>
           )}

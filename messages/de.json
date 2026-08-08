@@ -159,7 +159,12 @@
     "confirmButton": "Bestätigen — alles in Ordnung",
     "confirmDone": "Danke! Ticket geschlossen.",
     "reopenHint": "Problem nicht gelöst?",
-    "autoCloseNote": "Ohne Rückmeldung wird das Ticket 48h nach der Lösung automatisch geschlossen."
+    "autoCloseNote": "Ohne Rückmeldung wird das Ticket 48h nach der Lösung automatisch geschlossen.",
+    "aiReanalyze": "KI-Triage erneut ausführen",
+    "aiReanalyzing": "Läuft…",
+    "aiReanalyzeDone": "KI-Triage abgeschlossen",
+    "aiReanalyzeFailed": "KI-Triage konnte nicht erneut ausgeführt werden",
+    "presenceOnline": "{name} ist online"
   },
   "aiChat": {
     "title": "KI-Support-Assistent",
@@ -487,6 +492,9 @@
     "footer": {
       "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    },
+    "presence": {
+      "online": "{name} ist online"
     }
   }
 }

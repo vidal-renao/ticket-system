@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { AppShell } from "@/components/layout/AppShell";
+import { StaffPresenceProvider } from "@/components/presence/StaffPresenceProvider";
 import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 
 export default async function AppLayout({
@@ -22,14 +23,14 @@ export default async function AppLayout({
   const svc = createServiceClientStatic();
   const { data: profile, error: profileError } = await svc
     .from("profiles")
-    .select("full_name, role, specialty, avatar_url, availability_status")
+    .select("full_name, role, specialty, avatar_url, availability_status, organization_id")
     .eq("id", user.id)
     .maybeSingle();
 
   // If the query errors (e.g. availability_status column not yet migrated), fall back
   // to a minimal select so login still works before the migration is applied.
   const resolvedProfile = profile ?? (profileError
-    ? (await svc.from("profiles").select("full_name, role, specialty, avatar_url").eq("id", user.id).maybeSingle()).data
+    ? (await svc.from("profiles").select("full_name, role, specialty, avatar_url, organization_id").eq("id", user.id).maybeSingle()).data
     : null);
 
   if (!resolvedProfile) redirect(loginPath);
@@ -99,7 +100,15 @@ export default async function AppLayout({
       unreadNotifications={unreadNotifications ?? 0}
       inboxUnreadCount={inboxUnreadCount ?? 0}
     >
-      {children}
+      {/* One shared presence channel for the whole shell, so every avatar
+          reads the same socket instead of opening its own. */}
+      <StaffPresenceProvider
+        organizationId={resolvedProfile.organization_id ?? null}
+        userId={user.id}
+        isStaff={["agent", "manager", "admin"].includes(resolvedProfile.role)}
+      >
+        {children}
+      </StaffPresenceProvider>
     </AppShell>
   );
 }

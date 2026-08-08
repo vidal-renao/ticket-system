@@ -205,7 +205,12 @@
     "confirmButton": "Confirm — all good",
     "confirmDone": "Thank you! Ticket closed.",
     "reopenHint": "Issue not resolved?",
-    "autoCloseNote": "Without a response, the ticket closes automatically 48h after resolution."
+    "autoCloseNote": "Without a response, the ticket closes automatically 48h after resolution.",
+    "aiReanalyze": "Re-run AI triage",
+    "aiReanalyzing": "Running…",
+    "aiReanalyzeDone": "AI triage completed",
+    "aiReanalyzeFailed": "Could not re-run AI triage",
+    "presenceOnline": "{name} is online"
   },
   "aiChat": {
     "title": "AI Support Assistant",
@@ -487,6 +492,9 @@
     "footer": {
       "source": "public.tickets · ticket_comments · ticket_audit_logs · realtime",
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
+    },
+    "presence": {
+      "online": "{name} is online"
     }
   }
 }
