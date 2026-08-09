@@ -9,7 +9,7 @@ import {
 } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { applySlaAssessment, buildSlaDeadlinePatch, ensureSlaDeadlines, getSlaPolicyForTicket } from "@/lib/sla";
-import { createTicketNotification } from "@/lib/notifications";
+import { createTicketNotification, notifyTicketAssigned } from "@/lib/notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
 import { canAgentSetExecutionStatus, getForbiddenTicketPatchFields } from "@/lib/ticket-workflow";
 
@@ -257,15 +257,12 @@ export async function PATCH(
     newAssignee: data.assigned_to,
   });
 
-  if (existing.assigned_to !== data.assigned_to && data.assigned_to) {
-    await createTicketNotification(svc, {
-      userId: data.assigned_to,
-      ticketId: existing.id,
-      type: "ticket.assigned",
-      title: "Ticket assigned",
-      message: `${formatTicketNumber(data.ticket_number)} was assigned to you.`,
-    });
-  }
+  await notifyTicketAssigned(svc, {
+    ticketId: existing.id,
+    ticketNumber: data.ticket_number,
+    previousAssignee: existing.assigned_to,
+    nextAssignee: data.assigned_to,
+  });
 
   if (existing.status !== data.status && data.status === "resolved") {
     await createTicketNotification(svc, {

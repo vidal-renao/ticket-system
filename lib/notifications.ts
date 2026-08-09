@@ -1,4 +1,5 @@
 import { createServiceClientStatic } from "@/lib/supabase/server";
+import { assignmentNotificationMessage, shouldNotifyAssignee } from "@/lib/assignment-notifications";
 
 type QueryClient = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +35,35 @@ export async function createTicketNotification(
   if (error) {
     console.error("[notification]", error);
   }
+}
+
+/**
+ * The single entry point for "this ticket now belongs to you".
+ *
+ * Carries its own anti-duplicate guard so every assignment path gets the same
+ * behaviour: pass the owner before and after, and the helper decides. Returns
+ * whether a notification was actually created.
+ */
+export async function notifyTicketAssigned(
+  client: QueryClient,
+  input: {
+    ticketId: string;
+    ticketNumber: number | null | undefined;
+    previousAssignee: string | null | undefined;
+    nextAssignee: string | null | undefined;
+    source?: "routing" | "backlog";
+  }
+): Promise<boolean> {
+  if (!shouldNotifyAssignee(input.previousAssignee, input.nextAssignee)) return false;
+
+  await createTicketNotification(client, {
+    userId: input.nextAssignee,
+    ticketId: input.ticketId,
+    type: "ticket.assigned",
+    title: "Ticket assigned",
+    message: assignmentNotificationMessage(input.ticketNumber, input.source),
+  });
+  return true;
 }
 
 export async function notifyOrgManagers(
