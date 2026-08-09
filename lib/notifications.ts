@@ -15,11 +15,22 @@ interface TicketNotificationInput {
   actionUrl?: string | null;
 }
 
+/**
+ * Insert one in-app notification. Returns whether the row was actually
+ * written.
+ *
+ * Deliberately does not throw: a lost notification must not fail the request
+ * that triggered it -- nobody should be unable to comment because the bell
+ * could not be updated. But it must not vanish quietly either. A silent
+ * failure here is indistinguishable from "Realtime is not pushing", which is
+ * an expensive thing to debug from the outside, so the log carries enough
+ * context to identify the exact notification that was lost.
+ */
 export async function createTicketNotification(
   _supabase: QueryClient,
   input: TicketNotificationInput
-) {
-  if (!input.userId) return;
+): Promise<boolean> {
+  if (!input.userId) return false;
 
   const svc = createServiceClientStatic();
   const { error } = await svc.from("notifications").insert({
@@ -33,8 +44,16 @@ export async function createTicketNotification(
   });
 
   if (error) {
-    console.error("[notification]", error);
+    console.error("[notification] insert failed", {
+      type: input.type,
+      ticketId: input.ticketId,
+      userId: input.userId,
+      error: error.message,
+    });
+    return false;
   }
+
+  return true;
 }
 
 /**
@@ -56,14 +75,13 @@ export async function notifyTicketAssigned(
 ): Promise<boolean> {
   if (!shouldNotifyAssignee(input.previousAssignee, input.nextAssignee)) return false;
 
-  await createTicketNotification(client, {
+  return createTicketNotification(client, {
     userId: input.nextAssignee,
     ticketId: input.ticketId,
     type: "ticket.assigned",
     title: "Ticket assigned",
     message: assignmentNotificationMessage(input.ticketNumber, input.source),
   });
-  return true;
 }
 
 export async function notifyOrgManagers(
