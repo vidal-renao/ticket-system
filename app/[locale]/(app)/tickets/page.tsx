@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Loader2,
   ArrowRight,
+  UserX,
 } from "lucide-react";
 import {
   formatTicketRef,
@@ -31,7 +32,7 @@ import {
   formatDateTime,
   formatDuration,
 } from "@/lib/utils";
-import { getTicketPresentation } from "@/lib/ticket-presentation";
+import { getTicketPresentation, isAwaitingAvailability } from "@/lib/ticket-presentation";
 import { ACTIVE_TICKET_STATUSES } from "@/lib/ticket-lifecycle";
 import { matchesTicketQuery, ticketRefTokens } from "@/lib/ticket-search";
 import { TicketSearch } from "@/components/tickets/TicketSearch";
@@ -554,7 +555,15 @@ export default async function TicketsPage({
             const slaState = getTicketListSlaState(ticket);
             const companyContext = companyContextByCreator[ticket.created_by];
             const assignedProfile = ticket.assigned_to ? assigneeById[ticket.assigned_to] : null;
-            const assigneeLabel = ticket.assigned_to ? formatAgentIdentity(assignedProfile) : "Unassigned";
+            const awaitingAvailability = isAwaitingAvailability({
+              assignedTo: ticket.assigned_to,
+              metadata: (ticket as StaffTicket).metadata,
+            });
+            const assigneeLabel = ticket.assigned_to
+              ? formatAgentIdentity(assignedProfile)
+              : awaitingAvailability
+                ? "Awaiting an available agent"
+                : "Unassigned";
             const assigneeName = assignedProfile?.full_name?.trim() || assigneeLabel;
             const presentation = getTicketPresentation({
               priority: ticket.priority,
@@ -587,10 +596,17 @@ export default async function TicketsPage({
                           <span className="text-[11px] text-[var(--color-text-muted)]">
                             {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
                           </span>
-                          <span className="inline-flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
-                            <PresenceAvatar name={assigneeName} status={ticket.assigned_to ? "online" : "offline"} size="sm" />
-                            {assigneeLabel}
-                          </span>
+                          {awaitingAvailability ? (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+                              <UserX className="h-3.5 w-3.5" aria-hidden="true" />
+                              {assigneeLabel}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                              <PresenceAvatar name={assigneeName} status={ticket.assigned_to ? "online" : "offline"} size="sm" />
+                              {assigneeLabel}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -601,6 +617,9 @@ export default async function TicketsPage({
                         />
                         {presentation.isVip && (
                           <Badge className="border-fuchsia-400/25 bg-fuchsia-500/10 text-fuchsia-200">VIP</Badge>
+                        )}
+                        {awaitingAvailability && (
+                          <Badge className="border-amber-400/30 bg-amber-500/10 text-amber-200">Needs an owner</Badge>
                         )}
                         <Badge className={`${slaState.className} text-[10px]`}>{slaState.label}</Badge>
                         <Badge className={statusColor(ticket.status)}>{ts(ticket.status)}</Badge>

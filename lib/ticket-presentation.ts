@@ -1,3 +1,5 @@
+import { ROUTING_AWAITING_AVAILABILITY } from "@/lib/ticket-routing";
+
 type TicketPresentationInput = {
   priority: string;
   metadata?: unknown;
@@ -39,6 +41,22 @@ export function getTicketPresentation(input: TicketPresentationInput) {
           ? "VIP organization"
           : null,
   };
+}
+
+/**
+ * Whether a ticket is unassigned *because nobody was reachable*, as opposed to
+ * being merely new or waiting on triage.
+ *
+ * Deliberately gated on the ticket still having no assignee: that way the
+ * marker never has to be cleaned up. Once anyone takes the ticket the label
+ * disappears on its own, whatever `metadata` still says.
+ */
+export function isAwaitingAvailability(input: {
+  assignedTo?: string | null;
+  metadata?: unknown;
+}): boolean {
+  if (input.assignedTo) return false;
+  return asRecord(input.metadata)?.routing_status === ROUTING_AWAITING_AVAILABILITY;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
