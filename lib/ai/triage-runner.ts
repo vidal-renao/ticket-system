@@ -7,7 +7,9 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
-import { selectFreestAgent, selectSpecialistAgent, type RoutingCandidate } from "@/lib/ticket-routing";
+import { routeTicket, type RoutingCandidate } from "@/lib/ticket-routing";
+import { effectivePresence } from "@/lib/presence";
+import { getLastSeenMap } from "@/lib/presence-server";
 
 /**
  * AI triage and automatic assignment, extracted from the ticket-creation route
@@ -36,7 +38,7 @@ export async function findAutomaticAssignment(
       ? svc.from("teams").select("id, name").eq("id", input.teamId).eq("organization_id", orgId).maybeSingle()
       : Promise.resolve({ data: null }),
     svc.from("categories").select("id, name, slug").eq("organization_id", orgId).eq("is_active", true),
-    svc.from("profiles").select("id, specialty, team_id").eq("organization_id", orgId).eq("role", "agent").eq("is_active", true),
+    svc.from("profiles").select("id, specialty, team_id, availability_status").eq("organization_id", orgId).eq("role", "agent").eq("is_active", true),
     svc.from("teams").select("id, name").eq("organization_id", orgId),
   ]);
 
@@ -45,36 +47,47 @@ export async function findAutomaticAssignment(
     return entry.slug?.toLowerCase() === target || entry.name?.toLowerCase() === target;
   }) ?? null;
 
-  // Find agents assigned to this team
   const agentIds = (agents ?? []).map((agent) => agent.id);
 
-  // Try specialist first (overflow threshold: 5 open tickets)
-  const { data: openTickets } = agentIds.length
-    ? await svc.from("tickets").select("assigned_to").eq("organization_id", orgId).in("assigned_to", agentIds).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
-    : { data: [] };
+  // Current load, and the heartbeats that say who is actually at the keyboard.
+  // last_seen_at goes through getLastSeenMap rather than the select above so a
+  // database without the presence migration degrades to the declared status
+  // instead of failing the whole routing query.
+  const [{ data: openTickets }, lastSeenByAgent] = await Promise.all([
+    agentIds.length
+      ? svc.from("tickets").select("assigned_to").eq("organization_id", orgId).in("assigned_to", agentIds).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
+      : Promise.resolve({ data: [] as { assigned_to: string | null }[] }),
+    getLastSeenMap(svc, agentIds),
+  ]);
   const counts: Record<string, number> = {};
   for (const row of openTickets ?? []) {
     if (row.assigned_to) counts[row.assigned_to] = (counts[row.assigned_to] ?? 0) + 1;
   }
 
   const teamNames = Object.fromEntries((teams ?? []).map((entry) => [entry.id, entry.name]));
+  const now = Date.now();
   const candidates: RoutingCandidate[] = (agents ?? []).map((agent) => ({
     id: agent.id,
     specialty: agent.specialty,
     teamId: agent.team_id,
     teamName: agent.team_id ? teamNames[agent.team_id] ?? null : null,
     activeTickets: counts[agent.id] ?? 0,
+    // Only "online" counts: effectivePresence keeps "busy" distinct from
+    // "offline", and busy means do not send more work.
+    available: effectivePresence(agent.availability_status, lastSeenByAgent[agent.id], now) === "online",
   }));
-  // Specialist first; overflow to the freest agent org-wide when no specialty
-  // or team matches, so nothing lands unassigned for lack of a specialist.
-  const selected =
-    selectSpecialistAgent(candidates, {
-      categoryName: category?.name ?? input.categoryName,
-      teamId: team?.id ?? null,
-      teamName: team?.name ?? null,
-    }) ?? selectFreestAgent(candidates);
 
-  return { assignedTo: selected?.id ?? null, categoryId: category?.id ?? null };
+  const decision = routeTicket(candidates, {
+    categoryName: category?.name ?? input.categoryName,
+    teamId: team?.id ?? null,
+    teamName: team?.name ?? null,
+  });
+
+  if (decision.reason === "no_agents_available") {
+    console.warn("[routing] no reachable agent in org", orgId, "- leaving ticket unassigned");
+  }
+
+  return { assignedTo: decision.agent?.id ?? null, categoryId: category?.id ?? null };
 }
 
 // ─── Background helpers ─────────────────────────────────────────────────────
