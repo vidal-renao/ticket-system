@@ -2,7 +2,7 @@ import { forbidden, notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { getInitials, resolveTicketAccess } from "@/lib/ticket-visibility";
+import { formatAgentIdentity, getInitials, resolveTicketAccess } from "@/lib/ticket-visibility";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -12,6 +12,9 @@ import { ReanalyzeButton } from "@/components/tickets/ReanalyzeButton";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
 import { SlaCountdown } from "@/components/tickets/SlaCountdown";
 import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
+import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
+import { PresenceDot } from "@/components/presence/PresenceDot";
+import { TicketAssigneeSelect } from "@/components/tickets/TicketAssigneeSelect";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
@@ -77,6 +80,7 @@ export default async function TicketDetailPage({
   const [
     { data: category },
     { data: creator },
+    { data: assignee },
     { data: aiAnalysis },
     { data: comments },
     { data: organization },
@@ -86,6 +90,13 @@ export default async function TicketDetailPage({
       ? svc.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
     svc.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
+    ticket.assigned_to
+      ? svc
+          .from("profiles")
+          .select("id, full_name, avatar_url, specialty, availability_status")
+          .eq("id", ticket.assigned_to)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     isStaff
       ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
@@ -130,6 +141,41 @@ export default async function TicketDetailPage({
   const sector = creatorCompanyInfo?.industry?.trim() || "General";
   const creatorName = creator?.full_name?.trim() || "Requester";
   const creatorInitials = getInitials(creatorName);
+
+  // Owner block. `formatAgentIdentity` is the same label /admin uses, and the
+  // declared-status + heartbeat pair is the same one /admin and /team use, so
+  // the ticket page cannot disagree with them about who is online.
+  const assigneeProfile = assignee as {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    specialty: string | null;
+    availability_status: string | null;
+  } | null;
+  const assigneeName = assigneeProfile ? formatAgentIdentity(assigneeProfile) : null;
+  const assigneeLastSeen = assigneeProfile
+    ? (await getLastSeenMap(svc, [assigneeProfile.id]))[assigneeProfile.id]
+    : undefined;
+  const assigneePresence = assigneeProfile
+    ? effectivePresence(assigneeProfile.availability_status, assigneeLastSeen)
+    : "offline";
+
+  // Reassignment is admin-only, matching ADMIN_PATCH_FIELDS on the route that
+  // performs it, so the option list is not even loaded for anyone else.
+  const canReassign = profile.role === "admin";
+  const assignableAgents = canReassign
+    ? (
+        (
+          await svc
+            .from("profiles")
+            .select("id, full_name, specialty")
+            .eq("organization_id", ticket.organization_id)
+            .eq("role", "agent")
+            .eq("is_active", true)
+            .order("full_name")
+        ).data ?? []
+      ).map((agent) => ({ id: agent.id, name: formatAgentIdentity(agent) }))
+    : [];
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
@@ -249,6 +295,56 @@ export default async function TicketDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* Who is actually on this ticket. The chain-of-custody strip below
+              still reports whether it is routed; this says by whom. */}
+          {isStaff && (
+            <Card>
+              <CardContent className="py-3">
+                <p className="text-xs font-medium text-[var(--color-text-muted)] mb-2">
+                  {t("assignedTo")}
+                </p>
+                {assigneeProfile ? (
+                  <div className="flex items-center gap-3">
+                    <PresenceAvatar
+                      name={assigneeName ?? ""}
+                      avatarUrl={assigneeProfile.avatar_url}
+                      status={assigneePresence}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+                        <span className="truncate">{assigneeName}</span>
+                        <PresenceDot
+                          userId={assigneeProfile.id}
+                          label={t("presenceOnline", { name: assigneeProfile.full_name ?? "" })}
+                        />
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        {t(`presence.${assigneePresence}`)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-amber-400">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    {t("unassigned")}
+                  </div>
+                )}
+
+                {/* Same PATCH the admin cockpit performs; the route already
+                    fires the ticket.assigned notification. */}
+                {canReassign && (
+                  <TicketAssigneeSelect
+                    ticketId={ticket.id}
+                    currentAssignee={ticket.assigned_to}
+                    agents={assignableAgents}
+                    disabled={ticket.status === "closed"}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {(responseDueAt || resolutionDueAt) && (
             <Card>
