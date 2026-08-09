@@ -7,7 +7,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
-import { routeTicket, type RoutingCandidate } from "@/lib/ticket-routing";
+import { routeTicket, ROUTING_AWAITING_AVAILABILITY, type RoutingCandidate } from "@/lib/ticket-routing";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
 
@@ -26,6 +26,12 @@ function formatTicketNumber(ticketNumber: number | null | undefined) {
 export interface AssignmentResult {
   assignedTo: string | null;
   categoryId: string | null;
+  /**
+   * Set when routing deliberately declined to assign because no agent was
+   * reachable. Callers stamp it onto the ticket so the queue can say why the
+   * ticket has no owner instead of showing a bare "Unassigned".
+   */
+  unassignedReason: "no_agents_available" | null;
 }
 
 export async function findAutomaticAssignment(
@@ -87,7 +93,11 @@ export async function findAutomaticAssignment(
     console.warn("[routing] no reachable agent in org", orgId, "- leaving ticket unassigned");
   }
 
-  return { assignedTo: decision.agent?.id ?? null, categoryId: category?.id ?? null };
+  return {
+    assignedTo: decision.agent?.id ?? null,
+    categoryId: category?.id ?? null,
+    unassignedReason: decision.reason === "no_agents_available" ? "no_agents_available" : null,
+  };
 }
 
 // ─── Background helpers ─────────────────────────────────────────────────────
@@ -212,7 +222,7 @@ export async function runAITriage(
 
   const { data: currentTicket } = await svc
     .from("tickets")
-    .select("id, organization_id, created_by, assigned_to, routing_override, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due")
+    .select("id, organization_id, created_by, assigned_to, routing_override, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, metadata")
     .eq("id", ticketId)
     .eq("organization_id", orgId)
     .single();
@@ -285,6 +295,21 @@ export async function runAITriage(
           message: `${formatTicketNumber(assignedTicket.ticket_number)} was assigned to you.`,
         });
       }
+    } else if (assignment.unassignedReason === "no_agents_available") {
+      // Triage knows what the ticket is about and still found nobody to hand
+      // it to. Record why, merging rather than replacing so VIP flags and any
+      // other metadata written elsewhere survive.
+      const existing =
+        currentTicket.metadata && typeof currentTicket.metadata === "object" && !Array.isArray(currentTicket.metadata)
+          ? (currentTicket.metadata as Record<string, unknown>)
+          : {};
+      await svc
+        .from("tickets")
+        .update({ metadata: { ...existing, routing_status: ROUTING_AWAITING_AVAILABILITY } })
+        .eq("id", ticketId)
+        .eq("organization_id", orgId)
+        .is("assigned_to", null)
+        .is("deleted_at", null);
     }
   }
 }

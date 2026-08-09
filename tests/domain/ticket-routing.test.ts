@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canonicalRoutingLabel, inferTicketCategory, routeTicket, selectFreestAgent, selectSpecialistAgent } from "../../lib/ticket-routing";
+import {
+  canonicalRoutingLabel,
+  inferTicketCategory,
+  routeTicket,
+  ROUTING_AWAITING_AVAILABILITY,
+  selectFreestAgent,
+  selectSpecialistAgent,
+} from "../../lib/ticket-routing";
+import { isAwaitingAvailability } from "../../lib/ticket-presentation";
 import { effectivePresence } from "../../lib/presence";
 
 describe("enterprise ticket routing", () => {
@@ -116,6 +124,31 @@ describe("routing respects who is actually available", () => {
       { categoryName: "Software" }
     );
     expect(decision.agent?.id).toBe("free");
+  });
+});
+
+describe("an unassigned ticket says why it has no owner", () => {
+  const awaiting = { routing_status: ROUTING_AWAITING_AVAILABILITY };
+
+  it("distinguishes a ticket nobody could take from one that is merely new", () => {
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: awaiting })).toBe(true);
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: {} })).toBe(false);
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: null })).toBe(false);
+  });
+
+  it("drops the marker as soon as somebody owns the ticket", () => {
+    // Nothing has to clear the metadata: taking the ticket is enough, so the
+    // label can never go stale on an assigned ticket.
+    expect(isAwaitingAvailability({ assignedTo: "agent-1", metadata: awaiting })).toBe(false);
+  });
+
+  it("survives other metadata being present", () => {
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: { is_vip: true, ...awaiting } })).toBe(true);
+  });
+
+  it("ignores metadata that is not an object", () => {
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: "awaiting_availability" })).toBe(false);
+    expect(isAwaitingAvailability({ assignedTo: null, metadata: [awaiting] })).toBe(false);
   });
 });
 

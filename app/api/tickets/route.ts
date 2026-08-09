@@ -6,7 +6,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
 import { sendEmail, ticketEmailSubject } from "@/lib/email";
-import { inferTicketCategory } from "@/lib/ticket-routing";
+import { inferTicketCategory, ROUTING_AWAITING_AVAILABILITY } from "@/lib/ticket-routing";
 import { findAutomaticAssignment, runAITriage, scheduleBackground } from "@/lib/ai/triage-runner";
 
 export async function POST(request: Request) {
@@ -86,6 +86,11 @@ export async function POST(request: Request) {
       ...slaPatch,
       ...(assignment.assignedTo && { assigned_to: assignment.assignedTo, assigned_at: createdAt }),
       ...(assignment.categoryId && { category_id: assignment.categoryId }),
+      // No owner because nobody was reachable, not because the ticket is new.
+      // The queue reads this to say so out loud.
+      ...(assignment.unassignedReason === "no_agents_available" && {
+        metadata: { routing_status: ROUTING_AWAITING_AVAILABILITY },
+      }),
     })
     .select()
     .single();
