@@ -2,7 +2,7 @@ import type { createServiceClientStatic } from "@/lib/supabase/server";
 import { canonicalRoutingLabel } from "@/lib/ticket-routing";
 import { legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
-import { createTicketNotification } from "@/lib/notifications";
+import { notifyTicketAssigned } from "@/lib/notifications";
 
 type ServiceClient = ReturnType<typeof createServiceClientStatic>;
 
@@ -98,12 +98,12 @@ export async function adoptUnassignedTicketsForNewAgent(
       newAssignee: input.agentId,
     });
 
-    await createTicketNotification(svc, {
-      userId: input.agentId,
+    await notifyTicketAssigned(svc, {
       ticketId: updated.id,
-      type: "ticket.assigned",
-      title: "Ticket assigned",
-      message: `TK-${String(updated.ticket_number ?? 0).padStart(4, "0")} was assigned to you from the unrouted backlog.`,
+      ticketNumber: updated.ticket_number,
+      previousAssignee: null,
+      nextAssignee: input.agentId,
+      source: "backlog",
     });
   }
 

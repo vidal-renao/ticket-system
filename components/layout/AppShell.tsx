@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "./Sidebar";
@@ -11,6 +11,13 @@ import { Menu, X, Zap } from "lucide-react";
 import { ScrollToTop } from "./ScrollToTop";
 import { SessionTimeoutModal } from "./SessionTimeoutModal";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
+
+/**
+ * Realtime delivers new notifications, so this poll is the safety net rather
+ * than the primary path: it reconciles reads made in another tab and covers
+ * any window where the socket is down.
+ */
+const NOTIFICATIONS_POLL_MS = 30_000;
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -111,31 +118,31 @@ export function AppShell({
     setLiveInboxUnread(inboxUnreadCount);
   }, [inboxUnreadCount]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function refreshNotifications() {
-      try {
-        const response = await fetch("/api/notifications", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (cancelled) return;
-        setLiveNotifications(data.notifications ?? []);
-        setLiveUnreadNotifications(data.unreadCount ?? 0);
-        setLiveInboxUnread(data.inboxUnreadCount ?? 0);
-      } catch {
-        // Keep the current UI state if polling fails.
-      }
+  // Shared by the poll below and by the realtime subscription: both only need
+  // to say "something changed", and the endpoint returns the full picture
+  // (list, unread count, inbox count) in one round trip.
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const response = await fetch("/api/notifications", { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      setLiveNotifications(data.notifications ?? []);
+      setLiveUnreadNotifications(data.unreadCount ?? 0);
+      setLiveInboxUnread(data.inboxUnreadCount ?? 0);
+    } catch {
+      // Keep the current UI state if the request fails.
     }
-
-    refreshNotifications();
-    const interval = window.setInterval(refreshNotifications, 15000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
   }, []);
+
+  // Fallback path. Realtime covers new notifications instantly, but the poll
+  // still owns everything an INSERT cannot report: notifications marked read
+  // in another tab, and any interval where the socket is down or the table is
+  // missing from the publication.
+  useEffect(() => {
+    void refreshNotifications();
+    const interval = window.setInterval(refreshNotifications, NOTIFICATIONS_POLL_MS);
+    return () => window.clearInterval(interval);
+  }, [refreshNotifications]);
 
   // Set status offline when tab/window closes (sendBeacon is fire-and-forget)
   useEffect(() => {
@@ -146,30 +153,60 @@ export function AppShell({
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
-  // Realtime: listen for availability_status changes on profiles so sidebar updates live
+  // Realtime: a notification addressed to this user lands on the socket, so
+  // the bell reacts at once instead of up to NOTIFICATIONS_POLL_MS later.
+  //
+  // Replaces a subscription to `profiles` that could never fire: that table is
+  // not a member of the `supabase_realtime` publication, and the channel never
+  // called setAuth, so the server evaluated the policies as `anon`. Its
+  // callback refreshed notifications — nothing to do with presence — which the
+  // poll was already doing, so the bell was polling-only all along.
   useEffect(() => {
-    const channel = supabase
-      .channel("profile-availability")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .on("postgres_changes" as any, {
-        event: "UPDATE",
-        schema: "public",
-        table: "profiles",
-      }, () => {
-        // Trigger notification refresh which also re-renders the shell
-        fetch("/api/notifications", { cache: "no-store" })
-          .then((r) => r.json())
-          .then((data) => {
-            setLiveNotifications(data.notifications ?? []);
-            setLiveUnreadNotifications(data.unreadCount ?? 0);
-            setLiveInboxUnread(data.inboxUnreadCount ?? 0);
-          })
-          .catch(() => {});
-      })
-      .subscribe();
+    let disposed = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let channel: any = null;
 
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase]);
+    async function subscribe() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (disposed || !session) return;
+
+      // Realtime enforces RLS per subscriber, so the socket has to carry the
+      // user's JWT. Without this the policies evaluate as `anon` and the
+      // server silently sends nothing.
+      supabase.realtime.setAuth(session.access_token);
+
+      channel = supabase
+        .channel(`notifications-${session.user.id}`)
+        .on(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          "postgres_changes" as any,
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            // Belt and braces: the users_own_notifications policy already
+            // restricts this subscriber to their own rows, but filtering
+            // server-side avoids shipping rows only to discard them.
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            // Refetch rather than trusting the payload: the endpoint also
+            // returns the counts, and it is scoped server-side.
+            void refreshNotifications();
+          }
+        )
+        .subscribe();
+    }
+
+    void subscribe();
+
+    return () => {
+      disposed = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [supabase, refreshNotifications]);
 
   async function handleSignOut() {
     // Set offline before signing out so status is accurate

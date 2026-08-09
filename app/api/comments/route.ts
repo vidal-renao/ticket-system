@@ -12,6 +12,7 @@ import {
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
+import { planCommentNotification } from "@/lib/comment-notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
 import { canAgentSetExecutionStatus } from "@/lib/ticket-workflow";
 
@@ -101,42 +102,54 @@ export async function POST(request: Request) {
     }
   }
 
+  // Only staff can write an internal note; a customer asking for one gets a
+  // public comment. Everything downstream keys off this effective value, not
+  // off the raw request flag.
+  const isInternalNote = isStaff && is_internal;
+
   const { data: comment, error } = await svc
     .from("ticket_comments")
     .insert({
       ticket_id,
       author_id: user.id,
       content: content.trim(),
-      is_internal: isStaff && is_internal,
+      is_internal: isInternalNote,
     })
     .select("*, profiles(full_name, avatar_url)")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  if (!is_internal) {
-    const recipientId = isStaff ? ticket.created_by : ticket.assigned_to;
-    if (recipientId && recipientId !== user.id) {
-      await createTicketNotification(svc, {
-        userId: recipientId,
-        ticketId: ticket_id,
-        type: "comment.public",
-        title: "New ticket comment",
-        message: `${formatTicketNumber(ticket.ticket_number)} has a new public comment.`,
-      });
-    }
+  const notification = planCommentNotification({
+    isInternal: isInternalNote,
+    authorId: user.id,
+    authorIsStaff: isStaff,
+    ticket,
+  });
 
-    if (isStaff) {
-      await sendEmail({
-        to: await getAuthUserEmail(ticket.created_by),
-        subject: ticketEmailSubject(ticket.ticket_number, ticket.title),
-        text: `There is a new reply on your support ticket.\n\n${content.trim()}`,
-      });
-    }
+  if (notification) {
+    await createTicketNotification(svc, {
+      userId: notification.recipientId,
+      ticketId: ticket_id,
+      type: notification.type,
+      title: notification.title,
+      message: isInternalNote
+        ? `${formatTicketNumber(ticket.ticket_number)} has a new internal note.`
+        : `${formatTicketNumber(ticket.ticket_number)} has a new public comment.`,
+    });
+  }
+
+  // Email is for the customer, so an internal note never reaches it.
+  if (!isInternalNote && isStaff) {
+    await sendEmail({
+      to: await getAuthUserEmail(ticket.created_by),
+      subject: ticketEmailSubject(ticket.ticket_number, ticket.title),
+      text: `There is a new reply on your support ticket.\n\n${content.trim()}`,
+    });
   }
 
   let slaTicket = await ensureSlaDeadlines(svc, ticket);
-  if (isStaff && !is_internal && !ticket.first_response_at && !ticket.first_agent_response_at) {
+  if (isStaff && !isInternalNote && !ticket.first_response_at && !ticket.first_agent_response_at) {
     const firstResponseAt = new Date().toISOString();
     const { data: updatedFirstResponse, error: firstResponseError } = await svc
       .from("tickets")

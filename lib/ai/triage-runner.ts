@@ -5,7 +5,7 @@ import { retrieveRelevantKnowledge, buildRAGContext } from "@/lib/ai/rag";
 import { ACTIVE_TICKET_STATUSES, legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
-import { createTicketNotification } from "@/lib/notifications";
+import { notifyTicketAssigned } from "@/lib/notifications";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
 import { routeTicket, ROUTING_AWAITING_AVAILABILITY, type RoutingCandidate } from "@/lib/ticket-routing";
 import { effectivePresence } from "@/lib/presence";
@@ -18,9 +18,6 @@ import { getLastSeenMap } from "@/lib/presence-server";
  * background task never completed, and there was no way to re-run it.
  */
 
-function formatTicketNumber(ticketNumber: number | null | undefined) {
-  return ticketNumber ? `TK-${String(ticketNumber).padStart(4, "0")}` : "Ticket";
-}
 // ─── Auto-assignment engine ─────────────────────────────────────────────────
 
 export interface AssignmentResult {
@@ -287,12 +284,13 @@ export async function runAITriage(
           oldAssignee: null,
           newAssignee: assignedTicket.assigned_to,
         });
-        await createTicketNotification(svc, {
-          userId: assignedTicket.assigned_to,
+        // previousAssignee is null by construction: this branch only runs on a
+        // ticket the guarded UPDATE found still unassigned.
+        await notifyTicketAssigned(svc, {
           ticketId,
-          type: "ticket.assigned",
-          title: "Ticket assigned",
-          message: `${formatTicketNumber(assignedTicket.ticket_number)} was assigned to you.`,
+          ticketNumber: assignedTicket.ticket_number,
+          previousAssignee: null,
+          nextAssignee: assignedTicket.assigned_to,
         });
       }
     } else if (assignment.unassignedReason === "no_agents_available") {

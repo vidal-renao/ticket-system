@@ -4,7 +4,7 @@ import { getCurrentProfile } from "@/lib/authz";
 import { legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
-import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
+import { notifyOrgManagers, notifyTicketAssigned } from "@/lib/notifications";
 import { sendEmail, ticketEmailSubject } from "@/lib/email";
 import { inferTicketCategory, ROUTING_AWAITING_AVAILABILITY } from "@/lib/ticket-routing";
 import { findAutomaticAssignment, runAITriage, scheduleBackground } from "@/lib/ai/triage-runner";
@@ -112,12 +112,11 @@ export async function POST(request: Request) {
       newAssignee: assignment.assignedTo,
     });
 
-    await createTicketNotification(supabase, {
-      userId: assignment.assignedTo,
+    await notifyTicketAssigned(supabase, {
       ticketId: ticket.id,
-      type: "ticket.assigned",
-      title: "Ticket assigned",
-      message: `${formatTicketNumber(ticket.ticket_number)} was assigned to you.`,
+      ticketNumber: ticket.ticket_number,
+      previousAssignee: null,
+      nextAssignee: assignment.assignedTo,
     });
   } else {
     // No matching specialist: the ticket sits in the administrator intake
