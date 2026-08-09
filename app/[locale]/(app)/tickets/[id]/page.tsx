@@ -14,6 +14,7 @@ import { SlaCountdown } from "@/components/tickets/SlaCountdown";
 import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { PresenceDot } from "@/components/presence/PresenceDot";
+import { TicketAssigneeSelect } from "@/components/tickets/TicketAssigneeSelect";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
@@ -158,6 +159,23 @@ export default async function TicketDetailPage({
   const assigneePresence = assigneeProfile
     ? effectivePresence(assigneeProfile.availability_status, assigneeLastSeen)
     : "offline";
+
+  // Reassignment is admin-only, matching ADMIN_PATCH_FIELDS on the route that
+  // performs it, so the option list is not even loaded for anyone else.
+  const canReassign = profile.role === "admin";
+  const assignableAgents = canReassign
+    ? (
+        (
+          await svc
+            .from("profiles")
+            .select("id, full_name, specialty")
+            .eq("organization_id", ticket.organization_id)
+            .eq("role", "agent")
+            .eq("is_active", true)
+            .order("full_name")
+        ).data ?? []
+      ).map((agent) => ({ id: agent.id, name: formatAgentIdentity(agent) }))
+    : [];
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
@@ -312,6 +330,17 @@ export default async function TicketDetailPage({
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     {t("unassigned")}
                   </div>
+                )}
+
+                {/* Same PATCH the admin cockpit performs; the route already
+                    fires the ticket.assigned notification. */}
+                {canReassign && (
+                  <TicketAssigneeSelect
+                    ticketId={ticket.id}
+                    currentAssignee={ticket.assigned_to}
+                    agents={assignableAgents}
+                    disabled={ticket.status === "closed"}
+                  />
                 )}
               </CardContent>
             </Card>

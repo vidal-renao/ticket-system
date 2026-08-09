@@ -217,7 +217,10 @@
       "online": "En línea",
       "busy": "Ocupado",
       "offline": "Desconectado"
-    }
+    },
+    "reassign": "Reasignar ticket",
+    "reassigned": "Ticket reasignado",
+    "reassignFailed": "No se pudo reasignar el ticket"
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",
