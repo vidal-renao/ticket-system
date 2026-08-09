@@ -7,7 +7,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
-import { selectSpecialistAgent, type RoutingCandidate } from "@/lib/ticket-routing";
+import { selectFreestAgent, selectSpecialistAgent, type RoutingCandidate } from "@/lib/ticket-routing";
 
 /**
  * AI triage and automatic assignment, extracted from the ticket-creation route
@@ -57,7 +57,6 @@ export async function findAutomaticAssignment(
     if (row.assigned_to) counts[row.assigned_to] = (counts[row.assigned_to] ?? 0) + 1;
   }
 
-  // Overflow — all specialists are saturated; find freest agent org-wide
   const teamNames = Object.fromEntries((teams ?? []).map((entry) => [entry.id, entry.name]));
   const candidates: RoutingCandidate[] = (agents ?? []).map((agent) => ({
     id: agent.id,
@@ -66,16 +65,18 @@ export async function findAutomaticAssignment(
     teamName: agent.team_id ? teamNames[agent.team_id] ?? null : null,
     activeTickets: counts[agent.id] ?? 0,
   }));
-  const selected = selectSpecialistAgent(candidates, {
-    categoryName: category?.name ?? input.categoryName,
-    teamId: team?.id ?? null,
-    teamName: team?.name ?? null,
-  });
+  // Specialist first; overflow to the freest agent org-wide when no specialty
+  // or team matches, so nothing lands unassigned for lack of a specialist.
+  const selected =
+    selectSpecialistAgent(candidates, {
+      categoryName: category?.name ?? input.categoryName,
+      teamId: team?.id ?? null,
+      teamName: team?.name ?? null,
+    }) ?? selectFreestAgent(candidates);
 
   return { assignedTo: selected?.id ?? null, categoryId: category?.id ?? null };
 }
 
-/** Returns the agent ID with the fewest open tickets, below maxTickets cap. */
 // ─── Background helpers ─────────────────────────────────────────────────────
 
 export function scheduleBackground(promise: Promise<void>): void {

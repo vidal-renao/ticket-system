@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalRoutingLabel, inferTicketCategory, selectSpecialistAgent } from "../../lib/ticket-routing";
+import { canonicalRoutingLabel, inferTicketCategory, selectFreestAgent, selectSpecialistAgent } from "../../lib/ticket-routing";
 
 describe("enterprise ticket routing", () => {
   const candidates = [
@@ -12,8 +12,32 @@ describe("enterprise ticket routing", () => {
     expect(selectSpecialistAgent(candidates, { categoryName: "Software" })?.id).toBe("software-a");
   });
 
-  it("leaves unmatched work unassigned", () => {
+  it("reports no specialist for unmatched work", () => {
+    // The specialist matcher itself stays strict; the overflow fallback above
+    // it is what keeps such a ticket from landing unassigned.
     expect(selectSpecialistAgent(candidates, { categoryName: "Legal" })).toBeNull();
+  });
+
+  it("overflows unmatched work to the freest agent org-wide", () => {
+    expect(selectSpecialistAgent(candidates, { categoryName: "Legal" })).toBeNull();
+    expect(selectFreestAgent(candidates)?.id).toBe("hardware-a");
+  });
+
+  it("breaks an overflow tie deterministically, by id", () => {
+    expect(selectFreestAgent([
+      { id: "b", specialty: "Software", activeTickets: 2 },
+      { id: "a", specialty: "Hardware", activeTickets: 2 },
+    ])?.id).toBe("a");
+  });
+
+  it("has nobody to overflow to in an organization without agents", () => {
+    expect(selectFreestAgent([])).toBeNull();
+  });
+
+  it("does not reorder the caller's candidate array", () => {
+    const original = [...candidates];
+    selectFreestAgent(candidates);
+    expect(candidates).toEqual(original);
   });
 
   it("prefers the least busy matching specialist", () => {

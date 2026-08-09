@@ -51,6 +51,23 @@ export function selectSpecialistAgent(
   return matches.sort((a, b) => a.activeTickets - b.activeTickets || a.id.localeCompare(b.id))[0] ?? null;
 }
 
+/**
+ * Overflow fallback: the freest agent in the organization, regardless of
+ * specialty.
+ *
+ * `selectSpecialistAgent` returns null whenever nothing matches the ticket's
+ * category or team, which means every request outside the specialties actually
+ * staffed (hardware, software, networking today) was landing unassigned. A
+ * ticket nobody owns is a ticket nobody sees, so an imperfect owner beats no
+ * owner: the SLA clock then has someone to chase.
+ *
+ * Same load ordering as the specialist tie-break, so the two paths distribute
+ * work identically. Sorts a copy — callers keep their array untouched.
+ */
+export function selectFreestAgent(candidates: RoutingCandidate[]): RoutingCandidate | null {
+  return [...candidates].sort((a, b) => a.activeTickets - b.activeTickets || a.id.localeCompare(b.id))[0] ?? null;
+}
+
 export function inferTicketCategory(title: string, description: string): string | null {
   const input = normalizeRoutingLabel(`${title} ${description}`);
   let best: { category: string; score: number } | null = null;
