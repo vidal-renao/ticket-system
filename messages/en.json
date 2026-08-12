@@ -220,7 +220,9 @@
     },
     "reassign": "Reassign ticket",
     "reassigned": "Ticket reassigned",
-    "reassignFailed": "Could not reassign the ticket"
+    "reassignFailed": "Could not reassign the ticket",
+    "agentsAvailable": "Available",
+    "agentsUnavailable": "Not available"
   },
   "aiChat": {
     "title": "AI Support Assistant",

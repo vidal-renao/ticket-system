@@ -6,10 +6,7 @@ import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface Agent {
-  id: string;
-  name: string;
-}
+import { partitionAgentOptions, type AgentOption } from "@/lib/agent-options";
 
 /**
  * Reassignment from the ticket page itself.
@@ -31,13 +28,15 @@ export function TicketAssigneeSelect({
 }: {
   ticketId: string;
   currentAssignee: string | null;
-  agents: Agent[];
+  agents: AgentOption[];
   disabled?: boolean;
 }) {
   const router = useRouter();
   const t = useTranslations("ticket");
   const [isPending, startTransition] = useTransition();
   const [assignee, setAssignee] = useState(currentAssignee ?? "");
+
+  const { available, unavailable } = partitionAgentOptions(agents);
 
   function handleAssign(agentId: string) {
     const previous = assignee;
@@ -75,11 +74,28 @@ export function TicketAssigneeSelect({
         className="w-full cursor-pointer truncate rounded-lg border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-2 py-1.5 text-xs text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-surface-500)] focus:border-indigo-500 focus:outline-none disabled:opacity-50"
       >
         <option value="">{t("unassigned")}</option>
-        {agents.map((agent) => (
-          <option key={agent.id} value={agent.id}>
-            {agent.name}
-          </option>
-        ))}
+        {/* Two bands rather than one flat list: an admin picking an owner
+            should not have to read every row to find who can actually take
+            it. Browsers ignore most styling on <option>, so the status is
+            written into the label instead of implied by colour alone. */}
+        {available.length > 0 && (
+          <optgroup label={t("agentsAvailable")}>
+            {available.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {unavailable.length > 0 && (
+          <optgroup label={t("agentsUnavailable")}>
+            {unavailable.map((agent) => (
+              <option key={agent.id} value={agent.id} className="text-[var(--color-text-muted)]">
+                {`${agent.name} — ${t(`presence.${agent.presence}`)}`}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
       {isPending && (
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--color-text-muted)]" aria-hidden="true" />

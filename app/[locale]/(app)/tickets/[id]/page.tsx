@@ -16,6 +16,7 @@ import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { PresenceDot } from "@/components/presence/PresenceDot";
 import { TicketAssigneeSelect } from "@/components/tickets/TicketAssigneeSelect";
 import { effectivePresence } from "@/lib/presence";
+import { sortAgentOptions, type AgentOption } from "@/lib/agent-options";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
 import { AlertTriangle, Clock, Shield } from "lucide-react";
@@ -163,19 +164,33 @@ export default async function TicketDetailPage({
   // Reassignment is admin-only, matching ADMIN_PATCH_FIELDS on the route that
   // performs it, so the option list is not even loaded for anyone else.
   const canReassign = profile.role === "admin";
-  const assignableAgents = canReassign
-    ? (
-        (
-          await svc
-            .from("profiles")
-            .select("id, full_name, specialty")
-            .eq("organization_id", ticket.organization_id)
-            .eq("role", "agent")
-            .eq("is_active", true)
-            .order("full_name")
-        ).data ?? []
-      ).map((agent) => ({ id: agent.id, name: formatAgentIdentity(agent) }))
-    : [];
+  let assignableAgents: AgentOption[] = [];
+  if (canReassign) {
+    const { data: agentRows } = await svc
+      .from("profiles")
+      .select("id, full_name, specialty, availability_status")
+      .eq("organization_id", ticket.organization_id)
+      .eq("role", "agent")
+      .eq("is_active", true)
+      .order("full_name");
+
+    const rows = (agentRows ?? []) as {
+      id: string;
+      full_name: string | null;
+      specialty: string | null;
+      availability_status: string | null;
+    }[];
+    // Same declared-status + heartbeat pair the owner card above uses, so the
+    // selector cannot disagree with the avatar right next to it.
+    const agentLastSeen = await getLastSeenMap(svc, rows.map((agent) => agent.id));
+    assignableAgents = sortAgentOptions(
+      rows.map((agent) => ({
+        id: agent.id,
+        name: formatAgentIdentity(agent),
+        presence: effectivePresence(agent.availability_status, agentLastSeen[agent.id]),
+      }))
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">

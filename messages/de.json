@@ -174,7 +174,9 @@
     },
     "reassign": "Anfrage neu zuweisen",
     "reassigned": "Anfrage neu zugewiesen",
-    "reassignFailed": "Anfrage konnte nicht neu zugewiesen werden"
+    "reassignFailed": "Anfrage konnte nicht neu zugewiesen werden",
+    "agentsAvailable": "Verfügbar",
+    "agentsUnavailable": "Nicht verfügbar"
   },
   "aiChat": {
     "title": "KI-Support-Assistent",
