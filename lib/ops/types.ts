@@ -131,6 +131,14 @@ export interface OpsAuthor {
   id: string;
   full_name: string | null;
   role: string | null;
+  /**
+   * Declared availability and last heartbeat, carried raw so the console can
+   * re-derive presence as its clock advances instead of freezing whatever was
+   * true when the page was rendered. Absent for customers: presence here means
+   * "can pick up a ticket", which only applies to staff.
+   */
+  availability_status?: string | null;
+  last_seen_at?: string | null;
 }
 
 export interface OpsInitialData {
@@ -141,4 +149,10 @@ export interface OpsInitialData {
   organizationName: string;
   organizationId: string;
   viewerRole: string;
+  /**
+   * Server clock at render time. The console's own `now` is 0 until it mounts,
+   * so presence is derived against this on the first paint and server and
+   * client agree; afterwards the ticking clock takes over.
+   */
+  renderedAt: string;
 }

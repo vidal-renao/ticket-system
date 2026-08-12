@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { formatTicketRef } from "@/lib/utils";
 import type { OpsEvent, OpsEventKind } from "@/lib/ops/types";
-import { PresenceDot } from "@/components/presence/PresenceDot";
+import { PresenceMark } from "@/components/presence/PresenceMark";
+import type { EffectivePresence } from "@/lib/presence";
 import { EmptyState, MonoText, Tag } from "./primitives";
 import { EVENT_COLOR, MONO, OPS, PRIORITY_COLOR } from "./tokens";
 
@@ -53,6 +54,7 @@ export function OpsActivityFeed({
   locale,
   localePrefix,
   authorName,
+  authorPresence,
   animate,
   now,
 }: {
@@ -60,6 +62,7 @@ export function OpsActivityFeed({
   locale: string;
   localePrefix: string;
   authorName: (id: string | null) => string;
+  authorPresence: (id: string | null) => EffectivePresence | null;
   animate: boolean;
   now: number;
 }) {
@@ -144,9 +147,11 @@ export function OpsActivityFeed({
 
                 <MonoText className="mt-1 flex items-center gap-1.5 text-[11.5px]" style={{ color: OPS.faint }}>
                   {actor && (
-                    <PresenceDot
-                      userId={event.actorId}
-                      label={t("presence.online", { name: actor })}
+                    <PresenceMark
+                      presence={authorPresence(event.actorId)}
+                      label={t(`presence.${authorPresence(event.actorId) ?? "offline"}`, {
+                        name: actor,
+                      })}
                     />
                   )}
                   {actor ? `${actor} · ` : ""}

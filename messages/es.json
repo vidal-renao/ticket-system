@@ -507,7 +507,9 @@
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
     },
     "presence": {
-      "online": "{name} está en línea"
+      "online": "{name} está en línea",
+      "busy": "{name} está ocupado",
+      "offline": "{name} está desconectado"
     }
   }
 }

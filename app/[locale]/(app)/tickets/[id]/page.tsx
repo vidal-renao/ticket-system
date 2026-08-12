@@ -13,7 +13,6 @@ import { TranslateButton } from "@/components/tickets/TranslateButton";
 import { SlaCountdown } from "@/components/tickets/SlaCountdown";
 import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
-import { PresenceDot } from "@/components/presence/PresenceDot";
 import { TicketAssigneeSelect } from "@/components/tickets/TicketAssigneeSelect";
 import { effectivePresence } from "@/lib/presence";
 import { sortAgentOptions, type AgentOption } from "@/lib/agent-options";
@@ -328,12 +327,11 @@ export default async function TicketDetailPage({
                       size="sm"
                     />
                     <div className="min-w-0">
-                      <p className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
-                        <span className="truncate">{assigneeName}</span>
-                        <PresenceDot
-                          userId={assigneeProfile.id}
-                          label={t("presenceOnline", { name: assigneeProfile.full_name ?? "" })}
-                        />
+                      {/* No socket dot here: the avatar ring and the label
+                          below already carry effectivePresence, and the dot
+                          could disagree with both. */}
+                      <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">
+                        {assigneeName}
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)]">
                         {t(`presence.${assigneePresence}`)}

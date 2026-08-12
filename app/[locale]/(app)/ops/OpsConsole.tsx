@@ -6,6 +6,7 @@ import { useReducedMotion } from "framer-motion";
 import { Activity, ShieldCheck, Ticket as TicketIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { effectivePresence, type EffectivePresence } from "@/lib/presence";
 import {
   OPS_TICKET_COLUMNS,
   type OpsAuditLog,
@@ -81,6 +82,16 @@ export function OpsConsole({
       initialData.authors.map((author: OpsAuthor) => [author.id, author.full_name ?? "—"])
     )
   );
+  const [presenceById, setPresenceById] = useState<
+    Record<string, { status: string | null; lastSeen: string | null }>
+  >(() =>
+    Object.fromEntries(
+      initialData.authors.map((author: OpsAuthor) => [
+        author.id,
+        { status: author.availability_status ?? null, lastSeen: author.last_seen_at ?? null },
+      ])
+    )
+  );
   const [audit, setAudit] = useState<OpsAuditSummary>(initialAudit);
   const [refreshingAudit, setRefreshingAudit] = useState(false);
   const [highlighted, setHighlighted] = useState<Set<string>>(() => new Set());
@@ -151,15 +162,27 @@ export function OpsConsole({
 
       void supabase
         .from("profiles")
-        .select("id, full_name")
+        .select("id, full_name, role, availability_status, last_seen_at")
         .in("id", missing)
         .then(({ data }) => {
           missing.forEach((id) => pendingAuthorsRef.current.delete(id));
           if (!data || data.length === 0) return;
+          const rows = data as unknown as OpsAuthor[];
           setAuthors((previous) => {
             const next = { ...previous };
-            for (const row of data as unknown as OpsAuthor[]) {
-              next[row.id] = row.full_name ?? "—";
+            for (const row of rows) next[row.id] = row.full_name ?? "—";
+            return next;
+          });
+          setPresenceById((previous) => {
+            const next = { ...previous };
+            for (const row of rows) {
+              // Same rule as the server pass: only staff carry presence, so a
+              // customer never renders as "offline".
+              const isStaff = row.role === "agent" || row.role === "manager" || row.role === "admin";
+              next[row.id] = {
+                status: isStaff ? (row.availability_status ?? null) : null,
+                lastSeen: isStaff ? (row.last_seen_at ?? null) : null,
+              };
             }
             return next;
           });
@@ -272,6 +295,28 @@ export function OpsConsole({
   const authorName = useCallback(
     (id: string | null) => (id ? (authors[id] ?? t("table.unknownActor")) : t("table.unassigned")),
     [authors, t]
+  );
+
+  /**
+   * Presence is re-derived on every clock tick rather than frozen at render
+   * time. A console left open on a wall would otherwise keep showing an agent
+   * as available long after they closed their laptop — the exact staleness
+   * this signal exists to prevent. Someone going *offline* decays here within
+   * the heartbeat window; someone coming back online appears on the next load,
+   * since `profiles` is not part of the realtime publication.
+   *
+   * Before mount `now` is 0, so the server's clock is used and the first paint
+   * matches what the server rendered.
+   */
+  const authorPresence = useCallback(
+    (id: string | null): EffectivePresence | null => {
+      if (!id) return null;
+      const source = presenceById[id];
+      if (!source?.status) return null;
+      const at = now === 0 ? Date.parse(initialData.renderedAt) : now;
+      return effectivePresence(source.status, source.lastSeen, at);
+    },
+    [presenceById, now, initialData.renderedAt]
   );
 
   const tabs: [OpsTab, string, typeof ShieldCheck][] = [
@@ -404,6 +449,7 @@ export function OpsConsole({
                       locale={locale}
                       localePrefix={localePrefix}
                       authorName={authorName}
+                      authorPresence={authorPresence}
                       animate={animate}
                       now={now}
                     />
@@ -438,6 +484,7 @@ export function OpsConsole({
             highlighted={highlighted}
             localePrefix={localePrefix}
             authorName={authorName}
+            authorPresence={authorPresence}
           />
         )}
 
@@ -448,6 +495,7 @@ export function OpsConsole({
               locale={locale}
               localePrefix={localePrefix}
               authorName={authorName}
+              authorPresence={authorPresence}
               animate={animate}
               now={now}
             />

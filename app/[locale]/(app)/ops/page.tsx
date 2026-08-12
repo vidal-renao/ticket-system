@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getAuditSummary } from "@/lib/ops/audit-source";
+import { getLastSeenMap } from "@/lib/presence-server";
 import { buildSeedEvents } from "@/lib/ops/derive";
 import {
   OPS_AI_ANALYSIS_COLUMNS,
@@ -102,14 +103,30 @@ export default async function OpsPage({
   for (const comment of comments) authorIds.add(comment.author_id);
   for (const log of auditLogs) if (log.actor_id) authorIds.add(log.actor_id);
 
+  // availability_status and last_seen_at ride along so the console can show
+  // who is actually able to take a ticket. last_seen_at comes from
+  // getLastSeenMap rather than this select: the helper swallows its own error,
+  // so a database without the presence migration loses the indicator instead
+  // of failing the whole console.
   let authors: OpsAuthor[] = [];
   if (authorIds.size > 0) {
     const { data } = await svc
       .from("profiles")
-      .select("id, full_name, role")
+      .select("id, full_name, role, availability_status")
       .eq("organization_id", organizationId)
       .in("id", [...authorIds]);
-    authors = (data ?? []) as unknown as OpsAuthor[];
+    const rows = (data ?? []) as unknown as OpsAuthor[];
+    const staffIds = rows
+      .filter((author) => author.role === "agent" || author.role === "manager" || author.role === "admin")
+      .map((author) => author.id);
+    const lastSeen = await getLastSeenMap(svc, staffIds);
+    const staff = new Set(staffIds);
+    authors = rows.map((author) =>
+      staff.has(author.id)
+        ? { ...author, last_seen_at: lastSeen[author.id] ?? null }
+        : // Customers get no presence at all rather than a misleading "offline".
+          { ...author, availability_status: null, last_seen_at: null }
+    );
   }
 
   return (
@@ -122,6 +139,7 @@ export default async function OpsPage({
         organizationName: orgResult.data?.name ?? "—",
         organizationId,
         viewerRole: profile.role as string,
+        renderedAt: new Date().toISOString(),
       }}
       initialAudit={audit}
       locale={locale}
