@@ -222,7 +222,8 @@
     "reassigned": "Ticket reasignado",
     "reassignFailed": "No se pudo reasignar el ticket",
     "agentsAvailable": "Disponibles",
-    "agentsUnavailable": "No disponibles"
+    "agentsUnavailable": "No disponibles",
+    "assigneeUnavailableWarning": "Este agente está marcado como «{status}»; puede que no vea el ticket pronto."
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",

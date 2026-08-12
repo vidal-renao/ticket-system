@@ -3,10 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { partitionAgentOptions, type AgentOption } from "@/lib/agent-options";
+import { isAgentAvailable, partitionAgentOptions, type AgentOption } from "@/lib/agent-options";
 
 /**
  * Reassignment from the ticket page itself.
@@ -38,6 +38,11 @@ export function TicketAssigneeSelect({
 
   const { available, unavailable } = partitionAgentOptions(agents);
 
+  // Derived from the selection, so the notice follows an optimistic set and
+  // disappears again if the server rejects it.
+  const selected = agents.find((agent) => agent.id === assignee) ?? null;
+  const unavailableAssignee = selected && !isAgentAvailable(selected.presence) ? selected : null;
+
   function handleAssign(agentId: string) {
     const previous = assignee;
     setAssignee(agentId);
@@ -65,7 +70,8 @@ export function TicketAssigneeSelect({
   }
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="mt-3">
+      <div className="flex items-center gap-2">
       <select
         value={assignee}
         onChange={(event) => handleAssign(event.target.value)}
@@ -99,6 +105,25 @@ export function TicketAssigneeSelect({
       </select>
       {isPending && (
         <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--color-text-muted)]" aria-hidden="true" />
+      )}
+      </div>
+
+      {/* A warning, never a block: the admin decides who owns the ticket, and
+          there are good reasons to hand work to someone who is away. It stays
+          on screen rather than firing as a toast, because it describes the
+          state the ticket is now in, not an event that just happened. */}
+      {unavailableAssignee && (
+        <p
+          role="status"
+          className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-amber-300"
+        >
+          <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>
+            {t("assigneeUnavailableWarning", {
+              status: t(`presence.${unavailableAssignee.presence}`),
+            })}
+          </span>
+        </p>
       )}
     </div>
   );

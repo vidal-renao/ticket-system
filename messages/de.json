@@ -176,7 +176,8 @@
     "reassigned": "Anfrage neu zugewiesen",
     "reassignFailed": "Anfrage konnte nicht neu zugewiesen werden",
     "agentsAvailable": "Verfügbar",
-    "agentsUnavailable": "Nicht verfügbar"
+    "agentsUnavailable": "Nicht verfügbar",
+    "assigneeUnavailableWarning": "Diese Person ist als „{status}“ markiert; sie sieht die Anfrage möglicherweise nicht bald."
   },
   "aiChat": {
     "title": "KI-Support-Assistent",
