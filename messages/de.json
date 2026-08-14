@@ -177,7 +177,20 @@
     "reassignFailed": "Anfrage konnte nicht neu zugewiesen werden",
     "agentsAvailable": "Verfügbar",
     "agentsUnavailable": "Nicht verfügbar",
-    "assigneeUnavailableWarning": "Diese Person ist als „{status}“ markiert; sie sieht die Anfrage möglicherweise nicht bald."
+    "assigneeUnavailableWarning": "Diese Person ist als „{status}“ markiert; sie sieht die Anfrage möglicherweise nicht bald.",
+    "forceClose": {
+      "action": "Schließung erzwingen",
+      "title": "Schließung dieser Anfrage erzwingen",
+      "warning": "Damit wird der normale Freigabeprozess übersprungen — Bearbeitung, Administratorfreigabe und Bestätigung durch den Kunden. Der Vorgang wird mit Ihrem Namen und Grund im Audit-Log erfasst.",
+      "reasonLabel": "Grund (erforderlich)",
+      "reasonPlaceholder": "z. B. Duplikat von TK-0042, diese wird geschlossen.",
+      "reasonHint": "Mindestens {min} Zeichen. Wird im Audit-Log gespeichert.",
+      "confirm": "Schließung erzwingen",
+      "cancel": "Abbrechen",
+      "done": "Anfrage zwangsweise geschlossen und protokolliert",
+      "notAudited": "Anfrage geschlossen, aber der Audit-Eintrag konnte nicht gespeichert werden. Bitte melden.",
+      "failed": "Schließung konnte nicht erzwungen werden"
+    }
   },
   "aiChat": {
     "title": "KI-Support-Assistent",

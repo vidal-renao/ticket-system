@@ -223,7 +223,20 @@
     "reassignFailed": "Could not reassign the ticket",
     "agentsAvailable": "Available",
     "agentsUnavailable": "Not available",
-    "assigneeUnavailableWarning": "This agent is marked “{status}” — they may not see the ticket soon."
+    "assigneeUnavailableWarning": "This agent is marked “{status}” — they may not see the ticket soon.",
+    "forceClose": {
+      "action": "Force close",
+      "title": "Force close this ticket",
+      "warning": "This skips the normal approval flow — execution, administrator sign-off and the customer's confirmation. It will be recorded in the audit log with your name and reason.",
+      "reasonLabel": "Reason (required)",
+      "reasonPlaceholder": "e.g. Duplicate of TK-0042, closing this one.",
+      "reasonHint": "At least {min} characters. Stored in the audit log.",
+      "confirm": "Force close",
+      "cancel": "Cancel",
+      "done": "Ticket force-closed and recorded",
+      "notAudited": "Ticket closed, but the audit entry failed to save. Report this.",
+      "failed": "Could not force-close the ticket"
+    }
   },
   "aiChat": {
     "title": "AI Support Assistant",
