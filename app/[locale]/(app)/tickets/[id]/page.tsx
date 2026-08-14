@@ -21,6 +21,7 @@ import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from 
 import { AlertTriangle, Clock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
 import { TicketWorkflowActions } from "@/components/tickets/TicketWorkflowActions";
+import { AdminForceCloseAction } from "@/components/tickets/AdminForceCloseAction";
 
 export default async function TicketDetailPage({
   params,
@@ -279,6 +280,14 @@ export default async function TicketDetailPage({
                   status={ticket.status}
                   reviewStatus={ticket.review_status}
                 />
+                {/* Separate from the workflow controls above, and below them:
+                    this is the exit for what the flow cannot express, not one
+                    more step in it. */}
+                {profile.role === "admin" && (
+                  <div className="mt-3 border-t border-[var(--color-surface-700)] pt-3">
+                    <AdminForceCloseAction ticketId={ticket.id} status={ticket.status} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

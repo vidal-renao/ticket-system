@@ -223,7 +223,20 @@
     "reassignFailed": "No se pudo reasignar el ticket",
     "agentsAvailable": "Disponibles",
     "agentsUnavailable": "No disponibles",
-    "assigneeUnavailableWarning": "Este agente está marcado como «{status}»; puede que no vea el ticket pronto."
+    "assigneeUnavailableWarning": "Este agente está marcado como «{status}»; puede que no vea el ticket pronto.",
+    "forceClose": {
+      "action": "Forzar cierre",
+      "title": "Forzar el cierre de este ticket",
+      "warning": "Esto salta el flujo de aprobación normal — ejecución, visto bueno del administrador y confirmación del cliente. Quedará registrado en el log de auditoría con tu nombre y el motivo.",
+      "reasonLabel": "Motivo (obligatorio)",
+      "reasonPlaceholder": "p. ej. Duplicado de TK-0042, cierro este.",
+      "reasonHint": "Mínimo {min} caracteres. Se guarda en el log de auditoría.",
+      "confirm": "Forzar cierre",
+      "cancel": "Cancelar",
+      "done": "Ticket cerrado a la fuerza y registrado",
+      "notAudited": "Ticket cerrado, pero no se pudo guardar la entrada de auditoría. Repórtalo.",
+      "failed": "No se pudo forzar el cierre del ticket"
+    }
   },
   "aiChat": {
     "title": "Asistente IA de Soporte",
