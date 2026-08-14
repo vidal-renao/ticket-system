@@ -11,7 +11,6 @@ import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { suggestReply } from "@/app/actions/suggest-reply";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
-import { PresenceDot } from "@/components/presence/PresenceDot";
 
 interface Comment {
   id: string;
@@ -232,12 +231,8 @@ export function TicketComments({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-secondary)]">
+            <span className="text-xs font-medium text-[var(--color-text-secondary)]">
               {comment.profiles?.full_name ?? "Unknown"}
-              <PresenceDot
-                userId={comment.author_id}
-                label={t("presenceOnline", { name: comment.profiles?.full_name ?? "" })}
-              />
             </span>
             {roleLabel && (
               <span className="text-[9px] px-1.5 py-0.5 rounded font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">

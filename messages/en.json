@@ -220,7 +220,10 @@
     },
     "reassign": "Reassign ticket",
     "reassigned": "Ticket reassigned",
-    "reassignFailed": "Could not reassign the ticket"
+    "reassignFailed": "Could not reassign the ticket",
+    "agentsAvailable": "Available",
+    "agentsUnavailable": "Not available",
+    "assigneeUnavailableWarning": "This agent is marked “{status}” — they may not see the ticket soon."
   },
   "aiChat": {
     "title": "AI Support Assistant",
@@ -504,7 +507,9 @@
       "compliance": "Swiss DSG compliant | VIDAL Helpdesk AI Audit"
     },
     "presence": {
-      "online": "{name} is online"
+      "online": "{name} is online",
+      "busy": "{name} is busy",
+      "offline": "{name} is offline"
     }
   }
 }

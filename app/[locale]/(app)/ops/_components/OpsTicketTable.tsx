@@ -9,7 +9,8 @@ import type { TicketPriority } from "@/lib/supabase/types";
 import type { CanonicalTicketStatus } from "@/lib/ticket-lifecycle";
 import { OPS_CANONICAL_STATUSES, OPS_PRIORITIES, canonicalOf, type OpsFilters } from "@/lib/ops/derive";
 import type { OpsTicket } from "@/lib/ops/types";
-import { PresenceDot } from "@/components/presence/PresenceDot";
+import { PresenceMark } from "@/components/presence/PresenceMark";
+import type { EffectivePresence } from "@/lib/presence";
 import { MonoText, Tag } from "./primitives";
 import { MONO, OPS, PRIORITY_COLOR, STATUS_COLOR } from "./tokens";
 
@@ -47,6 +48,7 @@ export function OpsTicketTable({
   highlighted,
   localePrefix,
   authorName,
+  authorPresence,
 }: {
   tickets: OpsTicket[];
   totalCount: number;
@@ -55,6 +57,7 @@ export function OpsTicketTable({
   highlighted: Set<string>;
   localePrefix: string;
   authorName: (id: string | null) => string;
+  authorPresence: (id: string | null) => EffectivePresence | null;
 }) {
   const t = useTranslations("ops");
 
@@ -195,9 +198,11 @@ export function OpsTicketTable({
                   <td className="px-3 py-2" style={{ color: OPS.muted }}>
                     <span className="inline-flex items-center gap-1.5">
                       {ticket.assigned_to ? authorName(ticket.assigned_to) : t("table.unassigned")}
-                      <PresenceDot
-                        userId={ticket.assigned_to}
-                        label={t("presence.online", { name: authorName(ticket.assigned_to) })}
+                      <PresenceMark
+                        presence={authorPresence(ticket.assigned_to)}
+                        label={t(`presence.${authorPresence(ticket.assigned_to) ?? "offline"}`, {
+                          name: authorName(ticket.assigned_to),
+                        })}
                       />
                     </span>
                   </td>
