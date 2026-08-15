@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   const svc = createServiceClientStatic();
   const { data: adminProfile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   }
 
   const { error: profileError } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .upsert(
       {
         id: userId,
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     // company name (replaceable later in Settings → Company profile).
     const companyName = body.company_name?.trim() || name.trim();
     taxId = body.tax_id?.trim() || generateCif(companyName);
-    const { error: custError } = await svc.from("customers_info").upsert(
+    const { error: custError } = await svc.from("hd_customers_info").upsert(
       {
         id: userId,
         company_name: companyName,

@@ -55,7 +55,7 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["organizations"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["organizations"]["Insert"]>;
       };
-      profiles: {
+      hd_profiles: {
         Row: {
           id: string;
           organization_id: string | null;
@@ -78,8 +78,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["profiles"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_profiles"]["Row"], "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_profiles"]["Insert"]>;
       };
       teams: {
         Row: {
@@ -94,7 +94,7 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["teams"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["teams"]["Insert"]>;
       };
-      customers_info: {
+      hd_customers_info: {
         Row: {
           id: string;
           company_name: string;
@@ -104,8 +104,8 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["customers_info"]["Row"], "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["customers_info"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_customers_info"]["Row"], "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_customers_info"]["Insert"]>;
       };
       categories: {
         Row: {
@@ -138,7 +138,7 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["sla_policies"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["sla_policies"]["Insert"]>;
       };
-      tickets: {
+      hd_tickets: {
         Row: {
           id: string;
           ticket_number: number;
@@ -185,10 +185,10 @@ export interface Database {
           metadata: Json;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["tickets"]["Row"], "id" | "ticket_number" | "created_at">;
-        Update: Partial<Database["public"]["Tables"]["tickets"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_tickets"]["Row"], "id" | "ticket_number" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_tickets"]["Insert"]>;
       };
-      ticket_comments: {
+      hd_ticket_comments: {
         Row: {
           id: string;
           ticket_id: string;
@@ -200,10 +200,10 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["ticket_comments"]["Row"], "id" | "created_at" | "updated_at">;
-        Update: Partial<Database["public"]["Tables"]["ticket_comments"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_ticket_comments"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_ticket_comments"]["Insert"]>;
       };
-      ai_analysis: {
+      hd_ai_analysis: {
         Row: {
           id: string;
           ticket_id: string;
@@ -228,13 +228,13 @@ export interface Database {
           agent_feedback: string | null;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["ai_analysis"]["Row"], "id" | "created_at">;
-        Update: Partial<Database["public"]["Tables"]["ai_analysis"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_ai_analysis"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_ai_analysis"]["Insert"]>;
       };
       // Named ticket_audit_logs (not audit_logs) because this Supabase
       // project is shared with other apps and a pre-existing "audit_logs"
       // table there belongs to a different one, with an incompatible shape.
-      ticket_audit_logs: {
+      hd_ticket_audit_logs: {
         Row: {
           id: string;
           organization_id: string | null;
@@ -247,10 +247,10 @@ export interface Database {
           new_values: Json | null;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["ticket_audit_logs"]["Row"], "id" | "created_at">;
-        Update: Partial<Database["public"]["Tables"]["ticket_audit_logs"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_ticket_audit_logs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_ticket_audit_logs"]["Insert"]>;
       };
-      notifications: {
+      hd_notifications: {
         Row: {
           id: string;
           user_id: string;
@@ -262,8 +262,8 @@ export interface Database {
           is_read: boolean;
           created_at: string;
         };
-        Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "created_at">;
-        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+        Insert: Omit<Database["public"]["Tables"]["hd_notifications"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["hd_notifications"]["Insert"]>;
       };
       audit_runs: {
         Row: {
@@ -292,14 +292,14 @@ export interface Database {
 }
 
 // Convenience joined types
-export type Ticket = Database["public"]["Tables"]["tickets"]["Row"];
-export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type Ticket = Database["public"]["Tables"]["hd_tickets"]["Row"];
+export type Profile = Database["public"]["Tables"]["hd_profiles"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type SlaPolicy = Database["public"]["Tables"]["sla_policies"]["Row"];
-export type AIAnalysis = Database["public"]["Tables"]["ai_analysis"]["Row"];
-export type AuditLog = Database["public"]["Tables"]["ticket_audit_logs"]["Row"];
-export type TicketComment = Database["public"]["Tables"]["ticket_comments"]["Row"];
-export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type AIAnalysis = Database["public"]["Tables"]["hd_ai_analysis"]["Row"];
+export type AuditLog = Database["public"]["Tables"]["hd_ticket_audit_logs"]["Row"];
+export type TicketComment = Database["public"]["Tables"]["hd_ticket_comments"]["Row"];
+export type Notification = Database["public"]["Tables"]["hd_notifications"]["Row"];
 
 export type TicketWithRelations = Ticket & {
   profiles: Pick<Profile, "id" | "full_name" | "avatar_url"> | null;

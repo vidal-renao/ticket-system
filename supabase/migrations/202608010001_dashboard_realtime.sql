@@ -19,7 +19,7 @@
 --
 -- Rollback (forward-only per ADR-006 — only if reverting this exact migration):
 --   ALTER PUBLICATION supabase_realtime DROP TABLE
---     public.tickets, public.ticket_comments, public.ticket_audit_logs;
+--     public.hd_tickets, public.hd_ticket_comments, public.hd_ticket_audit_logs;
 -- ============================================================================
 
 do $$
@@ -30,7 +30,7 @@ begin
     raise exception 'publication supabase_realtime does not exist';
   end if;
 
-  foreach target_table in array array['tickets', 'ticket_comments', 'ticket_audit_logs']
+  foreach target_table in array array['hd_tickets', 'hd_ticket_comments', 'hd_ticket_audit_logs']
   loop
     if not exists (
       select 1

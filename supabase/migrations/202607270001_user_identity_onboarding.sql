@@ -4,13 +4,13 @@
 --
 -- Rollback (manual, forward-only per ADR-006 — do not run unless reverting
 -- this exact migration before it reaches production):
---   DROP TRIGGER IF EXISTS profiles_reference_code_immutable ON public.profiles;
---   DROP TRIGGER IF EXISTS profiles_set_reference_code ON public.profiles;
+--   DROP TRIGGER IF EXISTS profiles_reference_code_immutable ON public.hd_profiles;
+--   DROP TRIGGER IF EXISTS profiles_set_reference_code ON public.hd_profiles;
 --   DROP FUNCTION IF EXISTS public.rve_reference_code_immutable();
 --   DROP FUNCTION IF EXISTS public.rve_set_reference_code();
 --   DROP FUNCTION IF EXISTS public.rve_random_suffix();
 --   DROP FUNCTION IF EXISTS public.rve_role_code(text, text);
---   ALTER TABLE public.profiles
+--   ALTER TABLE public.hd_profiles
 --     DROP CONSTRAINT IF EXISTS profiles_reference_code_format_check,
 --     DROP CONSTRAINT IF EXISTS profiles_reference_code_key,
 --     DROP CONSTRAINT IF EXISTS profiles_customer_type_check,
@@ -34,13 +34,13 @@ SET LOCAL search_path = public, extensions, pg_temp;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 -- ----------------------------------------------------------------------------
--- 1. New nullable columns on profiles
+-- 1. New nullable columns on hd_profiles
 -- ----------------------------------------------------------------------------
-ALTER TABLE public.profiles
+ALTER TABLE public.hd_profiles
   ADD COLUMN IF NOT EXISTS customer_type   TEXT,
   ADD COLUMN IF NOT EXISTS reference_code  TEXT,
   -- phone is documented in docs/migration_v1_final.sql's original CREATE
-  -- TABLE but was never actually present on production's profiles table
+  -- TABLE but was never actually present on production's hd_profiles table
   -- (confirmed via information_schema before this migration was applied) --
   -- added here defensively rather than assumed pre-existing.
   ADD COLUMN IF NOT EXISTS phone           TEXT,
@@ -53,16 +53,16 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS logo_url        TEXT;
 
 -- ----------------------------------------------------------------------------
--- 2. customer_type backfill (evidence-based: a real customers_info.company_name
+-- 2. customer_type backfill (evidence-based: a real hd_customers_info.company_name
 --    means "company"; its absence means "individual" — a suggestive display
 --    name like "Empresa Cliente 1" is NOT treated as evidence on its own).
 --    Must happen BEFORE the CHECK constraint below, since existing customer
 --    rows currently have customer_type = NULL.
 -- ----------------------------------------------------------------------------
-UPDATE public.profiles p
+UPDATE public.hd_profiles p
 SET customer_type = CASE
   WHEN EXISTS (
-    SELECT 1 FROM public.customers_info ci
+    SELECT 1 FROM public.hd_customers_info ci
     WHERE ci.id = p.id AND ci.company_name IS NOT NULL AND btrim(ci.company_name) <> ''
   ) THEN 'company'
   ELSE 'individual'
@@ -75,7 +75,7 @@ WHERE p.role = 'customer' AND p.customer_type IS NULL;
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
-    WHERE conname = 'profiles_customer_type_check' AND conrelid = 'public.profiles'::regclass
+    WHERE conname = 'profiles_customer_type_check' AND conrelid = 'public.hd_profiles'::regclass
   ) THEN
     -- customer_type IS NULL is always allowed -- both as the permanent state
     -- for non-customer roles, and as the transitional state for a customer
@@ -83,7 +83,7 @@ DO $$ BEGIN
     -- follow-up upsert that classifies it individual/company. Once it IS
     -- set, though, it must be a valid value and the profile must actually
     -- be a customer.
-    ALTER TABLE public.profiles
+    ALTER TABLE public.hd_profiles
       ADD CONSTRAINT profiles_customer_type_check
       CHECK (
         customer_type IS NULL
@@ -165,7 +165,7 @@ BEGIN
   LOOP
     v_attempt := v_attempt + 1;
     v_candidate := 'VRE-' || v_role_code || '-' || public.rve_random_suffix();
-    IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE reference_code = v_candidate) THEN
+    IF NOT EXISTS (SELECT 1 FROM public.hd_profiles WHERE reference_code = v_candidate) THEN
       NEW.reference_code := v_candidate;
       RETURN NEW;
     END IF;
@@ -191,13 +191,13 @@ $$;
 
 DO $$ BEGIN
   CREATE TRIGGER profiles_set_reference_code
-    BEFORE INSERT OR UPDATE ON public.profiles
+    BEFORE INSERT OR UPDATE ON public.hd_profiles
     FOR EACH ROW EXECUTE FUNCTION public.rve_set_reference_code();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE TRIGGER profiles_reference_code_immutable
-    BEFORE UPDATE ON public.profiles
+    BEFORE UPDATE ON public.hd_profiles
     FOR EACH ROW EXECUTE FUNCTION public.rve_reference_code_immutable();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -213,7 +213,7 @@ DECLARE
   v_attempt INTEGER;
 BEGIN
   FOR rec IN
-    SELECT id, role, customer_type FROM public.profiles
+    SELECT id, role, customer_type FROM public.hd_profiles
     WHERE reference_code IS NULL ORDER BY created_at
   LOOP
     v_role_code := public.rve_role_code(rec.role, rec.customer_type);
@@ -225,8 +225,8 @@ BEGIN
     LOOP
       v_attempt := v_attempt + 1;
       v_candidate := 'VRE-' || v_role_code || '-' || public.rve_random_suffix();
-      IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE reference_code = v_candidate) THEN
-        UPDATE public.profiles SET reference_code = v_candidate WHERE id = rec.id;
+      IF NOT EXISTS (SELECT 1 FROM public.hd_profiles WHERE reference_code = v_candidate) THEN
+        UPDATE public.hd_profiles SET reference_code = v_candidate WHERE id = rec.id;
         EXIT;
       END IF;
       IF v_attempt >= 20 THEN
@@ -242,18 +242,18 @@ END $$;
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
-    WHERE conname = 'profiles_reference_code_key' AND conrelid = 'public.profiles'::regclass
+    WHERE conname = 'profiles_reference_code_key' AND conrelid = 'public.hd_profiles'::regclass
   ) THEN
-    ALTER TABLE public.profiles ADD CONSTRAINT profiles_reference_code_key UNIQUE (reference_code);
+    ALTER TABLE public.hd_profiles ADD CONSTRAINT profiles_reference_code_key UNIQUE (reference_code);
   END IF;
 END $$;
 
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
-    WHERE conname = 'profiles_reference_code_format_check' AND conrelid = 'public.profiles'::regclass
+    WHERE conname = 'profiles_reference_code_format_check' AND conrelid = 'public.hd_profiles'::regclass
   ) THEN
-    ALTER TABLE public.profiles
+    ALTER TABLE public.hd_profiles
       ADD CONSTRAINT profiles_reference_code_format_check
       CHECK (
         reference_code IS NULL
@@ -263,10 +263,10 @@ DO $$ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_profiles_reference_code
-  ON public.profiles (reference_code) WHERE reference_code IS NOT NULL;
+  ON public.hd_profiles (reference_code) WHERE reference_code IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_profiles_customer_type
-  ON public.profiles (organization_id, customer_type) WHERE role = 'customer';
+  ON public.hd_profiles (organization_id, customer_type) WHERE role = 'customer';
 
 -- ----------------------------------------------------------------------------
 -- 8. Column-level grants — extend the existing self-service-editable set.
@@ -274,7 +274,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_customer_type
 --    stay admin/service-role-only, consistent with role/organization_id.
 -- ----------------------------------------------------------------------------
 GRANT UPDATE (full_name, phone, locale, address, city, postal_code, country, website, contact_person, logo_url)
-  ON public.profiles TO authenticated;
+  ON public.hd_profiles TO authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 9. Storage: `logos` bucket, mirroring the existing `avatars` bucket pattern

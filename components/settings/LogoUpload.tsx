@@ -73,7 +73,7 @@ export function LogoUpload({ userId, companyName, currentUrl }: LogoUploadProps)
     const { data: { publicUrl } } = supabase.storage.from("logos").getPublicUrl(path);
 
     const { error: profileError } = await supabase
-      .from("profiles")
+      .from("hd_profiles")
       .update({ logo_url: publicUrl })
       .eq("id", userId);
 

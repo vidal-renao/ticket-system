@@ -21,7 +21,7 @@ export default async function AppLayout({
   // This prevents redirect loops when profiles RLS policies are misconfigured.
   const svc = createServiceClientStatic();
   const { data: profile, error: profileError } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("full_name, role, specialty, avatar_url, availability_status, organization_id")
     .eq("id", user.id)
     .maybeSingle();
@@ -29,7 +29,7 @@ export default async function AppLayout({
   // If the query errors (e.g. availability_status column not yet migrated), fall back
   // to a minimal select so login still works before the migration is applied.
   const resolvedProfile = profile ?? (profileError
-    ? (await svc.from("profiles").select("full_name, role, specialty, avatar_url, organization_id").eq("id", user.id).maybeSingle()).data
+    ? (await svc.from("hd_profiles").select("full_name, role, specialty, avatar_url, organization_id").eq("id", user.id).maybeSingle()).data
     : null);
 
   if (!resolvedProfile) redirect(loginPath);
@@ -48,7 +48,7 @@ export default async function AppLayout({
   // Companies see their company identity and sector next to the name.
   if (resolvedProfile.role === "customer") {
     const { data: companyInfo } = await svc
-      .from("customers_info")
+      .from("hd_customers_info")
       .select("company_name, industry")
       .eq("id", user.id)
       .maybeSingle();
@@ -61,25 +61,25 @@ export default async function AppLayout({
 
   const [{ data: notifications }, { count: unreadNotifications }, assignedCountResult, { count: inboxUnreadCount }] = await Promise.all([
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id, ticket_id, type, title, message, is_read, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(5),
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false),
     ["agent", "manager", "admin"].includes(resolvedProfile.role)
       ? svc
-          .from("tickets")
+          .from("hd_tickets")
           .select("id", { count: "exact", head: true })
           .eq("assigned_to", user.id)
           .in("status", ACTIVE_TICKET_STATUSES)
       : Promise.resolve({ count: 0 }),
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false)

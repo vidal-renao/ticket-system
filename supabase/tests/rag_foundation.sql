@@ -30,7 +30,7 @@ SET LOCAL ROLE service_role;
 INSERT INTO public.organizations (id, name, slug) VALUES
   ('10000000-0000-4000-8000-000000000001', 'Organization Alpha', 'alpha'),
   ('20000000-0000-4000-8000-000000000002', 'Organization Beta', 'beta');
-INSERT INTO public.profiles (id, organization_id, role) VALUES
+INSERT INTO public.hd_profiles (id, organization_id, role) VALUES
   ('10000000-0000-4000-8000-000000000011', '10000000-0000-4000-8000-000000000001', 'manager'),
   ('10000000-0000-4000-8000-000000000012', '10000000-0000-4000-8000-000000000001', 'agent'),
   ('10000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000001', 'customer'),

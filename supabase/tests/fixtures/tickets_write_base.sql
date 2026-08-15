@@ -1,4 +1,4 @@
--- Minimal legacy-schema stand-in for the tickets write-path suite, following
+-- Minimal legacy-schema stand-in for the hd_tickets write-path suite, following
 -- the same pattern as identity_legacy_base.sql / rag_legacy_base.sql: just
 -- enough of the historically ad-hoc-applied core schema for
 -- 202608040001_tickets_write_policies.sql and
@@ -54,7 +54,7 @@ CREATE TABLE public.organizations (
   is_active boolean NOT NULL DEFAULT true
 );
 
-CREATE TABLE public.profiles (
+CREATE TABLE public.hd_profiles (
   id uuid PRIMARY KEY,
   organization_id uuid REFERENCES public.organizations(id),
   role text NOT NULL CHECK (role IN ('customer', 'agent', 'manager', 'admin')),
@@ -62,12 +62,12 @@ CREATE TABLE public.profiles (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.tickets (
+CREATE TABLE public.hd_tickets (
   id uuid PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
   ticket_number bigserial,
   organization_id uuid NOT NULL REFERENCES public.organizations(id),
-  created_by uuid NOT NULL REFERENCES public.profiles(id),
-  assigned_to uuid REFERENCES public.profiles(id),
+  created_by uuid NOT NULL REFERENCES public.hd_profiles(id),
+  assigned_to uuid REFERENCES public.hd_profiles(id),
   assigned_team_id uuid,
   assigned_at timestamptz,
   assigned_by uuid,
@@ -92,10 +92,10 @@ CREATE TABLE public.tickets (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.ticket_comments (
+CREATE TABLE public.hd_ticket_comments (
   id uuid PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
-  ticket_id uuid NOT NULL REFERENCES public.tickets(id),
-  author_id uuid NOT NULL REFERENCES public.profiles(id),
+  ticket_id uuid NOT NULL REFERENCES public.hd_tickets(id),
+  author_id uuid NOT NULL REFERENCES public.hd_profiles(id),
   content text NOT NULL,
   is_internal boolean NOT NULL DEFAULT false,
   is_ai_generated boolean NOT NULL DEFAULT false,
@@ -112,7 +112,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path TO 'public'
 SET row_security TO 'off'
 AS $$
-  SELECT role::text FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT role::text FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 CREATE OR REPLACE FUNCTION public.current_profile_org_id()
@@ -121,7 +121,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path TO 'public'
 SET row_security TO 'off'
 AS $$
-  SELECT organization_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT organization_id FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.current_profile_role() TO anon, authenticated, service_role;
@@ -130,10 +130,10 @@ GRANT EXECUTE ON FUNCTION public.current_profile_org_id() TO anon, authenticated
 -- ---------------------------------------------------------------------------
 -- Pre-existing policies and grants (the state 202608040001 was written against)
 -- ---------------------------------------------------------------------------
-ALTER TABLE public.tickets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ticket_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hd_tickets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hd_ticket_comments ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY tickets_read_enterprise_scope ON public.tickets
+CREATE POLICY tickets_read_enterprise_scope ON public.hd_tickets
   FOR SELECT
   USING (
     deleted_at IS NULL
@@ -145,41 +145,41 @@ CREATE POLICY tickets_read_enterprise_scope ON public.tickets
     )
   );
 
-CREATE POLICY customers_create_tickets ON public.tickets
+CREATE POLICY customers_create_tickets ON public.hd_tickets
   FOR INSERT
   WITH CHECK (created_by = auth.uid() AND organization_id = current_profile_org_id());
 
-CREATE POLICY ticket_comments_read_authorized ON public.ticket_comments
+CREATE POLICY ticket_comments_read_authorized ON public.hd_ticket_comments
   FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM public.tickets ticket
-      WHERE ticket.id = ticket_comments.ticket_id
+      SELECT 1 FROM public.hd_tickets ticket
+      WHERE ticket.id = hd_ticket_comments.ticket_id
         AND ticket.deleted_at IS NULL
         AND ticket.organization_id = current_profile_org_id()
     )
   );
 
-CREATE POLICY ticket_comments_create_authorized ON public.ticket_comments
+CREATE POLICY ticket_comments_create_authorized ON public.hd_ticket_comments
   FOR INSERT
   WITH CHECK (
     author_id = auth.uid()
     AND EXISTS (
-      SELECT 1 FROM public.tickets ticket
-      WHERE ticket.id = ticket_comments.ticket_id
+      SELECT 1 FROM public.hd_tickets ticket
+      WHERE ticket.id = hd_ticket_comments.ticket_id
         AND ticket.deleted_at IS NULL
         AND ticket.organization_id = current_profile_org_id()
     )
   );
 
 -- Historical grant state: SELECT/INSERT only. The authenticated role never had
--- UPDATE on tickets nor INSERT on ticket_comments — that is what
+-- UPDATE on hd_tickets nor INSERT on hd_ticket_comments — that is what
 -- 202608040001 adds, and anon's write grants are what it revokes.
-GRANT SELECT, INSERT ON public.tickets TO authenticated;
-GRANT SELECT ON public.ticket_comments TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.tickets TO anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.ticket_comments TO anon;
-GRANT ALL ON public.tickets, public.ticket_comments, public.profiles, public.organizations TO service_role;
+GRANT SELECT, INSERT ON public.hd_tickets TO authenticated;
+GRANT SELECT ON public.hd_ticket_comments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hd_tickets TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hd_ticket_comments TO anon;
+GRANT ALL ON public.hd_tickets, public.hd_ticket_comments, public.hd_profiles, public.organizations TO service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
@@ -188,12 +188,12 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_
 INSERT INTO public.organizations (id, name, slug) VALUES
   ('921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'Vidal Real Estate', 'vidal-real-estate');
 
-INSERT INTO public.profiles (id, organization_id, role, full_name) VALUES
+INSERT INTO public.hd_profiles (id, organization_id, role, full_name) VALUES
   ('00000000-0000-4000-8000-0000000000ad', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', 'CI Admin'),
   ('00000000-0000-4000-8000-0000000000cc', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'CI Customer'),
   ('00000000-0000-4000-8000-0000000000a9', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'agent', 'CI Agent');
 
-INSERT INTO public.tickets (id, organization_id, created_by, assigned_to, title, status, priority) VALUES
+INSERT INTO public.hd_tickets (id, organization_id, created_by, assigned_to, title, status, priority) VALUES
   ('00000000-0000-4000-8000-000000007c01', '921f56a8-b2fe-4f24-bae9-fdf4863d4240',
    '00000000-0000-4000-8000-0000000000cc', '00000000-0000-4000-8000-0000000000a9',
    'CI ticket', 'open', 'medium');

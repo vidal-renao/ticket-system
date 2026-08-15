@@ -43,7 +43,7 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
         {
           event: "UPDATE",
           schema: "public",
-          table: "profiles",
+          table: "hd_profiles",
           filter: `organization_id=eq.${orgId}`,
         },
         (payload: { new: Record<string, unknown> }) => {

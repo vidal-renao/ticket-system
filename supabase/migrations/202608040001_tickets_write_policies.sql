@@ -1,7 +1,7 @@
 -- ============================================================================
--- Authenticated write path for tickets (and the inert comment INSERT policy)
+-- Authenticated write path for hd_tickets (and the inert comment INSERT policy)
 --
--- Context: public.tickets has RLS enabled with INSERT and SELECT policies only.
+-- Context: public.hd_tickets has RLS enabled with INSERT and SELECT policies only.
 -- There is no UPDATE and no DELETE policy, AND the `authenticated` role has no
 -- UPDATE privilege on the table at all (verified via
 -- information_schema.role_table_grants) — so both layers deny the authenticated
@@ -15,11 +15,11 @@
 -- they are separable and can be dropped from this file before applying.
 --
 -- Rollback (forward-only per ADR-006 — only if reverting this exact migration):
---   DROP TRIGGER IF EXISTS tickets_customer_update_guard ON public.tickets;
+--   DROP TRIGGER IF EXISTS tickets_customer_update_guard ON public.hd_tickets;
 --   DROP FUNCTION IF EXISTS public.tickets_guard_customer_update();
---   DROP POLICY IF EXISTS tickets_update_enterprise_scope ON public.tickets;
---   REVOKE UPDATE ON public.tickets FROM authenticated;
---   REVOKE INSERT ON public.ticket_comments FROM authenticated;
+--   DROP POLICY IF EXISTS tickets_update_enterprise_scope ON public.hd_tickets;
+--   REVOKE UPDATE ON public.hd_tickets FROM authenticated;
+--   REVOKE INSERT ON public.hd_ticket_comments FROM authenticated;
 --   -- section 5 revokes are not restored: anon never needed those privileges.
 -- ============================================================================
 
@@ -29,10 +29,10 @@
 -- USING keeps `deleted_at IS NULL`, so soft-deleted rows cannot be resurrected
 -- or edited. WITH CHECK deliberately omits it, so setting `deleted_at` (the
 -- project's soft delete) is a permitted transition.
-drop policy if exists tickets_update_enterprise_scope on public.tickets;
+drop policy if exists tickets_update_enterprise_scope on public.hd_tickets;
 
 create policy tickets_update_enterprise_scope
-  on public.tickets
+  on public.hd_tickets
   for update
   to authenticated
   using (
@@ -57,18 +57,18 @@ create policy tickets_update_enterprise_scope
 -- 2. No DELETE policy — deletion in this project is an UPDATE of deleted_at
 -- ---------------------------------------------------------------------------
 -- Hard DELETE would silently destroy the SLA history and orphan
--- ticket_audit_logs / ai_analysis rows. Soft delete is already covered by the
+-- hd_ticket_audit_logs / hd_ai_analysis rows. Soft delete is already covered by the
 -- UPDATE policy above, so no DELETE policy is created and the privilege stays
 -- revoked (see section 5).
 
 -- ---------------------------------------------------------------------------
 -- 3. Table privileges — policies are inert without them
 -- ---------------------------------------------------------------------------
--- `authenticated` had SELECT + INSERT on tickets but no UPDATE, and only SELECT
--- on ticket_comments — which is why ticket_comments_create_authorized (a
+-- `authenticated` had SELECT + INSERT on hd_tickets but no UPDATE, and only SELECT
+-- on hd_ticket_comments — which is why ticket_comments_create_authorized (a
 -- correct, already-existing INSERT policy) has never actually been reachable.
-grant update on public.tickets to authenticated;
-grant insert on public.ticket_comments to authenticated;
+grant update on public.hd_tickets to authenticated;
+grant insert on public.hd_ticket_comments to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 4. PROPOSAL — customer column guard
@@ -108,9 +108,9 @@ begin
 end;
 $$;
 
-drop trigger if exists tickets_customer_update_guard on public.tickets;
+drop trigger if exists tickets_customer_update_guard on public.hd_tickets;
 create trigger tickets_customer_update_guard
-  before update on public.tickets
+  before update on public.hd_tickets
   for each row
   execute function public.tickets_guard_customer_update();
 
@@ -120,8 +120,8 @@ create trigger tickets_customer_update_guard
 -- `anon` (the key shipped to every browser) currently holds INSERT, UPDATE,
 -- DELETE and TRUNCATE on both tables. RLS neutralises the first three today,
 -- and PostgREST never issues TRUNCATE, but none of these are needed: no
--- unauthenticated flow writes tickets or comments.
-revoke insert, update, delete, truncate on public.tickets from anon;
-revoke insert, update, delete, truncate on public.ticket_comments from anon;
-revoke truncate, delete on public.tickets from authenticated;
-revoke truncate on public.ticket_comments from authenticated;
+-- unauthenticated flow writes hd_tickets or comments.
+revoke insert, update, delete, truncate on public.hd_tickets from anon;
+revoke insert, update, delete, truncate on public.hd_ticket_comments from anon;
+revoke truncate, delete on public.hd_tickets from authenticated;
+revoke truncate on public.hd_ticket_comments from authenticated;

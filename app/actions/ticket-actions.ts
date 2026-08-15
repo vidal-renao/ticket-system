@@ -21,7 +21,7 @@ export async function setTicketUrgency(
   if (profile.role !== "customer") return { error: "Forbidden" };
 
   const access = await resolveTicketAccess<
-    Pick<Database["public"]["Tables"]["tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "priority">
+    Pick<Database["public"]["Tables"]["hd_tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "priority">
   >(svc, profile, ticketId, "id, organization_id, created_by, assigned_to, priority");
   if (access.kind !== "allowed") return { error: "Ticket not found" };
   const ticket = access.ticket;
@@ -34,7 +34,7 @@ export async function setTicketUrgency(
       : newPriority;
 
   const { error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update({ priority: safePriority })
     .eq("id", ticketId)
     .eq("organization_id", profile.organization_id)
@@ -64,7 +64,7 @@ export async function setTicketRating(
   if (profile.role !== "customer") return { error: "Forbidden" };
 
   const access = await resolveTicketAccess<
-    Pick<Database["public"]["Tables"]["tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "metadata">
+    Pick<Database["public"]["Tables"]["hd_tickets"]["Row"], "id" | "organization_id" | "created_by" | "assigned_to" | "metadata">
   >(svc, profile, ticketId, "id, organization_id, created_by, assigned_to, metadata");
   if (access.kind !== "allowed") return { error: "Ticket not found" };
   const ticket = access.ticket;
@@ -75,7 +75,7 @@ export async function setTicketRating(
       : {};
 
   const { error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update({ metadata: { ...existingMeta, customer_rating: rating } })
     .eq("id", ticketId)
     .eq("organization_id", profile.organization_id)

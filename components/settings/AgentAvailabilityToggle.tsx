@@ -26,7 +26,7 @@ export function AgentAvailabilityToggle({ userId, initial }: AgentAvailabilityTo
     setSaving(true);
     const supabase = createClient();
     const { error } = await supabase
-      .from("profiles")
+      .from("hd_profiles")
       .update({ availability_status: next })
       .eq("id", userId);
 

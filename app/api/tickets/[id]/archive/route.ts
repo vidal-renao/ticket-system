@@ -35,7 +35,7 @@ export async function POST(
   }
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, status, archived_at")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -60,7 +60,7 @@ export async function POST(
       : { archived_at: null, archived_by: null };
 
   const { error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", ticket.id)
     .eq("organization_id", profile.organization_id)
@@ -68,7 +68,7 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: "Archive update failed" }, { status: 500 });
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

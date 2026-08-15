@@ -8,7 +8,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
   const svc = createServiceClientStatic();
-  await svc.from("profiles").update({ availability_status: "offline" }).eq("id", user.id);
+  await svc.from("hd_profiles").update({ availability_status: "offline" }).eq("id", user.id);
 
   return NextResponse.json({ ok: true });
 }

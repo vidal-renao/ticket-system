@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, status, priority")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })

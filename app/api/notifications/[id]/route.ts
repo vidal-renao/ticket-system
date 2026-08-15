@@ -13,7 +13,7 @@ export async function PATCH(
 
   const svc = createServiceClientStatic();
   await svc
-    .from("notifications")
+    .from("hd_notifications")
     .update({ is_read: true })
     .eq("id", id)
     .eq("user_id", user.id);

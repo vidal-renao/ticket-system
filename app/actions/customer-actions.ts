@@ -27,14 +27,14 @@ export async function saveCustomerProfile(
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
   if (profile?.role !== "customer") return { error: "Forbidden" };
 
-  const { error } = await svc.from("customers_info").upsert(
+  const { error } = await svc.from("hd_customers_info").upsert(
     {
       id: user.id,
       company_name: data.company_name.trim(),

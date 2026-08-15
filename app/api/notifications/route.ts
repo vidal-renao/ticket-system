@@ -18,18 +18,18 @@ export async function GET() {
     { count: inboxUnreadCount },
   ] = await Promise.all([
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id, ticket_id, type, title, message, is_read, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20),
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false),
     svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false)
@@ -68,7 +68,7 @@ export async function PATCH() {
 
   const svc = createServiceClientStatic();
   await svc
-    .from("notifications")
+    .from("hd_notifications")
     .update({ is_read: true })
     .eq("user_id", user.id)
     .eq("is_read", false);

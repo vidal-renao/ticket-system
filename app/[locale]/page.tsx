@@ -29,7 +29,7 @@ export default async function LocaleRootPage({
 
   if (user) {
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("hd_profiles")
       .select("role")
       .eq("id", user.id)
       .single();

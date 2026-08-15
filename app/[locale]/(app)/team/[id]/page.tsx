@@ -51,7 +51,7 @@ export default async function TeamMemberPage({
 
   const svc = createServiceClientStatic();
   const { data: viewer } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -62,7 +62,7 @@ export default async function TeamMemberPage({
   }
 
   const { data: member } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, full_name, role, department, specialty, team_id, is_active, availability_status, created_at")
     .eq("id", id)
     .eq("organization_id", viewer.organization_id)
@@ -78,7 +78,7 @@ export default async function TeamMemberPage({
     await Promise.all([
       getLastSeenMap(svc, [member.id]),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("id, ticket_number, title, status, priority, created_at, sla_breached, review_status")
         .eq("organization_id", viewer.organization_id)
         .eq("assigned_to", member.id)
@@ -88,7 +88,7 @@ export default async function TeamMemberPage({
         .order("created_at", { ascending: false })
         .limit(30),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", viewer.organization_id)
         .eq("assigned_to", member.id)
@@ -96,7 +96,7 @@ export default async function TeamMemberPage({
         .is("deleted_at", null)
         .gte("resolved_at", todayStart.toISOString()),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("id", { count: "exact", head: true })
         .eq("organization_id", viewer.organization_id)
         .eq("assigned_to", member.id)

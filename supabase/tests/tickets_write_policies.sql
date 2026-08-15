@@ -1,4 +1,4 @@
--- pgTAP suite for the tickets write path:
+-- pgTAP suite for the hd_tickets write path:
 --   202608040001_tickets_write_policies.sql   (UPDATE policy, grants, guard)
 --   202608040002_fix_customer_update_guard.sql (guard actor resolution)
 --
@@ -70,55 +70,55 @@ $helper$;
 -- ---------------------------------------------------------------------------
 SELECT is(
   (SELECT count(*)::int FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'tickets'
+    WHERE schemaname = 'public' AND tablename = 'hd_tickets'
       AND policyname = 'tickets_update_enterprise_scope' AND cmd = 'UPDATE'),
   1,
-  'tickets has an UPDATE policy'
+  'hd_tickets has an UPDATE policy'
 );
 
 SELECT is(
   (SELECT count(*)::int FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'tickets' AND cmd = 'DELETE'),
+    WHERE schemaname = 'public' AND tablename = 'hd_tickets' AND cmd = 'DELETE'),
   0,
-  'tickets has no DELETE policy: deletion is an UPDATE of deleted_at'
+  'hd_tickets has no DELETE policy: deletion is an UPDATE of deleted_at'
 );
 
 SELECT ok(
-  has_table_privilege('authenticated', 'public.tickets', 'UPDATE'),
-  'authenticated may UPDATE tickets, so the UPDATE policy is reachable'
+  has_table_privilege('authenticated', 'public.hd_tickets', 'UPDATE'),
+  'authenticated may UPDATE hd_tickets, so the UPDATE policy is reachable'
 );
 
 SELECT ok(
-  has_table_privilege('authenticated', 'public.ticket_comments', 'INSERT'),
-  'authenticated may INSERT ticket_comments, so its INSERT policy is reachable'
+  has_table_privilege('authenticated', 'public.hd_ticket_comments', 'INSERT'),
+  'authenticated may INSERT hd_ticket_comments, so its INSERT policy is reachable'
 );
 
 SELECT ok(
-  NOT has_table_privilege('anon', 'public.tickets', 'UPDATE'),
-  'anon may not UPDATE tickets'
+  NOT has_table_privilege('anon', 'public.hd_tickets', 'UPDATE'),
+  'anon may not UPDATE hd_tickets'
 );
 
 SELECT ok(
-  NOT has_table_privilege('anon', 'public.tickets', 'INSERT'),
-  'anon may not INSERT tickets'
+  NOT has_table_privilege('anon', 'public.hd_tickets', 'INSERT'),
+  'anon may not INSERT hd_tickets'
 );
 
 SELECT ok(
-  NOT has_table_privilege('anon', 'public.ticket_comments', 'INSERT'),
-  'anon may not INSERT ticket_comments'
+  NOT has_table_privilege('anon', 'public.hd_ticket_comments', 'INSERT'),
+  'anon may not INSERT hd_ticket_comments'
 );
 
 SELECT ok(
-  NOT has_table_privilege('authenticated', 'public.tickets', 'DELETE'),
-  'authenticated may not hard-delete tickets'
+  NOT has_table_privilege('authenticated', 'public.hd_tickets', 'DELETE'),
+  'authenticated may not hard-delete hd_tickets'
 );
 
 SELECT is(
   (SELECT count(*)::int FROM pg_trigger
-    WHERE tgrelid = 'public.tickets'::regclass
+    WHERE tgrelid = 'public.hd_tickets'::regclass
       AND tgname = 'tickets_customer_update_guard' AND NOT tgisinternal),
   1,
-  'the customer column guard is attached to tickets'
+  'the customer column guard is attached to hd_tickets'
 );
 
 -- ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ SELECT ok(
 -- (a) service_role path — every application write. The guard must not fire.
 -- ---------------------------------------------------------------------------
 SELECT is(
-  pg_temp.attempt(NULL, $$ UPDATE public.tickets
+  pg_temp.attempt(NULL, $$ UPDATE public.hd_tickets
                               SET sla_breached = NOT sla_breached
                             WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   'rows=1',
@@ -153,7 +153,7 @@ SELECT is(
 );
 
 SELECT is(
-  pg_temp.attempt(NULL, $$ UPDATE public.tickets
+  pg_temp.attempt(NULL, $$ UPDATE public.hd_tickets
                               SET status = 'closed', closed_at = now()
                             WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   'rows=1',
@@ -161,11 +161,11 @@ SELECT is(
 );
 
 SELECT is(
-  pg_temp.attempt(NULL, $$ UPDATE public.tickets
+  pg_temp.attempt(NULL, $$ UPDATE public.hd_tickets
                               SET status = 'closed'
                             WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   'rows=1',
-  'service_role may perform the customer sign-off transition (POST /api/tickets/[id]/confirm)'
+  'service_role may perform the customer sign-off transition (POST /api/hd_tickets/[id]/confirm)'
 );
 
 -- ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ SELECT is(
 -- ---------------------------------------------------------------------------
 SELECT is(
   pg_temp.attempt('00000000-0000-4000-8000-0000000000cc',
-                  $$ UPDATE public.tickets
+                  $$ UPDATE public.hd_tickets
                         SET status = 'closed', closed_at = now()
                       WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   '42501',
@@ -182,7 +182,7 @@ SELECT is(
 
 SELECT is(
   pg_temp.attempt('00000000-0000-4000-8000-0000000000cc',
-                  $$ UPDATE public.tickets
+                  $$ UPDATE public.hd_tickets
                         SET assigned_to = '00000000-0000-4000-8000-0000000000ad'
                       WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   '42501',
@@ -191,7 +191,7 @@ SELECT is(
 
 SELECT is(
   pg_temp.attempt('00000000-0000-4000-8000-0000000000cc',
-                  $$ UPDATE public.tickets
+                  $$ UPDATE public.hd_tickets
                         SET priority = 'high'
                       WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   'rows=1',
@@ -203,7 +203,7 @@ SELECT is(
 -- ---------------------------------------------------------------------------
 SELECT is(
   pg_temp.attempt('00000000-0000-4000-8000-0000000000ad',
-                  $$ UPDATE public.tickets
+                  $$ UPDATE public.hd_tickets
                         SET status = 'closed', closed_at = now()
                       WHERE id = '00000000-0000-4000-8000-000000007c01' $$),
   'rows=1',

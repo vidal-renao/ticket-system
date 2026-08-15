@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   const svc = createServiceClientStatic();
   const { data: adminProfile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role")
     .eq("id", user.id)
     .single();
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     userId = invited.user.id;
   }
 
-  const { error: profileError } = await svc.from("profiles").upsert(
+  const { error: profileError } = await svc.from("hd_profiles").upsert(
     {
       id: userId,
       full_name: input.contact_person,
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
   }
 
   const taxId = input.tax_id?.trim() || generateCif(input.legal_name);
-  const { error: custError } = await svc.from("customers_info").upsert(
+  const { error: custError } = await svc.from("hd_customers_info").upsert(
     {
       id: userId,
       company_name: input.legal_name,
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
   if (custError) console.error("[admin/customers/company] customers_info error:", custError.message);
 
   const { data: profileRow } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("reference_code")
     .eq("id", userId)
     .single();

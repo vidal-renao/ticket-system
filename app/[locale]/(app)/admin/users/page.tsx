@@ -30,7 +30,7 @@ export default async function AdminUsersPage({
 
   const [{ data: profilesRaw }, { data: teamsRaw }, { data: authUsers }] = await Promise.all([
     svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, full_name, role, specialty, availability_status, is_active, avatar_url, customer_type, reference_code, organization_id")
       .eq("organization_id", orgId)
       .order("role")
@@ -47,7 +47,7 @@ export default async function AdminUsersPage({
     .map((profileRow) => profileRow.id);
 
   const { data: customerInfosRaw } = customerIds.length
-    ? await svc.from("customers_info").select("id, company_name").in("id", customerIds)
+    ? await svc.from("hd_customers_info").select("id, company_name").in("id", customerIds)
     : { data: [] };
 
   const companyById: Record<string, string | null> = Object.fromEntries(

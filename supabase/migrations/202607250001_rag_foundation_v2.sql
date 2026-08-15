@@ -10,7 +10,7 @@ DECLARE
   object_name text;
 BEGIN
   IF to_regclass('public.organizations') IS NULL
-     OR to_regclass('public.profiles') IS NULL THEN
+     OR to_regclass('public.hd_profiles') IS NULL THEN
     RAISE EXCEPTION 'RAG_PREFLIGHT_MISSING_CORE_TABLES';
   END IF;
   IF to_regprocedure('public.current_profile_org_id()') IS NULL
@@ -59,7 +59,7 @@ BEGIN
 END;
 $vector_preflight$;
 
--- Required by composite tenant-safe foreign keys. profiles.id is already
+-- Required by composite tenant-safe foreign keys. hd_profiles.id is already
 -- unique, so duplicates are impossible. Reuse an equivalent unique index when
 -- present; otherwise create the minimal candidate key required by composite FKs.
 DO $profiles_key$
@@ -70,7 +70,7 @@ BEGIN
     JOIN pg_class relation ON relation.oid = index_definition.indrelid
     JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
     WHERE namespace.nspname = 'public'
-      AND relation.relname = 'profiles'
+      AND relation.relname = 'hd_profiles'
       AND index_definition.indisunique
       AND index_definition.indpred IS NULL
       AND index_definition.indexprs IS NULL
@@ -84,7 +84,7 @@ BEGIN
       ) = ARRAY['id', 'organization_id']
   ) THEN
     CREATE UNIQUE INDEX profiles_id_organization_rag_uq_idx
-      ON public.profiles (id, organization_id);
+      ON public.hd_profiles (id, organization_id);
   END IF;
 END;
 $profiles_key$;
@@ -103,7 +103,7 @@ CREATE TABLE public.rag_knowledge_sources (
   CONSTRAINT rag_sources_org_fk FOREIGN KEY (organization_id)
     REFERENCES public.organizations(id) ON DELETE RESTRICT,
   CONSTRAINT rag_sources_creator_org_fk FOREIGN KEY (created_by, organization_id)
-    REFERENCES public.profiles(id, organization_id) ON DELETE RESTRICT,
+    REFERENCES public.hd_profiles(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_sources_id_org_uq UNIQUE (id, organization_id),
   CONSTRAINT rag_sources_name_org_uq UNIQUE (organization_id, name),
   CONSTRAINT rag_sources_name_ck CHECK (char_length(btrim(name)) BETWEEN 1 AND 200),
@@ -134,7 +134,7 @@ CREATE TABLE public.rag_knowledge_documents (
   CONSTRAINT rag_documents_source_org_fk FOREIGN KEY (source_id, organization_id)
     REFERENCES public.rag_knowledge_sources(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_documents_creator_org_fk FOREIGN KEY (created_by, organization_id)
-    REFERENCES public.profiles(id, organization_id) ON DELETE RESTRICT,
+    REFERENCES public.hd_profiles(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_documents_id_org_uq UNIQUE (id, organization_id),
   CONSTRAINT rag_documents_title_ck CHECK (char_length(btrim(title)) BETWEEN 1 AND 300),
   CONSTRAINT rag_documents_type_ck CHECK (
@@ -168,9 +168,9 @@ CREATE TABLE public.rag_knowledge_document_versions (
   CONSTRAINT rag_versions_document_org_fk FOREIGN KEY (document_id, organization_id)
     REFERENCES public.rag_knowledge_documents(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_versions_creator_org_fk FOREIGN KEY (created_by, organization_id)
-    REFERENCES public.profiles(id, organization_id) ON DELETE RESTRICT,
+    REFERENCES public.hd_profiles(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_versions_approver_org_fk FOREIGN KEY (approved_by, organization_id)
-    REFERENCES public.profiles(id, organization_id) ON DELETE RESTRICT,
+    REFERENCES public.hd_profiles(id, organization_id) ON DELETE RESTRICT,
   CONSTRAINT rag_versions_id_org_document_uq UNIQUE (id, organization_id, document_id),
   CONSTRAINT rag_versions_number_uq UNIQUE (organization_id, document_id, version_number),
   CONSTRAINT rag_versions_number_ck CHECK (version_number > 0),

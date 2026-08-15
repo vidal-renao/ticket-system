@@ -26,7 +26,7 @@ export async function getOrgSettings(): Promise<OrgSettings> {
   if (!user) return { pii_scrubbing_enabled: false };
 
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("hd_profiles")
     .select("organization_id")
     .eq("id", user.id)
     .single();
@@ -52,7 +52,7 @@ export async function setPiiScrubbing(
   if (!user) return { error: "Unauthorized" };
 
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -77,7 +77,7 @@ export async function setPiiScrubbing(
     if (orgError || !newOrg) return { error: `Cannot create organization: ${normalizeSupabaseErrorMessage(orgError)}` };
 
     const { error: profileError } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .update({ organization_id: newOrg.id })
       .eq("id", user.id);
 

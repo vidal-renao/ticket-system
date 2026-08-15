@@ -22,7 +22,7 @@ export default async function PredictivePage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles").select("role").eq("id", user.id).single();
+    .from("hd_profiles").select("role").eq("id", user.id).single();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
   if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);

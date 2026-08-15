@@ -30,7 +30,7 @@ export default async function AnalyticsPage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles").select("role, organization_id").eq("id", user.id).single();
+    .from("hd_profiles").select("role, organization_id").eq("id", user.id).single();
 
   const queuePath = locale === "de" ? "/queue" : `/${locale}/queue`;
   if (!profile || !["manager", "admin"].includes(profile.role)) redirect(queuePath);
@@ -50,7 +50,7 @@ export default async function AnalyticsPage({
 
   // Step 1: fetch org tickets (IDs needed to scope ai_analysis query)
   const { data: allTickets } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, priority, status, created_at, resolved_at, sla_breached, first_response_at, first_agent_response_at")
     .eq("organization_id", orgId);
 
@@ -62,7 +62,7 @@ export default async function AnalyticsPage({
     { data: openByPriority },
     { data: aiRows },
   ] = await Promise.all([
-    svc.from("tickets")
+    svc.from("hd_tickets")
       .select("id, ticket_number, title, priority, sla_resolution_due")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"])
@@ -71,12 +71,12 @@ export default async function AnalyticsPage({
       .eq("sla_breached", false)
       .order("sla_resolution_due", { ascending: true })
       .limit(10),
-    svc.from("tickets")
+    svc.from("hd_tickets")
       .select("priority")
       .eq("organization_id", orgId)
       .in("status", ["open", "in_progress"]),
     ticketIds.length > 0
-      ? svc.from("ai_analysis")
+      ? svc.from("hd_ai_analysis")
           .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
           .in("ticket_id", ticketIds)
       : Promise.resolve({ data: [] as { ticket_id: string; sentiment: string | null; confidence_score: number | null; category_accepted: boolean | null; contains_pii_detected: boolean }[] }),

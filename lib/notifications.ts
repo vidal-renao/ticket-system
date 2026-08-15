@@ -33,7 +33,7 @@ export async function createTicketNotification(
   if (!input.userId) return false;
 
   const svc = createServiceClientStatic();
-  const { error } = await svc.from("notifications").insert({
+  const { error } = await svc.from("hd_notifications").insert({
     user_id: input.userId,
     ticket_id: input.ticketId,
     type: input.type,
@@ -90,7 +90,7 @@ export async function notifyOrgManagers(
 ) {
   const svc = createServiceClientStatic();
   const { data: managers } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id")
     .eq("organization_id", organizationId)
     .in("role", ["manager", "admin"])

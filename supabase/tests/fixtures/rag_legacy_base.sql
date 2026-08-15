@@ -45,7 +45,7 @@ CREATE TABLE public.organizations (
   slug text UNIQUE NOT NULL
 );
 
-CREATE TABLE public.profiles (
+CREATE TABLE public.hd_profiles (
   id uuid PRIMARY KEY,
   organization_id uuid REFERENCES public.organizations(id),
   role text NOT NULL CHECK (role IN ('customer', 'agent', 'manager', 'admin'))
@@ -57,7 +57,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 SET row_security = off
 AS $$
-  SELECT organization_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT organization_id FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 CREATE OR REPLACE FUNCTION public.current_profile_role()
@@ -66,7 +66,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 SET row_security = off
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT role FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 REVOKE ALL ON FUNCTION public.current_profile_org_id() FROM PUBLIC;
@@ -104,7 +104,7 @@ AS $$
   LIMIT match_count;
 $$;
 
-GRANT ALL ON public.organizations, public.profiles, public.knowledge_chunks TO service_role;
+GRANT ALL ON public.organizations, public.hd_profiles, public.knowledge_chunks TO service_role;
 GRANT EXECUTE ON FUNCTION public.match_knowledge_chunks(
   vector, uuid, integer, double precision
 ) TO authenticated, service_role;

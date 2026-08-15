@@ -43,7 +43,7 @@ export default async function DashboardPage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id, availability_status")
     .eq("id", user.id)
     .maybeSingle();
@@ -121,45 +121,45 @@ async function AdminDashboard({
     { data: teamMembers },
   ] = await Promise.all([
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .in("status", ["open", "in_progress"]),
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .eq("priority", "critical")
       .in("status", ["open", "in_progress"]),
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .eq("status", "resolved"),
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("*", { count: "exact", head: true })
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .eq("sla_breached", true),
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("id, ticket_number, title, priority, status, created_at")
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(5),
     svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("priority")
       .eq("organization_id", orgId)
       .is("deleted_at", null)
       .in("status", ["open", "in_progress"]),
     svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, full_name, role, availability_status, specialty")
       .eq("organization_id", orgId)
       .in("role", ["agent", "manager"])
@@ -496,7 +496,7 @@ async function AgentDashboard({
   const [{ data: assignedTickets }, { count: resolvedToday }] =
     await Promise.all([
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select(
           "id, ticket_number, title, priority, status, sla_resolution_due, sla_breached, created_at"
         )
@@ -511,7 +511,7 @@ async function AgentDashboard({
         .order("sla_resolution_due", { ascending: true, nullsFirst: false })
         .limit(10),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("*", { count: "exact", head: true })
         .eq("assigned_to", userId)
         .is("deleted_at", null)
@@ -657,19 +657,19 @@ async function CustomerDashboard({
   const [{ count: openCount }, { count: resolvedCount }, { data: recentTickets }] =
     await Promise.all([
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId)
         .is("deleted_at", null)
         .in("status", ["open", "in_progress", "pending_customer", "pending_third_party"]),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("*", { count: "exact", head: true })
         .eq("created_by", userId)
         .is("deleted_at", null)
         .eq("status", "resolved"),
       svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("id, ticket_number, title, status, priority, created_at")
         .eq("created_by", userId)
         .is("deleted_at", null)

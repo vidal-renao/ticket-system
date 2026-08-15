@@ -1,6 +1,6 @@
 -- Minimal legacy-schema stand-in for CI, mirroring the pattern already
 -- established by rag_legacy_base.sql: just enough of the real, historically
--- ad-hoc-applied core schema (organizations/profiles/customers_info/storage)
+-- ad-hoc-applied core schema (organizations/hd_profiles/hd_customers_info/storage)
 -- for the identity migration to run against and be meaningfully pgTAP-tested,
 -- without trying to replay all 14 historical docs/*.sql files verbatim.
 \set ON_ERROR_STOP on
@@ -45,7 +45,7 @@ CREATE TABLE public.organizations (
   is_active boolean NOT NULL DEFAULT true
 );
 
-CREATE TABLE public.profiles (
+CREATE TABLE public.hd_profiles (
   id uuid PRIMARY KEY,
   organization_id uuid REFERENCES public.organizations(id),
   role text NOT NULL CHECK (role IN ('customer', 'agent', 'manager', 'admin')),
@@ -55,8 +55,8 @@ CREATE TABLE public.profiles (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE public.customers_info (
-  id uuid PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,
+CREATE TABLE public.hd_customers_info (
+  id uuid PRIMARY KEY REFERENCES public.hd_profiles(id) ON DELETE CASCADE,
   company_name text NOT NULL DEFAULT '',
   tax_id text NOT NULL DEFAULT ''
 );
@@ -67,7 +67,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 SET row_security = off
 AS $$
-  SELECT organization_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT organization_id FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 CREATE OR REPLACE FUNCTION public.current_profile_role()
@@ -76,7 +76,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public
 SET row_security = off
 AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
+  SELECT role FROM public.hd_profiles WHERE id = auth.uid() LIMIT 1;
 $$;
 
 REVOKE ALL ON FUNCTION public.current_profile_org_id() FROM PUBLIC;
@@ -113,8 +113,8 @@ AS $$
   END;
 $$;
 
-GRANT ALL ON public.organizations, public.profiles, public.customers_info TO service_role;
-GRANT SELECT ON public.organizations, public.profiles TO authenticated;
+GRANT ALL ON public.organizations, public.hd_profiles, public.hd_customers_info TO service_role;
+GRANT SELECT ON public.organizations, public.hd_profiles TO authenticated;
 GRANT ALL ON storage.buckets, storage.objects TO service_role;
 GRANT SELECT ON storage.buckets TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;

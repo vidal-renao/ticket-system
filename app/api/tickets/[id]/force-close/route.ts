@@ -61,7 +61,7 @@ export async function POST(
   const { reason } = validated;
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, organization_id, created_by, status, assigned_to, review_status, resolved_at")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -78,7 +78,7 @@ export async function POST(
   const nextReviewStatus = reviewStatusAfterForceClose(ticket.review_status);
 
   const { data: updated, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update({
       status: "closed",
       closed_at: now,
@@ -121,7 +121,7 @@ export async function POST(
   // The entry that makes this act distinguishable from a normal transition:
   // a dedicated action *and* an explicit flag inside the payload, so it can be
   // found either way. The reason rides in the same row.
-  const { error: auditError } = await svc.from("ticket_audit_logs").insert({
+  const { error: auditError } = await svc.from("hd_ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

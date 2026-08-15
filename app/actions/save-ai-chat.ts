@@ -16,7 +16,7 @@ export async function saveAiChatNote(
 
   // Verify the user owns this ticket (customers can only save on their own tickets)
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id")
     .eq("id", ticketId)
     .eq("created_by", user.id)
@@ -25,7 +25,7 @@ export async function saveAiChatNote(
 
   if (!ticket) return { error: "Access denied" };
 
-  const { error } = await svc.from("ticket_comments").insert({
+  const { error } = await svc.from("hd_ticket_comments").insert({
     ticket_id: ticketId,
     author_id: user.id,
     content: chatContent,

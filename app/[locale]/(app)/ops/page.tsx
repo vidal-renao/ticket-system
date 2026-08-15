@@ -45,7 +45,7 @@ export default async function OpsPage({
   // layout: a profiles RLS hiccup must not turn into a redirect loop.
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .maybeSingle();
@@ -64,23 +64,23 @@ export default async function OpsPage({
   const [ticketsResult, commentsResult, auditLogsResult, aiResult, orgResult, audit] =
     await Promise.all([
       supabase
-        .from("tickets")
+        .from("hd_tickets")
         .select(OPS_TICKET_COLUMNS)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(TICKET_LIMIT),
       supabase
-        .from("ticket_comments")
+        .from("hd_ticket_comments")
         .select(OPS_COMMENT_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(SEED_EVENT_LIMIT),
       supabase
-        .from("ticket_audit_logs")
+        .from("hd_ticket_audit_logs")
         .select(OPS_AUDIT_LOG_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(SEED_EVENT_LIMIT),
       supabase
-        .from("ai_analysis")
+        .from("hd_ai_analysis")
         .select(OPS_AI_ANALYSIS_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(60),
@@ -111,7 +111,7 @@ export default async function OpsPage({
   let authors: OpsAuthor[] = [];
   if (authorIds.size > 0) {
     const { data } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, full_name, role, availability_status")
       .eq("organization_id", organizationId)
       .in("id", [...authorIds]);

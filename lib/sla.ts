@@ -156,7 +156,7 @@ export async function applySlaAssessment(
   }
 
   await supabase
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", ticket.id)
     .eq("organization_id", ticket.organization_id);
@@ -190,7 +190,7 @@ export async function ensureSlaDeadlines(
   if (Object.keys(patch).length === 0) return ticket;
 
   const { data } = await supabase
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", ticket.id)
     .eq("organization_id", ticket.organization_id)
@@ -210,7 +210,7 @@ async function notifySlaBreachOnce(
 
   if (recipientId) {
     const { data: existing } = await svc
-      .from("notifications")
+      .from("hd_notifications")
       .select("id")
       .eq("user_id", recipientId)
       .eq("ticket_id", ticket.id)
@@ -230,7 +230,7 @@ async function notifySlaBreachOnce(
   }
 
   const { data: existingManagerNotice } = await svc
-    .from("notifications")
+    .from("hd_notifications")
     .select("id")
     .eq("ticket_id", ticket.id)
     .eq("type", type)
@@ -258,7 +258,7 @@ async function logSlaEventOnce(
 ) {
   const svc = createServiceClientStatic();
   const { data: existing } = await svc
-    .from("ticket_audit_logs")
+    .from("hd_ticket_audit_logs")
     .select("id")
     .eq("resource_type", "ticket")
     .eq("resource_id", ticket.id)
@@ -267,7 +267,7 @@ async function logSlaEventOnce(
 
   if (existing?.length) return;
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: actorId,
     actor_role: actorRole,

@@ -5,7 +5,7 @@ SET LOCAL ROLE service_role;
 
 INSERT INTO public.organizations (id, name, slug) VALUES
   ('10000000-0000-4000-8000-000000000001', 'Organization Alpha', 'alpha');
-INSERT INTO public.profiles (id, organization_id, role) VALUES
+INSERT INTO public.hd_profiles (id, organization_id, role) VALUES
   ('10000000-0000-4000-8000-000000000011',
    '10000000-0000-4000-8000-000000000001', 'manager');
 

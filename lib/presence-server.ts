@@ -14,7 +14,7 @@ export async function getLastSeenMap(
 ): Promise<Record<string, string | null>> {
   if (!userIds.length) return {};
   const { data, error } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, last_seen_at")
     .in("id", userIds);
   if (error || !data) return {};

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Organization not found" }, { status: 404 });
   }
 
-  const { error: profileError } = await svc.from("profiles").upsert(
+  const { error: profileError } = await svc.from("hd_profiles").upsert(
     {
       id: adminUserId,
       organization_id: organizationId,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, role, organization_id, is_active")
     .eq("id", adminUserId)
     .single();
@@ -98,7 +98,7 @@ export async function GET(request: Request) {
       .eq("id", organizationId)
       .single(),
     svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, role, organization_id, is_active")
       .eq("id", adminUserId)
       .single(),

@@ -55,7 +55,7 @@ export default async function HistoryPage({
   // History = finished work (resolved/closed), scoped per role. Archived
   // tickets only live here — they are excluded from every operational list.
   let query = svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, status, priority, created_by, assigned_to, resolved_at, closed_at, archived_at, created_at")
     .eq("organization_id", profile.organization_id)
     .is("deleted_at", null)
@@ -78,10 +78,10 @@ export default async function HistoryPage({
   ];
   const [{ data: peopleRaw }, { data: companiesRaw }] = await Promise.all([
     personIds.length
-      ? svc.from("profiles").select("id, full_name").in("id", personIds)
+      ? svc.from("hd_profiles").select("id, full_name").in("id", personIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
     personIds.length
-      ? svc.from("customers_info").select("id, company_name").in("id", personIds)
+      ? svc.from("hd_customers_info").select("id, company_name").in("id", personIds)
       : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
   ]);
   const nameById = Object.fromEntries(

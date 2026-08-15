@@ -28,7 +28,7 @@ export async function POST(
   }
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, organization_id, created_by, status, assigned_to, review_status")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -55,7 +55,7 @@ export async function POST(
 
   const now = new Date().toISOString();
   const { data: updated, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update({ status: "closed", closed_at: now })
     .eq("id", ticket.id)
     .eq("organization_id", profile.organization_id)
@@ -78,7 +78,7 @@ export async function POST(
     newAssignee: ticket.assigned_to,
   });
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: user.id,
     actor_role: profile.role,
