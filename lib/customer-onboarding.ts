@@ -60,6 +60,27 @@ export function planCustomerOnboarding(input: {
   return { kind: "link_existing", userId: existingUserId };
 }
 
+/**
+ * How the endpoint must write hd_profiles once the plan is decided.
+ *
+ * Not a detail: creating an account and creating its profile are not two
+ * independent writes. The `on_auth_user_created` trigger inserts a bare
+ * hd_profiles row (id, full_name, role='customer' -- no organization, no
+ * customer_type, no reference_code) inside the very statement that creates the
+ * auth user, so by the time `inviteUserByEmail` returns, a row already exists.
+ *
+ *  - invite: that row is ours, written microseconds ago by this request. Fill
+ *    it in. A plain insert collides with it and reports a brand-new account as
+ *    an existing customer -- and, worse, leaves the account behind, so every
+ *    retry then collides for real.
+ *  - link_existing: the account belongs to another application and we have
+ *    established it has no profile. Insert, so that a row appearing underneath
+ *    us fails loudly instead of being overwritten -- the original bug.
+ */
+export function profileWriteMode(planKind: "invite" | "link_existing"): "fill" | "create" {
+  return planKind === "invite" ? "fill" : "create";
+}
+
 export function alreadyCustomerMessage(referenceCode: string | null): string {
   return referenceCode
     ? `That email address is already a customer (${referenceCode}). Edit that customer instead, or use a different address.`

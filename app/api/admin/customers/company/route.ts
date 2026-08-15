@@ -6,6 +6,7 @@ import { generateCif } from "@/lib/tax-id";
 import { findAuthUserByEmail, USER_LOOKUP_FAILED_MESSAGE } from "@/lib/auth-admin-users";
 import {
   planCustomerOnboarding,
+  profileWriteMode,
   alreadyCustomerMessage,
   NEEDS_CONFIRMATION_MESSAGE,
   LINKED_ACCOUNT_NOTICE,
@@ -151,17 +152,14 @@ export async function POST(request: Request) {
     userId = invited.user.id;
   }
 
-  // insert, not upsert. Every path that reaches here has established there is
-  // no profile for this id, so a conflict can only mean one appeared in
-  // between -- which is the already_customer case, not something to overwrite.
-  // The previous upsert rewrote organization_id, role and customer_type from
-  // the form for anyone who already had a row.
-  const { error: profileError } = await svc.from("hd_profiles").insert({
+  // See profileWriteMode: an invited account already has the trigger's bare
+  // profile row and is filled in; a linked one has none and is created.
+  const profileFields = {
     id: userId,
     full_name: input.contact_person,
     organization_id: organizationId,
-    role: "customer",
-    customer_type: "company",
+    role: "customer" as const,
+    customer_type: "company" as const,
     is_active: true,
     phone: input.phone || null,
     address: input.address || null,
@@ -171,16 +169,27 @@ export async function POST(request: Request) {
     website: input.website || null,
     contact_person: input.contact_person,
     locale: input.locale,
-  });
+  };
+  const profiles = svc.from("hd_profiles");
+  const { error: profileError } =
+    profileWriteMode(plan.kind) === "fill"
+      ? await profiles.upsert(profileFields, { onConflict: "id" })
+      : await profiles.insert(profileFields);
 
   if (profileError) {
     console.error("[admin/customers/company] profile error:", profileError.message);
+    // An account this request created never outlives the request that failed.
+    // Returning before this cleanup is what left an orphaned auth user, whose
+    // bare trigger profile then rejected every retry as an existing customer.
+    if (plan.kind === "invite") {
+      await svc.auth.admin.deleteUser(userId);
+      return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
+    }
+    // Linking: the only conflict possible is a profile that appeared between
+    // our check and this write. The pre-existing account is left untouched.
     if (profileError.code === "23505") {
       return NextResponse.json({ error: alreadyCustomerMessage(null) }, { status: 409 });
     }
-    // Only an account this request created is cleaned up. A pre-existing one
-    // belongs to another application and must survive our failure.
-    if (plan.kind === "invite") await svc.auth.admin.deleteUser(userId);
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
   }
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { planCustomerOnboarding, alreadyCustomerMessage } from "../../lib/customer-onboarding";
+import {
+  planCustomerOnboarding,
+  profileWriteMode,
+  alreadyCustomerMessage,
+} from "../../lib/customer-onboarding";
 
 const NOBODY = { existingUserId: null, existingProfile: null, confirmedLink: false };
 
@@ -61,6 +65,23 @@ describe("the address is already a customer here", () => {
       confirmedLink: false,
     });
     expect(plan).toEqual({ kind: "already_customer", userId: "user-3", referenceCode: null });
+  });
+});
+
+describe("how the profile row is written", () => {
+  it("fills in the row the account-creation trigger already wrote", () => {
+    // Regression: an invited account is not a blank slate.
+    // on_auth_user_created inserts a bare hd_profiles row in the same statement
+    // that creates the auth user, so an insert here hit a duplicate key and the
+    // admin was told a brand-new address was "already a customer".
+    expect(profileWriteMode("invite")).toBe("fill");
+  });
+
+  it("creates the row for an account adopted from another application", () => {
+    // No trigger ran for us here -- the account predates this request and was
+    // verified to have no profile -- so a conflict is a genuine race and must
+    // fail rather than overwrite.
+    expect(profileWriteMode("link_existing")).toBe("create");
   });
 });
 
