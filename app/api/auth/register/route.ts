@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 
-  const { error: profileError } = await svc.from("profiles").upsert(
+  const { error: profileError } = await svc.from("hd_profiles").upsert(
     {
       id: userId,
       full_name: name,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (company_name) {
-    const { error: customerError } = await svc.from("customers_info").upsert(
+    const { error: customerError } = await svc.from("hd_customers_info").upsert(
       {
         id: userId,
         company_name,
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (customerError) {
-      await svc.from("profiles").delete().eq("id", userId);
+      await svc.from("hd_profiles").delete().eq("id", userId);
       await svc.auth.admin.deleteUser(userId);
       return NextResponse.json({ error: "Registration failed" }, { status: 500 });
     }

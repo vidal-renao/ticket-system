@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const svc = createServiceClientStatic();
   const { data: adminProfile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role")
     .eq("id", user.id)
     .single();
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     userId = invited.user.id;
   }
 
-  const { error: profileError } = await svc.from("profiles").upsert(
+  const { error: profileError } = await svc.from("hd_profiles").upsert(
     {
       id: userId,
       full_name: fullName,
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
   }
 
   const { data: profileRow } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("reference_code")
     .eq("id", userId)
     .single();

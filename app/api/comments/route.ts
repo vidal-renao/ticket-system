@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const isStaff = isStaffRole(profile.role);
 
-  const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
+  const access = await resolveTicketAccess<Database["public"]["Tables"]["hd_tickets"]["Row"]>(
     svc,
     profile,
     ticket_id,
@@ -108,14 +108,16 @@ export async function POST(request: Request) {
   const isInternalNote = isStaff && is_internal;
 
   const { data: comment, error } = await svc
-    .from("ticket_comments")
+    .from("hd_ticket_comments")
     .insert({
       ticket_id,
       author_id: user.id,
       content: content.trim(),
       is_internal: isInternalNote,
     })
-    .select("*, profiles(full_name, avatar_url)")
+    // Aliased back to `profiles` so the renamed table does not change the shape
+    // of the JSON this route returns to the client.
+    .select("*, profiles:hd_profiles(full_name, avatar_url)")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -152,7 +154,7 @@ export async function POST(request: Request) {
   if (isStaff && !isInternalNote && !ticket.first_response_at && !ticket.first_agent_response_at) {
     const firstResponseAt = new Date().toISOString();
     const { data: updatedFirstResponse, error: firstResponseError } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .update({
         first_response_at: firstResponseAt,
         first_agent_response_at: firstResponseAt,
@@ -170,7 +172,7 @@ export async function POST(request: Request) {
   if (requestedStatus) {
     const nextLegacyStatus = canonicalToLegacyStatus(requestedStatus);
     const { data: updatedTicket, error: ticketError } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .update({ status: nextLegacyStatus })
       .eq("id", ticket_id)
       .eq("organization_id", profile.organization_id)

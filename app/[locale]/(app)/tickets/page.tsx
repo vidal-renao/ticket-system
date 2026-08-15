@@ -154,7 +154,7 @@ export default async function TicketsPage({
   if (tickets && tickets.length > 0) {
     const ticketIds = (tickets as { id: string }[]).map((ticket) => ticket.id);
     const { data: aiRows, error: aiError } = await svc
-      .from("ai_analysis")
+      .from("hd_ai_analysis")
       .select("ticket_id, suggested_category")
       .in("ticket_id", ticketIds)
       .order("created_at", { ascending: false });
@@ -194,13 +194,13 @@ export default async function TicketsPage({
   const [{ data: organization }, { data: customerCompanyRows }, { data: staffProfileRows }, { count: assignedCount }] = await Promise.all([
     svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", profile.organization_id).single(),
     creatorIds.length
-      ? svc.from("customers_info").select("id, company_name, industry").in("id", creatorIds)
+      ? svc.from("hd_customers_info").select("id, company_name, industry").in("id", creatorIds)
       : Promise.resolve({ data: [] as { id: string; company_name: string; industry: string }[] }),
     assigneeIds.length
-      ? svc.from("profiles").select("id, full_name, specialty").in("id", assigneeIds)
+      ? svc.from("hd_profiles").select("id, full_name, specialty").in("id", assigneeIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null; specialty: string | null }[] }),
     isStaff
-      ? svc.from("tickets").select("id", { count: "exact", head: true }).eq("organization_id", profile.organization_id).eq("assigned_to", user.id).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
+      ? svc.from("hd_tickets").select("id", { count: "exact", head: true }).eq("organization_id", profile.organization_id).eq("assigned_to", user.id).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
       : Promise.resolve({ count: 0 }),
   ]);
 

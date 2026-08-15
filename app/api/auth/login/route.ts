@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
   const svc = createServiceClientStatic();
   const { data: profile, error: profileError } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
   // Mark user as online on successful login (staff only)
   if (["agent", "manager", "admin"].includes(profile.role)) {
-    await svc.from("profiles").update({ availability_status: "online" }).eq("id", user.id);
+    await svc.from("hd_profiles").update({ availability_status: "online" }).eq("id", user.id);
   }
 
   const locale = request.cookies.get("NEXT_LOCALE")?.value ?? "de";

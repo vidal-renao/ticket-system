@@ -86,7 +86,7 @@ export function useOpsRealtime(
           {
             event: "INSERT",
             schema: "public",
-            table: "tickets",
+            table: "hd_tickets",
             filter: `organization_id=eq.${organizationId}`,
           },
           (payload: { new: Record<string, unknown> }) => {
@@ -100,7 +100,7 @@ export function useOpsRealtime(
           {
             event: "UPDATE",
             schema: "public",
-            table: "tickets",
+            table: "hd_tickets",
             filter: `organization_id=eq.${organizationId}`,
           },
           (payload: { new: Record<string, unknown> }) => {
@@ -112,7 +112,7 @@ export function useOpsRealtime(
           // ticket_comments has no organization column; RLS scopes the stream.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           "postgres_changes" as any,
-          { event: "INSERT", schema: "public", table: "ticket_comments" },
+          { event: "INSERT", schema: "public", table: "hd_ticket_comments" },
           (payload: { new: Record<string, unknown> }) => {
             markEvent();
             handlersRef.current.onComment(payload.new as unknown as OpsComment);
@@ -124,7 +124,7 @@ export function useOpsRealtime(
           {
             event: "INSERT",
             schema: "public",
-            table: "ticket_audit_logs",
+            table: "hd_ticket_audit_logs",
             filter: `organization_id=eq.${organizationId}`,
           },
           (payload: { new: Record<string, unknown> }) => {

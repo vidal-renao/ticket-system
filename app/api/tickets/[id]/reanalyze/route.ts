@@ -36,7 +36,7 @@ export async function POST(
   }
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, description, priority, created_by, organization_id, deleted_at")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -50,7 +50,7 @@ export async function POST(
   // one: every reader of ai_analysis takes the most recent row, and leaving
   // stale rows behind would make the analytics counts drift.
   const { data: previous } = await svc
-    .from("ai_analysis")
+    .from("hd_ai_analysis")
     .select("id")
     .eq("ticket_id", ticket.id);
 
@@ -64,7 +64,7 @@ export async function POST(
   );
 
   const { data: fresh } = await svc
-    .from("ai_analysis")
+    .from("hd_ai_analysis")
     .select("id, suggested_category, suggested_priority, confidence_score, model_used")
     .eq("ticket_id", ticket.id)
     .order("created_at", { ascending: false })
@@ -80,13 +80,13 @@ export async function POST(
 
   if (previous?.length) {
     await svc
-      .from("ai_analysis")
+      .from("hd_ai_analysis")
       .delete()
       .eq("ticket_id", ticket.id)
       .in("id", previous.map((row) => row.id));
   }
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: ticket.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

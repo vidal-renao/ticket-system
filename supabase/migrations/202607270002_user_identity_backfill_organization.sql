@@ -10,7 +10,7 @@
 -- that are still NULL, and only the exact 10 ids below -- never overwrites
 -- an existing organization_id, never touches a row outside this named list.
 --
--- Rollback: UPDATE public.profiles SET organization_id = NULL
+-- Rollback: UPDATE public.hd_profiles SET organization_id = NULL
 --           WHERE id IN (<the 10 ids below>);
 -- ============================================================================
 
@@ -39,7 +39,7 @@ BEGIN
     RAISE EXCEPTION 'RVE_BACKFILL_CANONICAL_ORG_NOT_FOUND: no organizations row with slug=vidal-real-estate';
   END IF;
 
-  UPDATE public.profiles
+  UPDATE public.hd_profiles
   SET organization_id = v_org_id
   WHERE id = ANY (v_legitimate_ids)
     AND organization_id IS NULL;

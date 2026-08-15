@@ -161,7 +161,7 @@ export function OpsConsole({
       missing.forEach((id) => pendingAuthorsRef.current.add(id));
 
       void supabase
-        .from("profiles")
+        .from("hd_profiles")
         .select("id, full_name, role, availability_status, last_seen_at")
         .in("id", missing)
         .then(({ data }) => {
@@ -239,7 +239,7 @@ export function OpsConsole({
   /** After a dropped socket, re-read the snapshot to close the event gap. */
   const resync = useCallback(() => {
     void supabase
-      .from("tickets")
+      .from("hd_tickets")
       .select(OPS_TICKET_COLUMNS)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })

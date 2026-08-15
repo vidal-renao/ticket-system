@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   );
 
   const { data: ticket, error } = await supabase
-    .from("tickets")
+    .from("hd_tickets")
     .insert({
       title: title.trim(),
       description: description.trim(),

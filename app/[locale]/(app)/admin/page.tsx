@@ -115,7 +115,7 @@ export default async function AdminPage({
   const [{ data: ticketsRaw }, { data: allProfiles }, { data: categoriesRaw }, { data: teamsRaw }, { data: organization }] = await Promise.all([
     (() => {
       let query = svc
-        .from("tickets")
+        .from("hd_tickets")
         .select("id, ticket_number, title, status, priority, created_at, created_by, assigned_to, sla_breached, category_id, metadata, review_status, deleted_at")
         .eq("organization_id", orgId)
         .limit(500);
@@ -150,7 +150,7 @@ export default async function AdminPage({
           return query.order("created_at", { ascending: false });
       }
     })(),
-    svc.from("profiles").select("id, full_name, role, specialty, availability_status").eq("organization_id", orgId),
+    svc.from("hd_profiles").select("id, full_name, role, specialty, availability_status").eq("organization_id", orgId),
     svc.from("categories").select("id, name").eq("organization_id", orgId).order("name"),
     svc.from("teams").select("id, name").eq("organization_id", orgId).order("name"),
     svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", orgId).single(),
@@ -163,12 +163,12 @@ export default async function AdminPage({
 
   const customerIds = profiles.filter((entry) => entry.role === "customer").map((entry) => entry.id);
   const { data: customerInfosRaw } = customerIds.length
-    ? await svc.from("customers_info").select("id, company_name").in("id", customerIds)
+    ? await svc.from("hd_customers_info").select("id, company_name").in("id", customerIds)
     : { data: [] as CustomerInfo[] };
 
   const uncategorisedIds = tickets.filter((ticket) => !ticket.category_id).map((ticket) => ticket.id);
   const { data: aiRowsRaw } = uncategorisedIds.length
-    ? await svc.from("ai_analysis").select("ticket_id, suggested_category").in("ticket_id", uncategorisedIds).order("created_at", { ascending: false })
+    ? await svc.from("hd_ai_analysis").select("ticket_id, suggested_category").in("ticket_id", uncategorisedIds).order("created_at", { ascending: false })
     : { data: [] as AiRow[] };
 
   const profileById = Object.fromEntries(profiles.map((entry) => [entry.id, entry]));

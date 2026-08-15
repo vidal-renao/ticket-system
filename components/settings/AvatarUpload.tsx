@@ -48,7 +48,7 @@ export function AvatarUpload({ userId, name, currentUrl }: AvatarUploadProps) {
     const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
 
     const { error: profileError } = await supabase
-      .from("profiles")
+      .from("hd_profiles")
       .update({ avatar_url: publicUrl })
       .eq("id", userId);
 

@@ -80,7 +80,7 @@ export function getTicketsByRole(
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
   select: string
 ) {
-  return applyTicketVisibilityScope(client.from("tickets").select(select), profile);
+  return applyTicketVisibilityScope(client.from("hd_tickets").select(select), profile);
 }
 
 export async function getTicketIdsBySuggestedCategory(
@@ -89,8 +89,8 @@ export async function getTicketIdsBySuggestedCategory(
   category: string
 ): Promise<string[]> {
   const { data, error } = await client
-    .from("ai_analysis")
-    .select("ticket_id, tickets!inner(id, organization_id)")
+    .from("hd_ai_analysis")
+    .select("ticket_id, tickets:hd_tickets!inner(id, organization_id)")
     .eq("suggested_category", category)
     .eq("tickets.organization_id", organizationId)
     .order("created_at", { ascending: false });
@@ -157,7 +157,7 @@ export async function resolveTicketAccess<T>(
   select: string
 ): Promise<TicketAccessResult<T>> {
   const { data: baseTicket, error: baseError } = await client
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, organization_id, created_by, assigned_to")
     .eq("id", ticketId)
     .is("deleted_at", null)
@@ -186,7 +186,7 @@ export async function resolveTicketAccess<T>(
   }
 
   const scopedQuery = applyTicketVisibilityScope(
-    client.from("tickets").select(select).eq("id", ticketId),
+    client.from("hd_tickets").select(select).eq("id", ticketId),
     profile
   );
 

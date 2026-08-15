@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   const svc = createServiceClientStatic();
   const { data: tickets, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
     .in("status", ACTIVE_TICKET_STATUSES)
     .limit(500);
@@ -67,7 +67,7 @@ async function autoCloseConfirmedResolutions(
   const now = new Date().toISOString();
 
   const { data: stale } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, organization_id")
     .eq("status", "resolved")
     .is("deleted_at", null)
@@ -79,7 +79,7 @@ async function autoCloseConfirmedResolutions(
 
   const ids = stale.map((ticket) => ticket.id);
   const { error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update({ status: "closed", closed_at: now })
     .in("id", ids)
     .eq("status", "resolved")
@@ -92,7 +92,7 @@ async function autoCloseConfirmedResolutions(
 
   await Promise.all(
     stale.map((ticket) =>
-      svc.from("ticket_audit_logs").insert({
+      svc.from("hd_ticket_audit_logs").insert({
         organization_id: ticket.organization_id,
         actor_id: null,
         actor_role: "system",

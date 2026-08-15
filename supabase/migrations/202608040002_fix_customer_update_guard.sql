@@ -5,7 +5,7 @@
 --
 --   if current_profile_role() <> 'customer' then return new; end if;
 --
--- and current_profile_role() is `SELECT role FROM profiles WHERE id =
+-- and current_profile_role() is `SELECT role FROM hd_profiles WHERE id =
 -- auth.uid()`. Every application write runs through service_role, which
 -- carries no end-user JWT: auth.uid() is NULL, the SELECT matches no row and
 -- the function returns NULL. `NULL <> 'customer'` is NULL, not TRUE, so the

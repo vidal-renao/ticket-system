@@ -62,7 +62,7 @@ export default async function InboxPage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -77,7 +77,7 @@ export default async function InboxPage({
 
   if (isStaff && orgId) {
     let visibleTickets = svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("id")
       .eq("organization_id", orgId)
       .is("deleted_at", null);
@@ -87,7 +87,7 @@ export default async function InboxPage({
 
     if (ticketIds.length > 0) {
       const { data } = await svc
-        .from("ticket_comments")
+        .from("hd_ticket_comments")
         .select("id, content, is_internal, is_ai_generated, created_at, ticket_id, author_id")
         .in("ticket_id", ticketIds)
         .order("created_at", { ascending: false })
@@ -96,7 +96,7 @@ export default async function InboxPage({
     }
   } else {
     const { data: myTickets } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("id")
       .eq("created_by", user.id)
       .is("deleted_at", null);
@@ -104,7 +104,7 @@ export default async function InboxPage({
 
     if (ticketIds.length > 0) {
       const { data } = await svc
-        .from("ticket_comments")
+        .from("hd_ticket_comments")
         .select("id, content, is_internal, is_ai_generated, created_at, ticket_id, author_id")
         .in("ticket_id", ticketIds)
         .eq("is_internal", false)
@@ -120,10 +120,10 @@ export default async function InboxPage({
 
   const [{ data: ticketsRaw }, { data: profilesRaw }] = await Promise.all([
     uniqueTicketIds.length
-      ? svc.from("tickets").select("id, ticket_number, title, status, created_by, organization_id").eq("organization_id", orgId).in("id", uniqueTicketIds).is("deleted_at", null)
+      ? svc.from("hd_tickets").select("id, ticket_number, title, status, created_by, organization_id").eq("organization_id", orgId).in("id", uniqueTicketIds).is("deleted_at", null)
       : Promise.resolve({ data: [] as TicketRow[] }),
     uniqueAuthorIds.length
-      ? svc.from("profiles").select("id, full_name, role").in("id", uniqueAuthorIds)
+      ? svc.from("hd_profiles").select("id, full_name, role").in("id", uniqueAuthorIds)
       : Promise.resolve({ data: [] as ProfileRow[] }),
   ]);
 
@@ -132,13 +132,13 @@ export default async function InboxPage({
 
   const customerAuthorIds = authors.filter((p) => p.role === "customer").map((p) => p.id);
   const { data: customerInfosRaw } = customerAuthorIds.length
-    ? await svc.from("customers_info").select("id, company_name").in("id", customerAuthorIds)
+    ? await svc.from("hd_customers_info").select("id, company_name").in("id", customerAuthorIds)
     : { data: [] as CustomerInfo[] };
 
   // True "to read" state: comment notifications the user has not read yet.
   // They are marked read when the user opens the ticket, not the inbox.
   const { data: unreadNotifRows } = await svc
-    .from("notifications")
+    .from("hd_notifications")
     .select("ticket_id")
     .eq("user_id", user.id)
     .eq("is_read", false)

@@ -60,7 +60,7 @@ export async function PATCH(
     | null = null;
 
   const { data: byId, error: existingError } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select(baseSelect)
     .eq("id", rawId)
     .eq("organization_id", profile.organization_id)
@@ -70,7 +70,7 @@ export async function PATCH(
 
   if (!existing && normalizedTicketNumber !== null) {
     const { data: byTicketNumber, error: numberLookupError } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .select(baseSelect)
       .eq("ticket_number", normalizedTicketNumber)
       .eq("organization_id", profile.organization_id)
@@ -157,7 +157,7 @@ export async function PATCH(
 
   if (patch.assigned_to) {
     const { data: assignee } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, role, organization_id, is_active")
       .eq("id", patch.assigned_to as string)
       .eq("organization_id", profile.organization_id)
@@ -236,7 +236,7 @@ export async function PATCH(
   }
 
   const { data, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", existing.id)
     .eq("organization_id", profile.organization_id)

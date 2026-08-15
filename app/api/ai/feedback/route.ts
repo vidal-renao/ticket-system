@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("hd_profiles")
     .select("role")
     .eq("id", user.id)
     .single();
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!ticket_id) return NextResponse.json({ error: "ticket_id required" }, { status: 400 });
 
   const { error } = await supabase
-    .from("ai_analysis")
+    .from("hd_ai_analysis")
     .update({
       category_accepted,
       priority_accepted,

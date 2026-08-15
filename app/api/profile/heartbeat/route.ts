@@ -15,7 +15,7 @@ export async function POST() {
 
   const svc = createServiceClientStatic();
   const { error } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .update({ last_seen_at: new Date().toISOString() })
     .eq("id", user.id);
 

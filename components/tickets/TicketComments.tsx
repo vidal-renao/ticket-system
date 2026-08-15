@@ -122,13 +122,13 @@ export function TicketComments({
         {
           event: "INSERT",
           schema: "public",
-          table: "ticket_comments",
+          table: "hd_ticket_comments",
           filter: `ticket_id=eq.${ticketId}`,
         },
         async (payload: { new: Record<string, unknown> }) => {
           const newId = payload.new.id as string;
           const { data } = await supabase
-            .from("ticket_comments")
+            .from("hd_ticket_comments")
             .select("id, author_id, content, is_internal, is_ai_generated, created_at, profiles:author_id(full_name, avatar_url, role)")
             .eq("id", newId)
             .single();

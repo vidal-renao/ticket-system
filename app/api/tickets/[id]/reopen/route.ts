@@ -25,7 +25,7 @@ export async function POST(
   }
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, organization_id, created_by, priority, status, created_at, resolved_at, assigned_to, response_due_at, sla_first_response_due, sla_response_breached")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -84,7 +84,7 @@ export async function POST(
   };
 
   const { error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update(reopenPatch)
     .eq("id", id)
     .eq("organization_id", profile.organization_id)

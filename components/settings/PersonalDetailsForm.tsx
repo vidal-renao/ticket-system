@@ -83,7 +83,7 @@ export function PersonalDetailsForm({ initial, showAddress, showCompanyContact }
         return;
       }
       const { error: updateError } = await supabase
-        .from("profiles")
+        .from("hd_profiles")
         .update(parsed.data)
         .eq("id", user.id);
       if (updateError) {

@@ -185,7 +185,7 @@ export function AppShell({
           {
             event: "INSERT",
             schema: "public",
-            table: "notifications",
+            table: "hd_notifications",
             // Belt and braces: the users_own_notifications policy already
             // restricts this subscriber to their own rows, but filtering
             // server-side avoids shipping rows only to discard them.
@@ -213,7 +213,7 @@ export function AppShell({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase.from("profiles").update({ availability_status: "offline" }).eq("id", user.id);
+        await supabase.from("hd_profiles").update({ availability_status: "offline" }).eq("id", user.id);
       }
     } catch { /* silent — sign out proceeds regardless */ }
     await supabase.auth.signOut();

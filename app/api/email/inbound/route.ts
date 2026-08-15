@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const ticketNumber = extractTicketNumber(subject);
   if (ticketNumber) {
     const { data: ticket } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("id, created_by, assigned_to, organization_id, ticket_number")
       .eq("organization_id", senderProfile.organization_id)
       .eq("ticket_number", ticketNumber)
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       }
 
       const { data: comment, error } = await svc
-        .from("ticket_comments")
+        .from("hd_ticket_comments")
         .insert({
           ticket_id: ticket.id,
           author_id: senderProfile.id,
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
   );
 
   const { data: ticket, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .insert({
       organization_id: senderProfile.organization_id,
       created_by: senderProfile.id,
@@ -149,7 +149,7 @@ async function findProfileByEmail(
   if (!user) return null;
 
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, organization_id, role")
     .eq("id", user.id)
     .single();

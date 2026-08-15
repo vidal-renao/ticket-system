@@ -60,7 +60,7 @@ export default async function TeamPage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -84,7 +84,7 @@ export default async function TeamPage({
   const onlineOnly = filters.presence === "online";
 
   const { data: membersRaw } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, full_name, role, department, is_active, created_at, availability_status")
     .eq("organization_id", orgId)
     .in("role", ["agent", "manager", "admin", "customer"])
@@ -94,7 +94,7 @@ export default async function TeamPage({
   // Specialty/team_id and last_seen_at are fetched separately so environments
   // missing the newer columns keep working.
   const { data: extrasRaw } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, specialty, team_id")
     .eq("organization_id", orgId);
 
@@ -119,7 +119,7 @@ export default async function TeamPage({
     getLastSeenMap(svc, staff.map((m) => m.id)),
     staff.length
       ? svc
-          .from("tickets")
+          .from("hd_tickets")
           .select("assigned_to")
           .eq("organization_id", orgId)
           .in("assigned_to", staff.map((m) => m.id))
@@ -156,7 +156,7 @@ export default async function TeamPage({
   // Company names for customers
   const customerIds = customers.map((m) => m.id);
   const { data: customerInfoRaw } = customerIds.length
-    ? await svc.from("customers_info").select("id, company_name, industry").in("id", customerIds)
+    ? await svc.from("hd_customers_info").select("id, company_name, industry").in("id", customerIds)
     : { data: [] as { id: string; company_name: string; industry: string }[] };
   const companyMap = Object.fromEntries(
     ((customerInfoRaw ?? []) as { id: string; company_name: string; industry: string }[]).map(

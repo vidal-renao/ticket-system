@@ -26,7 +26,7 @@ export async function suggestReply(
   }
 
   const { data: ticket } = await supabase
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, title, description, category_id")
     .eq("id", ticketId)
     .eq("organization_id", profile.organization_id)
@@ -39,7 +39,7 @@ export async function suggestReply(
       ? supabase.from("categories").select("name").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
     supabase
-      .from("ai_analysis")
+      .from("hd_ai_analysis")
       .select("sentiment, detected_language")
       .eq("ticket_id", ticketId)
       .order("created_at", { ascending: false })

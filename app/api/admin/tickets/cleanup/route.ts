@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
   if (body.all) {
     let countQuery = svc
-      .from("tickets")
+      .from("hd_tickets")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", profile.organization_id);
     countQuery = body.action === "delete" ? countQuery.is("deleted_at", null) : countQuery.not("deleted_at", "is", null);
@@ -53,11 +53,11 @@ export async function POST(request: Request) {
     affected = count ?? 0;
     if (affected === 0) return NextResponse.json({ affected: 0 });
 
-    let updateAll = svc.from("tickets").update(patch).eq("organization_id", profile.organization_id);
+    let updateAll = svc.from("hd_tickets").update(patch).eq("organization_id", profile.organization_id);
     updateAll = body.action === "delete" ? updateAll.is("deleted_at", null) : updateAll.not("deleted_at", "is", null);
     ({ error } = await updateAll);
   } else {
-    let selection = svc.from("tickets").select("id").eq("organization_id", profile.organization_id).in("id", ticketIds);
+    let selection = svc.from("hd_tickets").select("id").eq("organization_id", profile.organization_id).in("id", ticketIds);
     selection = body.action === "delete" ? selection.is("deleted_at", null) : selection.not("deleted_at", "is", null);
     const { data: selected, error: selectionError } = await selection.limit(500);
     if (selectionError) return NextResponse.json({ error: "Ticket selection failed" }, { status: 500 });
@@ -65,11 +65,11 @@ export async function POST(request: Request) {
     affected = selectedIds.length;
     if (affected === 0) return NextResponse.json({ affected: 0 });
     singleResourceId = affected === 1 ? selectedIds[0] : null;
-    ({ error } = await svc.from("tickets").update(patch).eq("organization_id", profile.organization_id).in("id", selectedIds));
+    ({ error } = await svc.from("hd_tickets").update(patch).eq("organization_id", profile.organization_id).in("id", selectedIds));
   }
   if (error) return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

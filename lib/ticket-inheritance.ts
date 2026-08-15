@@ -27,7 +27,7 @@ export async function adoptUnassignedTicketsForNewAgent(
   if (!target) return [];
 
   const { data: candidates } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, category_id")
     .eq("organization_id", input.organizationId)
     .eq("status", "open")
@@ -48,7 +48,7 @@ export async function adoptUnassignedTicketsForNewAgent(
       ? svc.from("categories").select("id, name").in("id", categoryIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     svc
-      .from("ai_analysis")
+      .from("hd_ai_analysis")
       .select("ticket_id, suggested_category")
       .in("ticket_id", ticketIds)
       .order("created_at", { ascending: false }),
@@ -75,7 +75,7 @@ export async function adoptUnassignedTicketsForNewAgent(
     // Guarded update: skip if another request assigned this ticket in the
     // meantime instead of racing it.
     const { data: updated } = await svc
-      .from("tickets")
+      .from("hd_tickets")
       .update({ assigned_to: input.agentId, assigned_at: now })
       .eq("id", ticket.id)
       .eq("organization_id", input.organizationId)

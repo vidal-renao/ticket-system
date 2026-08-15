@@ -38,7 +38,7 @@ export default async function SettingsPage({
 
   const svc = createServiceClientStatic();
   let { data: profile, error: profileError } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select(
       "role, organization_id, full_name, avatar_url, availability_status, customer_type, reference_code, phone, locale, address, city, postal_code, country, website, contact_person, logo_url"
     )
@@ -47,7 +47,7 @@ export default async function SettingsPage({
 
   // Fallback if availability_status column hasn't been migrated yet
   if (!profile && profileError) {
-    const fallback = await svc.from("profiles").select("role, organization_id, full_name").eq("id", user.id).maybeSingle();
+    const fallback = await svc.from("hd_profiles").select("role, organization_id, full_name").eq("id", user.id).maybeSingle();
     profile = fallback.data as typeof profile;
     profileError = fallback.error;
   }
@@ -62,7 +62,7 @@ export default async function SettingsPage({
   let agentProfile: { team_id: string | null; specialty: string | null } | null = null;
   if (isAgent) {
     const { data } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("team_id, specialty")
       .eq("id", user.id)
       .single();
@@ -93,7 +93,7 @@ export default async function SettingsPage({
   const isCompanyCustomer = isCustomer && profile.customer_type === "company";
   if (isCompanyCustomer) {
     const { data } = await svc
-      .from("customers_info")
+      .from("hd_customers_info")
       .select("company_name, industry, business_details, tax_id")
       .eq("id", user.id)
       .maybeSingle();
@@ -104,7 +104,7 @@ export default async function SettingsPage({
     if (!customerInfo?.tax_id?.trim()) {
       const companyName = customerInfo?.company_name?.trim() || profile.full_name?.trim() || user.email || user.id;
       const generated = generateCif(companyName);
-      await svc.from("customers_info").upsert(
+      await svc.from("hd_customers_info").upsert(
         {
           id: user.id,
           company_name: customerInfo?.company_name ?? companyName,

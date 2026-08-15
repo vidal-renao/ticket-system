@@ -38,7 +38,7 @@ export async function recoverMissingTriage(
   const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString();
 
   const { data: recent, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, title, description, priority, organization_id, created_by")
     .is("deleted_at", null)
     .lt("created_at", cutoff)
@@ -53,7 +53,7 @@ export async function recoverMissingTriage(
   // ai_analysis has no organization column, so the orphan check is a second
   // pass over the ids rather than a join.
   const { data: analysed } = await svc
-    .from("ai_analysis")
+    .from("hd_ai_analysis")
     .select("ticket_id")
     .in("ticket_id", recent.map((ticket) => ticket.id));
 

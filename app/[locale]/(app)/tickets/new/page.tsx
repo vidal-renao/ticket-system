@@ -26,7 +26,7 @@ export default async function NewTicketPage({
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("organization_id")
     .eq("id", user.id)
     .single();

@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { data: ticket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, ticket_number, title, created_by, assigned_to, organization_id, status, review_status")
     .eq("id", id)
     .eq("organization_id", profile.organization_id)
@@ -72,7 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { data: updated, error } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", ticket.id)
     .eq("organization_id", profile.organization_id)
@@ -83,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: "Review update failed" }, { status: 500 });
   if (!updated) return NextResponse.json({ error: "Ticket changed; refresh and retry" }, { status: 409 });
 
-  await svc.from("ticket_audit_logs").insert({
+  await svc.from("hd_ticket_audit_logs").insert({
     organization_id: profile.organization_id,
     actor_id: user.id,
     actor_role: profile.role,

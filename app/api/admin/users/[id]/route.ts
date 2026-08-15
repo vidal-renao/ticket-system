@@ -13,7 +13,7 @@ export async function PATCH(
 
   const svc = createServiceClientStatic();
   const { data: adminProfile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
@@ -24,7 +24,7 @@ export async function PATCH(
 
   // Verify target belongs to same org
   const { data: targetProfile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("id, organization_id")
     .eq("id", targetId)
     .single();
@@ -66,7 +66,7 @@ export async function PATCH(
   }
 
   const { error } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .update(updates)
     .eq("id", targetId)
     .eq("organization_id", adminProfile.organization_id);

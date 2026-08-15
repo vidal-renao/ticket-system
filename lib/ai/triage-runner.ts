@@ -41,7 +41,7 @@ export async function findAutomaticAssignment(
       ? svc.from("teams").select("id, name").eq("id", input.teamId).eq("organization_id", orgId).maybeSingle()
       : Promise.resolve({ data: null }),
     svc.from("categories").select("id, name, slug").eq("organization_id", orgId).eq("is_active", true),
-    svc.from("profiles").select("id, specialty, team_id, availability_status").eq("organization_id", orgId).eq("role", "agent").eq("is_active", true),
+    svc.from("hd_profiles").select("id, specialty, team_id, availability_status").eq("organization_id", orgId).eq("role", "agent").eq("is_active", true),
     svc.from("teams").select("id, name").eq("organization_id", orgId),
   ]);
 
@@ -58,7 +58,7 @@ export async function findAutomaticAssignment(
   // instead of failing the whole routing query.
   const [{ data: openTickets }, lastSeenByAgent] = await Promise.all([
     agentIds.length
-      ? svc.from("tickets").select("assigned_to").eq("organization_id", orgId).in("assigned_to", agentIds).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
+      ? svc.from("hd_tickets").select("assigned_to").eq("organization_id", orgId).in("assigned_to", agentIds).in("status", ACTIVE_TICKET_STATUSES).is("deleted_at", null)
       : Promise.resolve({ data: [] as { assigned_to: string | null }[] }),
     getLastSeenMap(svc, agentIds),
   ]);
@@ -128,7 +128,7 @@ export async function runAITriage(
     svc.from("organizations").select("settings").eq("id", orgId).single(),
     svc.from("categories").select("name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     creatorId
-      ? svc.from("customers_info").select("company_name, industry, business_details").eq("id", creatorId).maybeSingle()
+      ? svc.from("hd_customers_info").select("company_name, industry, business_details").eq("id", creatorId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -164,7 +164,7 @@ export async function runAITriage(
       clearTimeout(timeout);
     }
   } catch (err) {
-    await svc.from("ai_analysis").insert({
+    await svc.from("hd_ai_analysis").insert({
       ticket_id: ticketId,
       suggested_category: "Other",
       suggested_priority: "medium",
@@ -193,7 +193,7 @@ export async function runAITriage(
     .eq("name", result.suggested_category)
     .single();
 
-  await svc.from("ai_analysis").insert({
+  await svc.from("hd_ai_analysis").insert({
     ticket_id: ticketId,
     suggested_category: result.suggested_category,
     suggested_priority: result.suggested_priority,
@@ -218,7 +218,7 @@ export async function runAITriage(
   };
 
   const { data: currentTicket } = await svc
-    .from("tickets")
+    .from("hd_tickets")
     .select("id, organization_id, created_by, assigned_to, routing_override, priority, status, created_at, resolved_at, response_due_at, resolution_due_at, sla_first_response_due, sla_resolution_due, metadata")
     .eq("id", ticketId)
     .eq("organization_id", orgId)
@@ -247,7 +247,7 @@ export async function runAITriage(
   }
 
   await svc
-    .from("tickets")
+    .from("hd_tickets")
     .update(patch)
     .eq("id", ticketId)
     .eq("organization_id", orgId);
@@ -259,7 +259,7 @@ export async function runAITriage(
     });
     if (assignment.assignedTo) {
       const { data: assignedTicket } = await svc
-        .from("tickets")
+        .from("hd_tickets")
         .update({
           assigned_to: assignment.assignedTo,
           assigned_at: new Date().toISOString(),
@@ -302,7 +302,7 @@ export async function runAITriage(
           ? (currentTicket.metadata as Record<string, unknown>)
           : {};
       await svc
-        .from("tickets")
+        .from("hd_tickets")
         .update({ metadata: { ...existing, routing_status: ROUTING_AWAITING_AVAILABILITY } })
         .eq("id", ticketId)
         .eq("organization_id", orgId)

@@ -52,7 +52,7 @@ export default async function TicketDetailPage({
 
   const isStaff = isStaffRole(profile?.role);
 
-  const access = await resolveTicketAccess<Database["public"]["Tables"]["tickets"]["Row"]>(
+  const access = await resolveTicketAccess<Database["public"]["Tables"]["hd_tickets"]["Row"]>(
     svc,
     profile,
     id,
@@ -67,7 +67,7 @@ export default async function TicketDetailPage({
   // Opening a ticket is what marks its notifications as read for this user —
   // the inbox "To read" tab stays accurate until each conversation is opened.
   await svc
-    .from("notifications")
+    .from("hd_notifications")
     .update({ is_read: true })
     .eq("user_id", currentUserId)
     .eq("ticket_id", ticket.id)
@@ -90,18 +90,18 @@ export default async function TicketDetailPage({
     ticket.category_id
       ? svc.from("categories").select("name, slug, color, icon").eq("id", ticket.category_id).single()
       : Promise.resolve({ data: null }),
-    svc.from("profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
+    svc.from("hd_profiles").select("full_name, avatar_url").eq("id", ticket.created_by).single(),
     ticket.assigned_to
       ? svc
-          .from("profiles")
+          .from("hd_profiles")
           .select("id, full_name, avatar_url, specialty, availability_status")
           .eq("id", ticket.assigned_to)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     isStaff
-      ? svc.from("ai_analysis").select("*").eq("ticket_id", id).single()
+      ? svc.from("hd_ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
-    svc.from("ticket_comments")
+    svc.from("hd_ticket_comments")
       .select("*, profiles:author_id(full_name, avatar_url, role)")
       .eq("ticket_id", id)
       .order("created_at", { ascending: true }),
@@ -111,7 +111,7 @@ export default async function TicketDetailPage({
       .eq("id", ticket.organization_id)
       .single(),
     svc
-      .from("customers_info")
+      .from("hd_customers_info")
       .select("company_name, industry")
       .eq("id", ticket.created_by)
       .maybeSingle(),
@@ -122,7 +122,7 @@ export default async function TicketDetailPage({
   let onlineAgentCount: number | null = null;
   if (!isStaff && ticket.organization_id) {
     const { data: staffRows } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, availability_status")
       .eq("organization_id", ticket.organization_id)
       .in("role", ["agent", "manager", "admin"])
@@ -167,7 +167,7 @@ export default async function TicketDetailPage({
   let assignableAgents: AgentOption[] = [];
   if (canReassign) {
     const { data: agentRows } = await svc
-      .from("profiles")
+      .from("hd_profiles")
       .select("id, full_name, specialty, availability_status")
       .eq("organization_id", ticket.organization_id)
       .eq("role", "agent")

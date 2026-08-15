@@ -19,7 +19,7 @@ export async function POST() {
 
   const svc = createServiceClientStatic();
   const { data: profile } = await svc
-    .from("profiles")
+    .from("hd_profiles")
     .select("role, organization_id")
     .eq("id", user.id)
     .single();
