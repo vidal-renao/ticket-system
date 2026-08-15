@@ -72,7 +72,10 @@ export async function POST(request: Request) {
       input.contact_email,
       {
         data: { full_name: input.contact_person },
-        redirectTo: `${APP_URL}/api/auth/callback?next=/settings`,
+        // Same as the individual endpoint: the set-password screen, not
+        // /api/auth/callback. See the note there for why the callback could
+        // never work for an invite.
+        redirectTo: `${APP_URL}/reset-password`,
       }
     );
     if (inviteError || !invited?.user) {
