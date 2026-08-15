@@ -3,6 +3,7 @@ import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 import { createIndividualCustomerSchema } from "@/lib/validation/security";
 import { getCanonicalOrganizationId } from "@/lib/organizations";
+import { findAuthUserByEmail, USER_LOOKUP_FAILED_MESSAGE } from "@/lib/auth-admin-users";
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
@@ -57,20 +58,24 @@ export async function POST(request: Request) {
 
   const fullName = `${input.first_name} ${input.last_name}`.trim();
 
-  const { data: existingUsers } = await svc.auth.admin.listUsers();
-  const alreadyExists = existingUsers?.users.some(
-    (u) => u.email?.toLowerCase() === input.email.toLowerCase()
-  );
+  const lookup = await findAuthUserByEmail(svc, input.email);
+  if (!lookup.ok) {
+    console.error("[admin/customers/individual] user lookup failed", {
+      email: input.email,
+      reason: lookup.reason,
+      message: lookup.message,
+    });
+    // 503, not 400: the request was fine, we just cannot answer it right now.
+    return NextResponse.json({ error: USER_LOOKUP_FAILED_MESSAGE }, { status: 503 });
+  }
 
   let userId: string;
   let invitationState: "invited" | "already_existing_user" = "invited";
+  const alreadyExists = lookup.user !== null;
 
-  if (alreadyExists) {
+  if (lookup.user) {
     invitationState = "already_existing_user";
-    const existing = existingUsers!.users.find(
-      (u) => u.email?.toLowerCase() === input.email.toLowerCase()
-    )!;
-    userId = existing.id;
+    userId = lookup.user.id;
   } else {
     const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(
       input.email,
@@ -87,6 +92,16 @@ export async function POST(request: Request) {
       }
     );
     if (inviteError || !invited?.user) {
+      // Never swallowed. GoTrue reports a duplicate address as a generic
+      // "Database error saving new user" with no hint of which address, which
+      // is unreadable from the outside; the address and the driver's own
+      // message have to reach the log or the next diagnosis starts from zero.
+      console.error("[admin/customers/individual] invite failed", {
+        email: input.email,
+        status: inviteError?.status ?? null,
+        code: inviteError?.code ?? null,
+        message: inviteError?.message ?? "invite returned no user",
+      });
       return NextResponse.json(
         { error: normalizeSupabaseErrorMessage(inviteError) },
         { status: 400 }

@@ -3,6 +3,7 @@ import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { normalizeSupabaseErrorMessage, createCompanyCustomerSchema } from "@/lib/validation/security";
 import { getCanonicalOrganizationId } from "@/lib/organizations";
 import { generateCif } from "@/lib/tax-id";
+import { findAuthUserByEmail, USER_LOOKUP_FAILED_MESSAGE } from "@/lib/auth-admin-users";
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
@@ -53,20 +54,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: existingUsers } = await svc.auth.admin.listUsers();
-  const alreadyExists = existingUsers?.users.some(
-    (u) => u.email?.toLowerCase() === input.contact_email.toLowerCase()
-  );
+  const lookup = await findAuthUserByEmail(svc, input.contact_email);
+  if (!lookup.ok) {
+    console.error("[admin/customers/company] user lookup failed", {
+      email: input.contact_email,
+      reason: lookup.reason,
+      message: lookup.message,
+    });
+    // 503, not 400: the request was fine, we just cannot answer it right now.
+    return NextResponse.json({ error: USER_LOOKUP_FAILED_MESSAGE }, { status: 503 });
+  }
 
   let userId: string;
   let invitationState: "invited" | "already_existing_user" = "invited";
+  const alreadyExists = lookup.user !== null;
 
-  if (alreadyExists) {
+  if (lookup.user) {
     invitationState = "already_existing_user";
-    const existing = existingUsers!.users.find(
-      (u) => u.email?.toLowerCase() === input.contact_email.toLowerCase()
-    )!;
-    userId = existing.id;
+    userId = lookup.user.id;
   } else {
     const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(
       input.contact_email,
@@ -79,6 +84,14 @@ export async function POST(request: Request) {
       }
     );
     if (inviteError || !invited?.user) {
+      // See the note in the individual endpoint: GoTrue's generic message
+      // names neither the address nor the constraint, so it goes to the log.
+      console.error("[admin/customers/company] invite failed", {
+        email: input.contact_email,
+        status: inviteError?.status ?? null,
+        code: inviteError?.code ?? null,
+        message: inviteError?.message ?? "invite returned no user",
+      });
       return NextResponse.json(
         { error: normalizeSupabaseErrorMessage(inviteError) },
         { status: 400 }
