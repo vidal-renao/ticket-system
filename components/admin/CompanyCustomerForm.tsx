@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { LinkExistingAccountPrompt, LinkedAccountNotice } from "@/components/admin/LinkExistingAccount";
 import { toast } from "sonner";
 import { createCompanyCustomerSchema } from "@/lib/validation/security";
 
@@ -18,7 +19,7 @@ const LOCALES = [
   { value: "en", label: "English" },
 ] as const;
 
-type FormState = "form" | "confirm" | "success";
+type FormState = "form" | "confirm" | "link-existing" | "success";
 
 export function CompanyCustomerForm() {
   const router = useRouter();
@@ -40,6 +41,9 @@ export function CompanyCustomerForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [invitationState, setInvitationState] = useState<string | null>(null);
+  const [linkPrompt, setLinkPrompt] = useState<string | null>(null);
+  const [accessLink, setAccessLink] = useState<string | null>(null);
+  const [linkNotice, setLinkNotice] = useState<string | null>(null);
 
   function buildPayload() {
     return {
@@ -70,22 +74,31 @@ export function CompanyCustomerForm() {
     setState("confirm");
   }
 
-  async function confirmCreate() {
+  async function confirmCreate(linkExisting = false) {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/customers/company", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify({ ...buildPayload(), link_existing_user: linkExisting }),
       });
       const data = await response.json();
       if (!response.ok) {
+        // The address belongs to an account from another application.
+        // Nothing was written; the admin decides whether to adopt it.
+        if (response.status === 409 && data.requires_confirmation) {
+          setLinkPrompt(data.error ?? "That address already has an account.");
+          setState("link-existing");
+          return;
+        }
         setError(data.error ?? "Could not create the company");
         setState("form");
         return;
       }
       setInvitationState(data.invitationState ?? "invited");
+      setAccessLink(data.access_link ?? null);
+      setLinkNotice(data.notice ?? null);
       setState("success");
       toast.success("Company created — invitation sent");
     } catch {
@@ -101,14 +114,32 @@ export function CompanyCustomerForm() {
       <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-6 text-center">
         <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-emerald-300" />
         <p className="text-sm font-semibold text-emerald-200">
-          {invitationState === "already_existing_user"
-            ? "This email already had an account — the existing profile was updated."
+          {invitationState === "linked_existing_user"
+            ? "Linked to an existing account. No invitation was sent."
             : "Company created. A secure email invitation was sent to the contact."}
         </p>
+        {invitationState === "linked_existing_user" && linkNotice && (
+          <LinkedAccountNotice notice={linkNotice} accessLink={accessLink} />
+        )}
         <Button className="mt-4" onClick={() => router.push("/admin/users")}>
           Back to user management
         </Button>
       </div>
+    );
+  }
+
+  if (state === "link-existing") {
+    return (
+      <LinkExistingAccountPrompt
+        email={contactEmail}
+        message={linkPrompt ?? ""}
+        loading={loading}
+        onConfirm={() => confirmCreate(true)}
+        onCancel={() => {
+          setLinkPrompt(null);
+          setState("form");
+        }}
+      />
     );
   }
 
@@ -129,7 +160,7 @@ export function CompanyCustomerForm() {
           <Button type="button" variant="ghost" onClick={() => setState("form")} disabled={loading}>
             Back
           </Button>
-          <Button type="button" onClick={confirmCreate} disabled={loading}>
+          <Button type="button" onClick={() => confirmCreate()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
             Send invitation
           </Button>

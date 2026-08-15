@@ -88,6 +88,9 @@ export const createIndividualCustomerSchema = z.object({
   country: z.string().trim().max(2).optional(),
   locale: z.enum(["de", "fr", "it", "en"]).default("de"),
   admin_notes: z.string().trim().max(1000).optional(),
+  // Set only on a second submit, after the admin has been shown that the
+  // address already has an account belonging to another application.
+  link_existing_user: z.boolean().optional().default(false),
 });
 
 // Phase 4A.14 §19: admin-created company customer. Deliberately has NO
@@ -106,6 +109,9 @@ export const createCompanyCustomerSchema = z.object({
   locale: z.enum(["de", "fr", "it", "en"]).default("de"),
   tax_id: z.string().trim().max(80).optional(),
   admin_notes: z.string().trim().max(1000).optional(),
+  // Set only on a second submit, after the admin has been shown that the
+  // address already has an account belonging to another application.
+  link_existing_user: z.boolean().optional().default(false),
 });
 
 export function normalizeSupabaseErrorMessage(error: { message?: string | null; code?: string | null } | null | undefined) {

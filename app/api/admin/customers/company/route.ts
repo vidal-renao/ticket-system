@@ -4,6 +4,12 @@ import { normalizeSupabaseErrorMessage, createCompanyCustomerSchema } from "@/li
 import { getCanonicalOrganizationId } from "@/lib/organizations";
 import { generateCif } from "@/lib/tax-id";
 import { findAuthUserByEmail, USER_LOOKUP_FAILED_MESSAGE } from "@/lib/auth-admin-users";
+import {
+  planCustomerOnboarding,
+  alreadyCustomerMessage,
+  NEEDS_CONFIRMATION_MESSAGE,
+  LINKED_ACCOUNT_NOTICE,
+} from "@/lib/customer-onboarding";
 
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
@@ -65,13 +71,58 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: USER_LOOKUP_FAILED_MESSAGE }, { status: 503 });
   }
 
-  let userId: string;
-  let invitationState: "invited" | "already_existing_user" = "invited";
-  const alreadyExists = lookup.user !== null;
-
+  // Does that account already have a customer profile here? Answered before
+  // anything is written, because the answer decides whether writing is allowed
+  // at all.
+  let existingProfile: { referenceCode: string | null } | null = null;
   if (lookup.user) {
-    invitationState = "already_existing_user";
-    userId = lookup.user.id;
+    const { data: row, error: rowError } = await svc
+      .from("hd_profiles")
+      .select("reference_code")
+      .eq("id", lookup.user.id)
+      .maybeSingle();
+    if (rowError) {
+      console.error("[admin/customers/company] profile lookup failed", {
+        email: input.contact_email,
+        message: rowError.message,
+      });
+      return NextResponse.json({ error: USER_LOOKUP_FAILED_MESSAGE }, { status: 503 });
+    }
+    if (row) existingProfile = { referenceCode: row.reference_code ?? null };
+  }
+
+  const plan = planCustomerOnboarding({
+    existingUserId: lookup.user?.id ?? null,
+    existingProfile,
+    confirmedLink: input.link_existing_user,
+  });
+
+  if (plan.kind === "already_customer") {
+    return NextResponse.json(
+      { error: alreadyCustomerMessage(plan.referenceCode), reference_code: plan.referenceCode },
+      { status: 409 }
+    );
+  }
+
+  if (plan.kind === "needs_confirmation") {
+    // Nothing written. The client re-submits the same body with
+    // link_existing_user: true once the admin has agreed.
+    return NextResponse.json(
+      {
+        error: NEEDS_CONFIRMATION_MESSAGE,
+        requires_confirmation: true,
+        existing_account: { email: input.contact_email },
+      },
+      { status: 409 }
+    );
+  }
+
+  let userId: string;
+  const invitationState: "invited" | "linked_existing_user" =
+    plan.kind === "link_existing" ? "linked_existing_user" : "invited";
+
+  if (plan.kind === "link_existing") {
+    userId = plan.userId;
   } else {
     const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(
       input.contact_email,
@@ -100,29 +151,36 @@ export async function POST(request: Request) {
     userId = invited.user.id;
   }
 
-  const { error: profileError } = await svc.from("hd_profiles").upsert(
-    {
-      id: userId,
-      full_name: input.contact_person,
-      organization_id: organizationId,
-      role: "customer",
-      customer_type: "company",
-      is_active: true,
-      phone: input.phone || null,
-      address: input.address || null,
-      city: input.city || null,
-      postal_code: input.postal_code || null,
-      country: input.country || null,
-      website: input.website || null,
-      contact_person: input.contact_person,
-      locale: input.locale,
-    },
-    { onConflict: "id" }
-  );
+  // insert, not upsert. Every path that reaches here has established there is
+  // no profile for this id, so a conflict can only mean one appeared in
+  // between -- which is the already_customer case, not something to overwrite.
+  // The previous upsert rewrote organization_id, role and customer_type from
+  // the form for anyone who already had a row.
+  const { error: profileError } = await svc.from("hd_profiles").insert({
+    id: userId,
+    full_name: input.contact_person,
+    organization_id: organizationId,
+    role: "customer",
+    customer_type: "company",
+    is_active: true,
+    phone: input.phone || null,
+    address: input.address || null,
+    city: input.city || null,
+    postal_code: input.postal_code || null,
+    country: input.country || null,
+    website: input.website || null,
+    contact_person: input.contact_person,
+    locale: input.locale,
+  });
 
   if (profileError) {
     console.error("[admin/customers/company] profile error:", profileError.message);
-    if (!alreadyExists) await svc.auth.admin.deleteUser(userId);
+    if (profileError.code === "23505") {
+      return NextResponse.json({ error: alreadyCustomerMessage(null) }, { status: 409 });
+    }
+    // Only an account this request created is cleaned up. A pre-existing one
+    // belongs to another application and must survive our failure.
+    if (plan.kind === "invite") await svc.auth.admin.deleteUser(userId);
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
   }
 
@@ -146,6 +204,28 @@ export async function POST(request: Request) {
     .eq("id", userId)
     .single();
 
+  // A linked account never received an invitation email, so it has no way of
+  // knowing it is now a customer here. The link is handed to the admin rather
+  // than sent: there is no verified sender domain, and an automatic send would
+  // fail silently.
+  let accessLink: string | null = null;
+  if (plan.kind === "link_existing") {
+    const { data: link, error: linkError } = await svc.auth.admin.generateLink({
+      type: "magiclink",
+      email: input.contact_email,
+      options: { redirectTo: `${APP_URL}/tickets` },
+    });
+    if (linkError) {
+      // The customer exists and is correct; only the convenience link is
+      // missing, so this does not fail the request.
+      console.error("[admin/customers/company] magic link failed", {
+        email: input.contact_email,
+        message: linkError.message,
+      });
+    }
+    accessLink = link?.properties?.action_link ?? null;
+  }
+
   return NextResponse.json({
     user: {
       id: userId,
@@ -155,5 +235,8 @@ export async function POST(request: Request) {
       reference_code: profileRow?.reference_code ?? null,
     },
     invitationState,
+    ...(plan.kind === "link_existing"
+      ? { notice: LINKED_ACCOUNT_NOTICE, access_link: accessLink }
+      : {}),
   });
 }
