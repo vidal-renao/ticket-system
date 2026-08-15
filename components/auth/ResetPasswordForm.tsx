@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
@@ -16,6 +16,30 @@ export function ResetPasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  /**
+   * This screen serves two arrivals, and they should not end the same way.
+   *
+   * A *recovery* link belongs to an existing account, so sending it back to
+   * /login to sign in with the new password is a deliberate re-authentication.
+   * An *invite* is the last step of creating an account: the person already
+   * holds a valid session from the link, and a second login would be friction
+   * for no security gain. So an invitee goes where any newly registered user
+   * goes -- /tickets, matching POST /api/auth/register.
+   *
+   * The two are told apart by the URL. An invite arrives as an implicit grant
+   * (#access_token=...&type=invite) because an admin-generated link has no
+   * PKCE verifier in this browser; a recovery arrives as ?code=... and carries
+   * no type. Read on mount, before the first createClient() call in the submit
+   * handler consumes the fragment.
+   */
+  const [cameFromInvite, setCameFromInvite] = useState(false);
+
+  useEffect(() => {
+    const fragment = window.location.hash.replace(/^#/, "");
+    if (!fragment) return;
+    setCameFromInvite(new URLSearchParams(fragment).get("type") === "invite");
+  }, []);
 
   const inputClass = [
     "w-full px-3 py-2.5 rounded-lg text-sm",
@@ -48,7 +72,10 @@ export function ResetPasswordForm() {
       } else {
         toast.success(t("resetPasswordSuccess"), { duration: 4000 });
         setTimeout(() => {
-          window.location.href = "/login";
+          // A full navigation, not a router push: the session was just written
+          // to cookies by the browser client, and the middleware has to read
+          // it on the next request for /tickets not to bounce to /login.
+          window.location.href = cameFromInvite ? "/tickets" : "/login";
         }, 2000);
       }
     } catch {

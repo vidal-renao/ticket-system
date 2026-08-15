@@ -76,7 +76,14 @@ export async function POST(request: Request) {
       input.email,
       {
         data: { full_name: fullName },
-        redirectTo: `${APP_URL}/api/auth/callback?next=/settings`,
+        // Straight to the set-password screen, the same destination the
+        // password reset uses. Not /api/auth/callback: that route reads a
+        // `code` query parameter, and an admin-generated invite has no PKCE
+        // verifier in the recipient's browser, so GoTrue completes it as an
+        // implicit grant and returns the credentials in the URL *fragment*.
+        // Fragments never reach the server, so the callback saw no code and
+        // bounced every invitee to /login?error=missing_code.
+        redirectTo: `${APP_URL}/reset-password`,
       }
     );
     if (inviteError || !invited?.user) {
