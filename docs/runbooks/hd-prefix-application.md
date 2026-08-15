@@ -52,13 +52,41 @@ from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.proname = 'assign_ticket_to_agent';
 ```
 
-**0.3 — Baseline the health endpoint** (it must be green *before* you start):
+**0.3 — Baseline the health endpoint** (it must be green *before* you start).
+
+`enforceCors` runs **before** the bearer check and denies by default, so an
+`Origin` header from `ALLOWED_ORIGINS` is required as well as the token. A curl
+without it gets 403 and never reaches the Supabase probe:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Origin: https://vidal-helpdesk-mcp.vercel.app" \
   -H "Authorization: Bearer $AUDIT_CRON_SECRET" \
-  https://$MCP_HOST/api/health/audit
-# expect: 200
+  https://vidal-helpdesk-mcp.vercel.app/api/health/audit
+# expect: 200, body {"supabase":"ok","supabaseError":null,"schema":"public",...}
+```
+
+The secret lives in Vercel as **`AUDIT_CRON_SECRET`** (the GitHub Actions side
+calls the same value `VIDAL_MCP_AUDIT_SECRET`).
+
+Status codes are diagnostic, and the last two let you confirm the secret is
+configured **without knowing its value**:
+
+| Code | Meaning |
+|---|---|
+| 500 | `ALLOWED_ORIGINS` empty at runtime |
+| 403 | `Origin` missing or not in the allowlist — the token was never read |
+| 503 | `AUDIT_CRON_SECRET` is **not set** in Vercel |
+| 401 | it **is** set, and this token is not it |
+| 200 | configured and correct |
+
+**Cheaper alternative:** the scheduled `Audit` workflow already proves all of
+this daily, from before the rename. A green run means the GitHub secret and the
+Vercel env agree, the origin is allowlisted, and the domain tables were
+readable — it asserts an email was actually delivered, not just HTTP 200:
+
+```bash
+gh run list --workflow=audit.yml -L 3 -R vidal-renao/vidal-helpdesk-mcp
 ```
 
 ---
