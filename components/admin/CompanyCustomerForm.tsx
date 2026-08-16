@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { LinkExistingAccountPrompt, LinkedAccountNotice } from "@/components/admin/LinkExistingAccount";
+import { LinkExistingAccountPrompt, AccessLinkNotice } from "@/components/admin/LinkExistingAccount";
 import { toast } from "sonner";
 import { createCompanyCustomerSchema } from "@/lib/validation/security";
 
@@ -118,9 +118,9 @@ export function CompanyCustomerForm() {
             ? "Linked to an existing account. No invitation was sent."
             : "Company created. A secure email invitation was sent to the contact."}
         </p>
-        {invitationState === "linked_existing_user" && linkNotice && (
-          <LinkedAccountNotice notice={linkNotice} accessLink={accessLink} />
-        )}
+        {/* Shown on both paths now. An emailed invitation is not proof of
+            access -- see AccessLinkNotice. */}
+        {linkNotice && <AccessLinkNotice notice={linkNotice} accessLink={accessLink} />}
         <Button className="mt-4" onClick={() => router.push("/admin/users")}>
           Back to user management
         </Button>

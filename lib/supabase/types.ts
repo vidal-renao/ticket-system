@@ -75,6 +75,9 @@ export interface Database {
           specialty: string | null;
           availability_status: AvailabilityStatus | null;
           last_seen_at: string | null;
+          /** Set when customer onboarding emailed an invitation. Paired with
+           *  last_seen_at to detect an invitation that was never completed. */
+          invited_at: string | null;
           created_at: string;
           updated_at: string;
         };

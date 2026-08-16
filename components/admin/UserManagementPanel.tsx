@@ -8,9 +8,10 @@ import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { CreateUserModal } from "@/components/admin/CreateUserModal";
 import {
   UserPlus, User, Building2, Search, Pencil, Trash2, CheckCircle2,
-  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle,
+  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, MailQuestion,
 } from "lucide-react";
 import { toast } from "sonner";
+import { hasNoFirstAccess, NO_FIRST_ACCESS_LABEL } from "@/lib/customer-onboarding";
 
 interface UserRow {
   id: string;
@@ -25,6 +26,8 @@ interface UserRow {
   customer_type: "individual" | "company" | null;
   reference_code: string | null;
   organization_id: string | null;
+  invited_at: string | null;
+  last_seen_at: string | null;
 }
 
 interface Team {
@@ -53,12 +56,23 @@ type FilterRole =
   | "admin"
   | "customer_individual"
   | "customer_company"
-  | "incomplete";
+  | "incomplete"
+  | "no_first_access";
 
 function isIncompleteProfile(u: UserRow): boolean {
   if (!u.organization_id) return true;
   if (u.role === "customer" && !u.customer_type) return true;
   return false;
+}
+
+/**
+ * An invited account that has never reached the application. Distinct from an
+ * incomplete profile: every field here is filled in correctly -- which is
+ * exactly why this needed its own marker. Alpen Logistics looked complete and
+ * active for a day while nobody could sign into it.
+ */
+function isAwaitingFirstAccess(u: UserRow): boolean {
+  return hasNoFirstAccess({ invitedAt: u.invited_at, lastSeenAt: u.last_seen_at });
 }
 
 export function UserManagementPanel({
@@ -82,6 +96,7 @@ export function UserManagementPanel({
     .filter((u) => {
       if (filterRole === "all") return true;
       if (filterRole === "incomplete") return isIncompleteProfile(u);
+      if (filterRole === "no_first_access") return isAwaitingFirstAccess(u);
       if (filterRole === "customer_individual") return u.role === "customer" && u.customer_type === "individual";
       if (filterRole === "customer_company") return u.role === "customer" && u.customer_type === "company";
       return u.role === filterRole;
@@ -172,6 +187,7 @@ export function UserManagementPanel({
           <option value="customer_individual">Individual customers</option>
           <option value="customer_company">Companies</option>
           <option value="incomplete">Incomplete profiles</option>
+          <option value="no_first_access">{NO_FIRST_ACCESS_LABEL}</option>
         </select>
         <button
           type="button"
@@ -276,6 +292,11 @@ export function UserManagementPanel({
                   {isIncompleteProfile(u) && (
                     <span className="flex items-center gap-1 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-300">
                       <AlertTriangle className="h-3 w-3" /> Incomplete
+                    </span>
+                  )}
+                  {isAwaitingFirstAccess(u) && (
+                    <span className="flex items-center gap-1 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300">
+                      <MailQuestion className="h-3 w-3" /> {NO_FIRST_ACCESS_LABEL}
                     </span>
                   )}
                   <span className={`ml-auto flex items-center gap-1 text-xs ${u.is_active !== false ? "text-green-400" : "text-[var(--color-text-muted)]"}`}>
@@ -384,6 +405,14 @@ export function UserManagementPanel({
                         {isIncompleteProfile(u) && (
                           <span title="Incomplete profile" className="flex items-center gap-1 rounded border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300">
                             <AlertTriangle className="h-3 w-3" />
+                          </span>
+                        )}
+                        {isAwaitingFirstAccess(u) && (
+                          <span
+                            title={`${NO_FIRST_ACCESS_LABEL} — invited, but has never signed in to the application`}
+                            className="flex items-center gap-1 rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300"
+                          >
+                            <MailQuestion className="h-3 w-3" />
                           </span>
                         )}
                       </div>
