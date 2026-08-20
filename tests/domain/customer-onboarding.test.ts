@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   planCustomerOnboarding,
   profileWriteMode,
+  hasNoFirstAccess,
   alreadyCustomerMessage,
 } from "../../lib/customer-onboarding";
 
@@ -82,6 +83,33 @@ describe("how the profile row is written", () => {
     // verified to have no profile -- so a conflict is a genuine race and must
     // fail rather than overwrite.
     expect(profileWriteMode("link_existing")).toBe("create");
+  });
+});
+
+describe("spotting an invitation that was never completed", () => {
+  // The real Alpen Logistics row, which sat in the directory for a day looking
+  // healthy. Accepting the invitation produced a sign-in, so last_sign_in_at
+  // was populated and told nobody anything; the heartbeat never fired, because
+  // /reset-password is outside AppShell.
+  const ALPEN = { invitedAt: "2026-08-15T14:51:58.562Z", lastSeenAt: null };
+
+  it("flags an invited account that has never reached the application", () => {
+    expect(hasNoFirstAccess(ALPEN)).toBe(true);
+  });
+
+  it("clears once they get in, however they got in", () => {
+    // Including by sign-in link, holding no password at all -- they are in.
+    expect(hasNoFirstAccess({ ...ALPEN, lastSeenAt: "2026-08-16T09:00:00Z" })).toBe(false);
+  });
+
+  it("never flags an account created with a password", () => {
+    // Agents come from admin.createUser, which sets no invited_at. Lena
+    // Brunner is the live example, and she must stay unmarked.
+    expect(hasNoFirstAccess({ invitedAt: null, lastSeenAt: null })).toBe(false);
+  });
+
+  it("never flags a linked account, which was never invited", () => {
+    expect(hasNoFirstAccess({ invitedAt: null, lastSeenAt: "2026-08-16T09:00:00Z" })).toBe(false);
   });
 });
 

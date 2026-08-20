@@ -59,12 +59,18 @@ export function LinkExistingAccountPrompt({
 }
 
 /**
- * Shown after linking. No invitation email exists for this person -- they were
- * never invited -- so the sign-in link is handed to the admin to deliver.
+ * The sign-in link, handed to the admin on every successful onboarding.
+ *
+ * For a linked account there is no invitation email at all -- they were never
+ * invited. For an invited one there is, but relying on it is what left Alpen
+ * Logistics unusable for a day: the mail can be eaten by the SMTP rate limit,
+ * and even when it lands the invitee has to finish a set-password screen that
+ * nobody supervises. Either way the admin leaves holding something that works.
+ *
  * Deliberately not emailed: there is no verified sender domain, and a silent
  * failure here would leave a customer who cannot get in and nobody knowing.
  */
-export function LinkedAccountNotice({
+export function AccessLinkNotice({
   notice,
   accessLink,
 }: {

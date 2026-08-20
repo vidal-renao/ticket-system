@@ -10,6 +10,7 @@ import {
   alreadyCustomerMessage,
   NEEDS_CONFIRMATION_MESSAGE,
   LINKED_ACCOUNT_NOTICE,
+  INVITED_ACCOUNT_NOTICE,
 } from "@/lib/customer-onboarding";
 
 const APP_URL =
@@ -169,6 +170,10 @@ export async function POST(request: Request) {
     website: input.website || null,
     contact_person: input.contact_person,
     locale: input.locale,
+    // Records that *we* emailed an invitation, which is what makes an account
+    // that never completes one detectable later. A linked account was never
+    // invited -- it already had credentials -- so it stays null.
+    invited_at: plan.kind === "invite" ? new Date().toISOString() : null,
   };
   const profiles = svc.from("hd_profiles");
   const { error: profileError } =
@@ -213,27 +218,30 @@ export async function POST(request: Request) {
     .eq("id", userId)
     .single();
 
-  // A linked account never received an invitation email, so it has no way of
-  // knowing it is now a customer here. The link is handed to the admin rather
-  // than sent: there is no verified sender domain, and an automatic send would
-  // fail silently.
-  let accessLink: string | null = null;
-  if (plan.kind === "link_existing") {
-    const { data: link, error: linkError } = await svc.auth.admin.generateLink({
-      type: "magiclink",
+  // The admin always leaves holding a working way in, on both paths. A linked
+  // account never received an invitation at all; an invited one received an
+  // email that may be rate-limited into oblivion and ends at a set-password
+  // screen nobody supervises. The link is generated, never sent -- there is no
+  // verified sender domain, so an automatic send would fail silently.
+  //
+  // Safe to mint next to the invitation: auth.one_time_tokens is unique on
+  // (user_id, token_type), and an invite occupies confirmation_token while a
+  // magic link occupies recovery_token. Different rows; the invitation email
+  // keeps working.
+  const { data: link, error: linkError } = await svc.auth.admin.generateLink({
+    type: "magiclink",
+    email: input.contact_email,
+    options: { redirectTo: `${APP_URL}/tickets` },
+  });
+  if (linkError) {
+    // The customer exists and is correct; only the convenience link is
+    // missing, so this does not fail the request.
+    console.error("[admin/customers/company] magic link failed", {
       email: input.contact_email,
-      options: { redirectTo: `${APP_URL}/tickets` },
+      message: linkError.message,
     });
-    if (linkError) {
-      // The customer exists and is correct; only the convenience link is
-      // missing, so this does not fail the request.
-      console.error("[admin/customers/company] magic link failed", {
-        email: input.contact_email,
-        message: linkError.message,
-      });
-    }
-    accessLink = link?.properties?.action_link ?? null;
   }
+  const accessLink = link?.properties?.action_link ?? null;
 
   return NextResponse.json({
     user: {
@@ -244,8 +252,7 @@ export async function POST(request: Request) {
       reference_code: profileRow?.reference_code ?? null,
     },
     invitationState,
-    ...(plan.kind === "link_existing"
-      ? { notice: LINKED_ACCOUNT_NOTICE, access_link: accessLink }
-      : {}),
+    notice: plan.kind === "link_existing" ? LINKED_ACCOUNT_NOTICE : INVITED_ACCOUNT_NOTICE,
+    access_link: accessLink,
   });
 }

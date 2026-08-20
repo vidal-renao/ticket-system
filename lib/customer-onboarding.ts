@@ -98,3 +98,44 @@ export const NEEDS_CONFIRMATION_MESSAGE =
  */
 export const LINKED_ACCOUNT_NOTICE =
   "Linked to an existing account. No invitation was sent and their password is unchanged — send them this sign-in link yourself.";
+
+/**
+ * The same link, for an account that *was* invited. The invitation email is
+ * still sent, but it is not something to rely on: it can be swallowed by the
+ * rate limit on the built-in SMTP, and even when it arrives the invitee has to
+ * finish a set-password screen that nobody supervises. Alpen Logistics failed
+ * at exactly that step and stayed unusable for a day. The admin now leaves the
+ * form holding a link that works regardless.
+ */
+export const INVITED_ACCOUNT_NOTICE =
+  "An invitation was emailed. If it does not arrive, or they never finish setting a password, send them this sign-in link instead — it signs them in without one.";
+
+/**
+ * Has an invited account never once reached the application?
+ *
+ * `last_sign_in_at` cannot answer this. Accepting an invitation is an implicit
+ * grant, so GoTrue records a sign-in for it even when the invitee abandons the
+ * set-password screen -- which is precisely what Alpen Logistics did, and why
+ * it was indistinguishable from a healthy customer.
+ *
+ * `last_seen_at` can. It is written by the AppShell heartbeat, and AppShell
+ * wraps the authenticated application only; /reset-password sits outside it in
+ * the (auth) route group. So the value means "this account actually got in",
+ * and it stays true however they got in -- password or sign-in link. That
+ * matters now that invited customers can enter by link and hold no password
+ * at all: they are in, so they must not be flagged.
+ *
+ * Deliberately not a heuristic on timestamp deltas. `updated_at` sits ~40ms
+ * after `last_sign_in_at` for a broken invite, but it collapses back to the
+ * same distance the moment a healthy customer logs in again, so the two are
+ * not separable that way.
+ */
+export function hasNoFirstAccess(profile: {
+  invitedAt: string | null;
+  lastSeenAt: string | null;
+}): boolean {
+  return profile.invitedAt !== null && profile.lastSeenAt === null;
+}
+
+/** Directory label for {@link hasNoFirstAccess}. */
+export const NO_FIRST_ACCESS_LABEL = "No first access";
