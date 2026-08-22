@@ -118,21 +118,21 @@ BEGIN
 END;
 $function$;
 
--- Restored with the broken call to the non-existent assign_ticket_to_agent()
--- intact, because that is what production had before the rename. A rollback
--- that quietly fixed a separate defect would not be a rollback.
-create or replace function public.trg_auto_assign_on_ai_analysis()
- returns trigger
- language plpgsql
- set search_path to 'public'
-as $function$
-BEGIN
-  IF EXISTS (SELECT 1 FROM tickets WHERE id = NEW.ticket_id AND assigned_to IS NULL) THEN
-    PERFORM assign_ticket_to_agent(NEW.ticket_id);
-  END IF;
-  RETURN NEW;
-END;
-$function$;
+-- trg_auto_assign_on_ai_analysis is deliberately NOT restored.
+--
+-- When this rollback was written it recreated the function verbatim, broken
+-- call and all, on the principle that a rollback reproduces the previous state
+-- rather than quietly fixing an unrelated defect. That principle still holds,
+-- but the state it was reproducing no longer exists: migration
+-- 202608220001_drop_legacy_assign_trigger.sql has since dropped the function
+-- and its trigger, finishing the routing handover begun on 2026-07-19.
+--
+-- Restoring it here would resurrect a trigger that calls a function nobody
+-- has, and destroy an AI analysis row every time one is written for an
+-- unassigned ticket. Undoing the hd_ prefix must not do that.
+--
+-- Routing lives in lib/ticket-routing.ts (findAutomaticAssignment), which is
+-- unaffected by table names and by this rollback.
 
 -- 3. Realtime publication. ---------------------------------------------------
 -- Same safety net as the forward migration, under the old names.
@@ -190,7 +190,7 @@ begin
     raise exception 'hd_ rollback: functions still reading prefixed names: %', bad_fn;
   end if;
 
-  raise notice 'hd_ rollback: 7 tables restored, 5 functions restored, publication verified';
+  raise notice 'hd_ rollback: 7 tables restored, 4 functions restored, publication verified';
 end
 $hd_rollback_assert$;
 
