@@ -164,7 +164,7 @@ export async function runAITriage(
       clearTimeout(timeout);
     }
   } catch (err) {
-    await svc.from("hd_ai_analysis").insert({
+    const { error: fallbackError } = await svc.from("hd_ai_analysis").insert({
       ticket_id: ticketId,
       suggested_category: "Other",
       suggested_priority: "medium",
@@ -183,6 +183,16 @@ export async function runAITriage(
       processing_time_ms: 0,
     });
     console.error("[AI Triage] Anthropic error for ticket", ticketId, err);
+    // The row that says "triage was attempted and failed" is the only thing
+    // separating that state from "triage never ran", so losing it silently
+    // costs more than the analysis itself.
+    if (fallbackError) {
+      console.error("[AI Triage] could not record the triage failure", {
+        ticketId,
+        code: fallbackError.code,
+        message: fallbackError.message,
+      });
+    }
     return;
   }
 
@@ -193,7 +203,7 @@ export async function runAITriage(
     .eq("name", result.suggested_category)
     .single();
 
-  await svc.from("hd_ai_analysis").insert({
+  const { error: analysisError } = await svc.from("hd_ai_analysis").insert({
     ticket_id: ticketId,
     suggested_category: result.suggested_category,
     suggested_priority: result.suggested_priority,
@@ -211,6 +221,19 @@ export async function runAITriage(
     output_tokens: result.output_tokens,
     processing_time_ms: result.processing_time_ms,
   });
+
+  // Not thrown: the assignment and SLA work below is still worth doing without
+  // an analysis row. But never swallowed either. This insert failed silently
+  // for a month -- the legacy ai_analysis_auto_assign trigger called a
+  // function that had been dropped, and rolled the row back AFTER INSERT --
+  // and the only visible trace was analyses that were simply absent.
+  if (analysisError) {
+    console.error("[AI Triage] analysis row was not written", {
+      ticketId,
+      code: analysisError.code,
+      message: analysisError.message,
+    });
+  }
 
   const patch: Record<string, unknown> = {
     detected_language: result.detected_language,
