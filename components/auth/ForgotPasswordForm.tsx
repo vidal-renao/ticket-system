@@ -5,9 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
+import { browserOrigin } from "@/lib/app-url";
 
 export function ForgotPasswordForm() {
   const t = useTranslations("auth");
@@ -30,8 +28,11 @@ export function ForgotPasswordForm() {
 
     try {
       const supabase = createClient();
+      // The origin of *this* browser, not a configured one. The PKCE verifier
+      // this call is about to store is a cookie on this origin; a link that
+      // comes back to any other one arrives without it.
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${APP_URL}/reset-password`,
+        redirectTo: `${browserOrigin()}/reset-password`,
       });
 
       if (error) {
