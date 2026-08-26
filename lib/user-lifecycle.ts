@@ -96,14 +96,34 @@ export function canAdministerUser(input: {
  */
 export type AccountState = "active" | "frozen" | "deleted";
 
-export function accountState(input: {
-  deletedAt: string | null | undefined;
-  isActive: boolean | null | undefined;
+/**
+ * Takes the profile row's own field names rather than camel-cased ones: this
+ * is read straight off a `hd_profiles` row in half a dozen places, and a
+ * translation step at every call site is a translation step to get wrong.
+ */
+export function accountState(account: {
+  deleted_at?: string | null;
+  is_active?: boolean | null;
 }): AccountState {
-  if (input.deletedAt) return "deleted";
+  if (account.deleted_at) return "deleted";
   // Null reads as active: the column defaults to true and predates this
   // feature, so an untouched row is a working account, not a frozen one.
-  return input.isActive === false ? "frozen" : "active";
+  return account.is_active === false ? "frozen" : "active";
+}
+
+/**
+ * May new work be sent here?
+ *
+ * Deliberately narrower than "may we name this person". A ticket assigned to
+ * somebody who has since left keeps showing their name, and their comments
+ * keep their author -- that history is the reason the delete is soft. What
+ * stops is being offered as somewhere to send work next.
+ */
+export function isAssignable(account: {
+  is_active?: boolean | null;
+  deleted_at?: string | null;
+}): boolean {
+  return accountState(account) === "active";
 }
 
 /**

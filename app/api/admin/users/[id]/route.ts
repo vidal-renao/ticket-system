@@ -40,7 +40,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const allowed = ["role", "specialty", "is_active"];
+  // is_active is deliberately not here any more. It is now one half of the
+  // frozen state -- the other half is the ban in GoTrue -- and setting it
+  // alone would recreate exactly the split this feature closed: an account
+  // out of routing that can still sign in. POST .../freeze owns it.
+  const allowed = ["role", "specialty"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];
@@ -48,7 +52,6 @@ export async function PATCH(
 
   if (targetId === user.id) {
     delete updates.role;
-    delete updates.is_active;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -60,9 +63,6 @@ export async function PATCH(
   }
   if (updates.specialty !== undefined && typeof updates.specialty !== "string") {
     return NextResponse.json({ error: "Invalid specialty" }, { status: 400 });
-  }
-  if (updates.is_active !== undefined && typeof updates.is_active !== "boolean") {
-    return NextResponse.json({ error: "Invalid account status" }, { status: 400 });
   }
 
   const { error } = await svc

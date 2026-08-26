@@ -5,6 +5,7 @@ import {
   banDurationFor,
   canAdministerUser,
   isActionableRole,
+  isAssignable,
 } from "../../lib/user-lifecycle";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -114,19 +115,37 @@ describe("what state an account is in", () => {
   it("reads an untouched row as active", () => {
     // is_active predates this feature and defaults to true; a null must not
     // read as frozen or every legacy profile would be locked out at once.
-    expect(accountState({ deletedAt: null, isActive: null })).toBe("active");
-    expect(accountState({ deletedAt: null, isActive: undefined })).toBe("active");
-    expect(accountState({ deletedAt: null, isActive: true })).toBe("active");
+    expect(accountState({ deleted_at: null, is_active: null })).toBe("active");
+    expect(accountState({ deleted_at: null, is_active: undefined })).toBe("active");
+    expect(accountState({ deleted_at: null, is_active: true })).toBe("active");
   });
 
   it("reads is_active false as frozen", () => {
-    expect(accountState({ deletedAt: null, isActive: false })).toBe("frozen");
+    expect(accountState({ deleted_at: null, is_active: false })).toBe("frozen");
   });
 
   it("lets deletion win over frozen", () => {
     // A deleted account is also frozen; saying both helps nobody.
-    expect(accountState({ deletedAt: "2026-08-26T00:00:00Z", isActive: false })).toBe("deleted");
-    expect(accountState({ deletedAt: "2026-08-26T00:00:00Z", isActive: true })).toBe("deleted");
+    expect(accountState({ deleted_at: "2026-08-26T00:00:00Z", is_active: false })).toBe("deleted");
+    expect(accountState({ deleted_at: "2026-08-26T00:00:00Z", is_active: true })).toBe("deleted");
+  });
+});
+
+describe("who may be sent new work", () => {
+  it("takes only a live account", () => {
+    expect(isAssignable({ is_active: true, deleted_at: null })).toBe(true);
+    expect(isAssignable({ is_active: null, deleted_at: null })).toBe(true);
+    expect(isAssignable({ is_active: false, deleted_at: null })).toBe(false);
+    expect(isAssignable({ is_active: true, deleted_at: "2026-08-26T00:00:00Z" })).toBe(false);
+  });
+
+  it("is narrower than being nameable, which is the point", () => {
+    // A ticket assigned to somebody who has since left keeps showing their
+    // name, and their comments keep their author -- that history is the whole
+    // reason the delete is soft. Only the offer of new work stops.
+    const departed = { is_active: false, deleted_at: "2026-08-26T00:00:00Z" };
+    expect(isAssignable(departed)).toBe(false);
+    expect(accountState(departed)).toBe("deleted");
   });
 });
 

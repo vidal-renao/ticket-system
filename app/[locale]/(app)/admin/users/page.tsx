@@ -31,7 +31,12 @@ export default async function AdminUsersPage({
   const [{ data: profilesRaw }, { data: teamsRaw }, { data: authUsers }] = await Promise.all([
     svc
       .from("hd_profiles")
-      .select("id, full_name, role, specialty, availability_status, is_active, avatar_url, customer_type, reference_code, organization_id, invited_at, last_seen_at")
+      // Deleted accounts are fetched, not filtered out. This is the one screen
+      // that has to show them: it is where they are restored from, and an
+      // administrator who cannot see what they deleted cannot undo it. The
+      // directory hides them behind a filter instead, the way the ticket
+      // cockpit does with its trash.
+      .select("id, full_name, role, specialty, availability_status, is_active, avatar_url, customer_type, reference_code, organization_id, invited_at, last_seen_at, deleted_at")
       .eq("organization_id", orgId)
       .order("role")
       .order("full_name"),

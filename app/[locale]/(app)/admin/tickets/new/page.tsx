@@ -37,6 +37,8 @@ export default async function AdminNewTicketPage({
       .select("id, full_name, customer_type")
       .eq("organization_id", orgId)
       .eq("role", "customer")
+      .is("deleted_at", null)
+      .eq("is_active", true)
       .order("full_name"),
     svc.from("teams").select("id, name").eq("organization_id", orgId).order("name"),
     svc.auth.admin.listUsers({ page: 1, perPage: 1000 }),

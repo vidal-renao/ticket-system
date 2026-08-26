@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   const svc = createServiceClientStatic();
   const { data: profile, error: profileError } = await svc
     .from("hd_profiles")
-    .select("role, organization_id")
+    .select("role, organization_id, is_active, deleted_at")
     .eq("id", user.id)
     .single();
 
@@ -109,6 +109,33 @@ export async function POST(request: NextRequest) {
         },
       },
       { status: 409 }
+    );
+  }
+
+  // A frozen or deleted account should never have got a password past GoTrue
+  // -- both carry a ban. This is the second lock, and it exists because the
+  // first one lives in a different system: a ban that failed to apply, was
+  // lifted directly in the dashboard, or predates this feature would otherwise
+  // let someone straight in. It costs one column on a query that already runs.
+  if (profile.deleted_at || profile.is_active === false) {
+    console.log("[auth/login] refused a closed account", {
+      email: email.trim().toLowerCase(),
+      userId: user.id,
+      deleted: Boolean(profile.deleted_at),
+    });
+    await supabase.auth.signOut();
+    return NextResponse.json(
+      {
+        error: "This account has been closed. Please contact your administrator.",
+        diagnostic: {
+          stage: "account-status",
+          // Frozen and deleted are not distinguished to the caller: which one
+          // it is tells an outsider something about the account, and the
+          // remedy is the same conversation either way.
+          accountClosed: true,
+        },
+      },
+      { status: 403 }
     );
   }
 

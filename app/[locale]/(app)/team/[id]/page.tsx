@@ -66,6 +66,7 @@ export default async function TeamMemberPage({
     .select("id, full_name, role, department, specialty, team_id, is_active, availability_status, created_at")
     .eq("id", id)
     .eq("organization_id", viewer.organization_id)
+    .is("deleted_at", null)
     .in("role", ["agent", "manager", "admin"])
     .maybeSingle();
 

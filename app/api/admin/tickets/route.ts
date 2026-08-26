@@ -9,6 +9,7 @@ import { sendEmail, ticketEmailSubject } from "@/lib/email";
 import { inferTicketCategory, ROUTING_AWAITING_AVAILABILITY } from "@/lib/ticket-routing";
 import { findAutomaticAssignment, runAITriage, scheduleBackground } from "@/lib/ai/triage-runner";
 import { adminTicketSchema } from "@/lib/validation/security";
+import { isAssignable } from "@/lib/user-lifecycle";
 
 /**
  * An administrator files a ticket on a customer's behalf -- the phone call, the
@@ -68,12 +69,22 @@ export async function POST(request: Request) {
   // -- reads created_by as the customer.
   const { data: customer } = await svc
     .from("hd_profiles")
-    .select("id, role, organization_id, full_name")
+    .select("id, role, organization_id, full_name, is_active, deleted_at")
     .eq("id", input.customer_id)
     .maybeSingle();
 
   if (!customer || customer.organization_id !== organizationId || customer.role !== "customer") {
     return NextResponse.json({ error: "No such customer in this organization" }, { status: 404 });
+  }
+
+  // A frozen or deleted customer cannot be given new work. The picker already
+  // leaves them out; this is the check that matters, because the id arrives in
+  // the request and the picker is only a suggestion.
+  if (!isAssignable(customer)) {
+    return NextResponse.json(
+      { error: "This customer's account is closed" },
+      { status: 409 }
+    );
   }
 
   const title = input.title;

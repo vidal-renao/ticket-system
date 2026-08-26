@@ -54,7 +54,7 @@ export async function POST(
 
   const { data: target } = await svc
     .from("hd_profiles")
-    .select("id, role, organization_id, full_name")
+    .select("id, role, organization_id, full_name, deleted_at")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -69,6 +69,15 @@ export async function POST(
     return NextResponse.json(
       { error: REFUSAL_MESSAGE[permission.refusal] },
       { status: REFUSAL_STATUS[permission.refusal] }
+    );
+  }
+
+  // A deleted account is barred from signing in, so a recovery link for one
+  // would end at a login it cannot pass. Restore first.
+  if (target!.deleted_at) {
+    return NextResponse.json(
+      { error: "This account is deleted. Restore it before sending a recovery link." },
+      { status: 409 }
     );
   }
 
