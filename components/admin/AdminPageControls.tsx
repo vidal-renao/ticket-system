@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { UserPlus, User, Building2, Tags } from "lucide-react";
+import { UserPlus, User, Building2, Tags, TicketPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CreateUserModal, type Team } from "@/components/admin/CreateUserModal";
 import { toast } from "sonner";
@@ -38,6 +38,16 @@ export function AdminPageControls({ teams }: AdminPageControlsProps) {
   return (
     <>
       <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+        {/* First, and primary: this is the cockpit's own errand -- the others
+            create people, this one creates the work the cockpit is about. */}
+        <Button
+          size="sm"
+          onClick={() => router.push("/admin/tickets/new")}
+          className="w-full whitespace-nowrap sm:w-auto"
+        >
+          <TicketPlus className="w-3.5 h-3.5" />
+          Ticket for Customer
+        </Button>
         <Button
           size="sm"
           variant="secondary"
