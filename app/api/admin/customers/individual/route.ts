@@ -12,9 +12,9 @@ import {
   LINKED_ACCOUNT_NOTICE,
   INVITED_ACCOUNT_NOTICE,
 } from "@/lib/customer-onboarding";
+import { appUrl } from "@/lib/app-url";
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
+const APP_URL = appUrl();
 
 // Phase 4A.14 §18: dedicated onboarding path for an individual customer.
 // role, customer_type, organization_id and reference_code are all imposed

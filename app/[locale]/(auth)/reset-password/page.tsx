@@ -30,9 +30,9 @@ export default async function ResetPasswordPage() {
             <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
               {t("resetPasswordTitle")}
             </h1>
-            <p className="text-sm text-[var(--color-text-secondary)] mt-1 text-center">
-              {t("resetPasswordSubtitle")}
-            </p>
+            {/* The subtitle lives in the form, which is the part that knows
+                whether a password is going to be asked for at all -- "choose a
+                secure password" over an expired-link notice reads as a bug. */}
           </div>
 
           <ResetPasswordForm />

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
+import { appUrl } from "@/lib/app-url";
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "https://ticket-system-sigma-pink.vercel.app";
+const APP_URL = appUrl();
 
 /**
  * Supabase auth callback — handles email confirmation, password reset, and

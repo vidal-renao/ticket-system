@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Password recovery
+
+### Fixed
+
+- Setting a new password from a recovery email failed with `422 flow_state_expired` whenever choosing the password took more than five minutes. The screen only constructed its Supabase client inside the submit handler, and constructing it is what starts the PKCE code exchange — so GoTrue's five-minute flow-state window was spent typing, not redeeming. The auth log for 2026-08-23 has the shape of it exactly: `/verify` at 19:31:29, `POST /token?grant_type=pkce` at 19:39:30, 422. The code is now redeemed on mount, roughly a second after the link is clicked, and the form is not shown until there is a session behind it. Time spent choosing a password no longer counts against anything.
+- The screen can now tell an expired link from an unusable one and says so, with a button to request a fresh one, instead of surfacing "Auth session missing!" after the second password field. A link opened in a different browser than the one that requested it — no PKCE verifier — is named as that rather than reported as expired.
+- The spent `?code=` is stripped from the URL once redeemed, keeping it out of history and referers.
+
+### Changed
+
+- One `lib/app-url.ts` replaces six inlined `process.env.NEXT_PUBLIC_APP_URL ?? "..."` fallbacks that had drifted into two different answers — the auth routes said `ticket-system-sigma-pink.vercel.app`, the metadata and sitemap said `helpdesk.vidallab.ch`, a domain not attached to the project. Vercel deployments now derive their own origin, so previews link to themselves.
+- The reset link a browser asks for comes back to `window.location.origin` rather than a configured URL. The PKCE verifier is a cookie on the requesting origin; any other target arrives without it.
+
 ## Unreleased — Live operations console
 
 - Added `/ops`, a manager/admin-only live operations console: KPI ribbon, canonical-status donut, priority and monthly-flow charts, filterable ticket table and a merged lifecycle activity feed, all fed by Supabase Realtime (`postgres_changes` on `tickets`, `ticket_comments`, `ticket_audit_logs`). Agents and customers are redirected to `/dashboard`, which now links to the console.

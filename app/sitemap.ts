@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { appUrl } from "@/lib/app-url";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
+const BASE_URL = appUrl();
 const LOCALES = ["de", "en", "es"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

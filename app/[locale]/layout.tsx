@@ -4,9 +4,10 @@ import { getMessages } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
 import { HtmlLang } from "@/components/layout/HtmlLang";
+import { appUrl } from "@/lib/app-url";
 import "../globals.css";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
+const APP_URL = appUrl();
 
 const OG_LOCALE: Record<string, string> = {
   de: "de_CH",

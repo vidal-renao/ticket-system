@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { appUrl } from "@/lib/app-url";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://helpdesk.vidallab.ch";
+const APP_URL = appUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
