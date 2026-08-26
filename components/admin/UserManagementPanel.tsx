@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/Button";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { CreateUserModal } from "@/components/admin/CreateUserModal";
 import {
+  PasswordResetDialog,
+  type PasswordResetOutcome,
+} from "@/components/admin/PasswordResetDialog";
+import {
   UserPlus, User, Building2, Search, Pencil, Trash2, CheckCircle2,
-  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, MailQuestion,
+  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, MailQuestion, KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { hasNoFirstAccess, NO_FIRST_ACCESS_LABEL } from "@/lib/customer-onboarding";
+import { isActionableRole } from "@/lib/user-lifecycle";
 
 interface UserRow {
   id: string;
@@ -91,6 +96,7 @@ export function UserManagementPanel({
   const [editSpecialty, setEditSpecialty] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [resetOutcome, setResetOutcome] = useState<PasswordResetOutcome | null>(null);
 
   const filtered = users
     .filter((u) => {
@@ -155,6 +161,33 @@ export function UserManagementPanel({
       toast.success(u.is_active ? "Account deactivated" : "Account activated");
     }
     setSavingId(null);
+  }
+
+  /**
+   * Start a recovery for somebody else. The administrator never sees or sets
+   * the password -- this only mints the link the person would have requested
+   * themselves, and the reset screen does the rest.
+   */
+  async function sendPasswordReset(u: UserRow) {
+    setSavingId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/password-reset`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not start the password reset");
+        return;
+      }
+      setResetOutcome({
+        name: u.full_name?.trim() || data.email,
+        email: data.email,
+        actionLink: data.action_link,
+        emailSent: Boolean(data.email_sent),
+      });
+    } catch {
+      toast.error("Could not start the password reset");
+    } finally {
+      setSavingId(null);
+    }
   }
 
   const inputCls =
@@ -322,6 +355,23 @@ export function UserManagementPanel({
                       <Button size="sm" variant="ghost" className="flex-1" onClick={() => startEdit(u)}>
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Button>
+                      {/* Administrators and managers are out of scope on
+                          purpose: they are the people who would use this screen
+                          to recover, so the recovery must not run through it. */}
+                      {!isSelf && isActionableRole(u.role) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1"
+                          onClick={() => sendPasswordReset(u)}
+                          disabled={isSaving}
+                        >
+                          {isSaving
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <><KeyRound className="h-3.5 w-3.5" /> Reset password</>
+                          }
+                        </Button>
+                      )}
                       {!isSelf && (
                         <Button
                           size="sm"
@@ -475,6 +525,20 @@ export function UserManagementPanel({
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
+                            {!isSelf && isActionableRole(u.role) && (
+                              <button
+                                type="button"
+                                onClick={() => sendPasswordReset(u)}
+                                disabled={isSaving}
+                                className="p-1.5 rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-indigo-500/10 hover:text-indigo-400"
+                                title="Send a password recovery link"
+                              >
+                                {isSaving
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <KeyRound className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                            )}
                             {!isSelf && (
                               <button
                                 type="button"
@@ -513,6 +577,8 @@ export function UserManagementPanel({
         onClose={() => setCreateOpen(false)}
         onSuccess={() => router.refresh()}
       />
+
+      <PasswordResetDialog outcome={resetOutcome} onClose={() => setResetOutcome(null)} />
     </div>
   );
 }
