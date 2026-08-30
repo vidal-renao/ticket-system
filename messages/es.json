@@ -56,6 +56,7 @@
     "resetPasswordChecking": "Comprobando el enlace...",
     "resetPasswordExpired": "Este enlace ha caducado. Por seguridad solo es válido unos minutos: solicita uno nuevo.",
     "resetPasswordInvalid": "Este enlace no es válido o ya se ha utilizado. Ábrelo en el mismo navegador desde el que lo solicitaste, o solicita uno nuevo.",
+    "resetPasswordClosed": "Esta cuenta está cerrada. Ponte en contacto con tu administrador.",
     "resetPasswordRequestNew": "Solicitar un enlace nuevo",
     "strengthWeak": "Débil",
     "strengthFair": "Regular",

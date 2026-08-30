@@ -98,6 +98,24 @@ describe("telling 'too late' apart from 'wrong link'", () => {
     expect(classifyRecoveryFailure({ code: "flow_state_expired" })).toBe("expired");
   });
 
+  it("names a banned account closed, not an invalid link", () => {
+    // Discovered the hard way: an administrator reset the password of a frozen
+    // account, GoTrue answered /verify with user_banned, and the screen told
+    // the recipient to open the link in the browser they requested it from --
+    // advice for a different problem, and a loop with no end.
+    expect(classifyRecoveryFailure({ code: "user_banned" })).toBe("closed");
+    expect(
+      classifyRecoveryFailure({ code: "access_denied", message: "User is banned" })
+    ).toBe("closed");
+  });
+
+  it("prefers closed over expired when a banned account is also stale", () => {
+    // Both facts are true; only one of them is the reason they cannot get in.
+    expect(
+      classifyRecoveryFailure({ code: "user_banned", message: "link has expired" })
+    ).toBe("closed");
+  });
+
   it("calls a missing verifier invalid, not expired", () => {
     // Opened in a different browser than the one that asked for the link.
     // Telling that person to request a new link is right, but telling them it

@@ -181,7 +181,7 @@ export function ResetPasswordForm() {
     );
   }
 
-  if (state === "expired" || state === "invalid") {
+  if (state === "expired" || state === "invalid" || state === "closed") {
     return (
       <div className="space-y-4">
         {/* The surface and text tokens, not amber-on-amber: the card is glass
@@ -191,15 +191,23 @@ export function ResetPasswordForm() {
         <div className="flex flex-col items-center gap-3 rounded-xl border border-amber-500/40 bg-[var(--color-surface-900)] p-6 text-center">
           <MailWarning className="h-5 w-5 text-amber-500" aria-hidden="true" />
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {state === "expired" ? t("resetPasswordExpired") : t("resetPasswordInvalid")}
+            {state === "expired"
+              ? t("resetPasswordExpired")
+              : state === "closed"
+                ? t("resetPasswordClosed")
+                : t("resetPasswordInvalid")}
           </p>
         </div>
+        {/* No "request a new link" for a closed account: a fresh link would be
+            refused the same way, and offering one sends them round a loop. */}
+        {state !== "closed" && (
         <a
           href="../forgot-password"
           className="block w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
         >
           {t("resetPasswordRequestNew")}
         </a>
+        )}
       </div>
     );
   }

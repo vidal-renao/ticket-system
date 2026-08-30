@@ -55,10 +55,20 @@ export type RecoveryLinkState =
    * No session and nothing usable in the URL -- opened in a different browser
    * than the one that asked for the link, already used, or hand-typed.
    */
-  | "invalid";
+  | "invalid"
+  /**
+   * The link was fine; the account is closed. GoTrue refuses a banned user at
+   * /verify with `user_banned`, and telling that person to try another browser
+   * would send them round a loop that cannot end -- the remedy is a
+   * conversation with an administrator, not another attempt.
+   */
+  | "closed";
 
 /** GoTrue's code for a PKCE flow state that outlived its window. */
 export const FLOW_STATE_EXPIRED = "flow_state_expired";
+
+/** GoTrue's code for an account with `banned_until` in the future. */
+export const USER_BANNED = "user_banned";
 
 /**
  * Does the URL carry anything worth trying, and of which kind?
@@ -118,9 +128,15 @@ export function classifyRecoveryFailure(error: {
   code?: string | null;
   message?: string | null;
   status?: number | null;
-}): Extract<RecoveryLinkState, "expired" | "invalid"> {
+}): Extract<RecoveryLinkState, "expired" | "invalid" | "closed"> {
   const code = (error.code ?? "").toLowerCase();
   const message = (error.message ?? "").toLowerCase();
+
+  // Checked first: a banned account also produces no session, and every other
+  // branch here would misread that absence as a problem with the link.
+  if (code === USER_BANNED || message.includes("user is banned")) {
+    return "closed";
+  }
 
   if (
     // flow_state_expired from the PKCE grant, otp_expired from a stale email

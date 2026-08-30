@@ -56,6 +56,7 @@
     "resetPasswordChecking": "Checking your link...",
     "resetPasswordExpired": "This link has expired. For security it is only valid for a few minutes — just request a new one.",
     "resetPasswordInvalid": "This link is invalid or has already been used. Open it in the same browser you requested it from, or request a new one.",
+    "resetPasswordClosed": "This account has been closed. Please contact your administrator.",
     "resetPasswordRequestNew": "Request a new link",
     "strengthWeak": "Weak",
     "strengthFair": "Fair",
