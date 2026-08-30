@@ -87,6 +87,7 @@ export default async function TeamPage({
     .from("hd_profiles")
     .select("id, full_name, role, department, is_active, created_at, availability_status")
     .eq("organization_id", orgId)
+    .is("deleted_at", null)
     .in("role", ["agent", "manager", "admin", "customer"])
     .order("role")
     .order("full_name");
@@ -96,7 +97,8 @@ export default async function TeamPage({
   const { data: extrasRaw } = await svc
     .from("hd_profiles")
     .select("id, specialty, team_id")
-    .eq("organization_id", orgId);
+    .eq("organization_id", orgId)
+    .is("deleted_at", null);
 
   const extrasMap = Object.fromEntries(
     ((extrasRaw ?? []) as { id: string; specialty: string | null; team_id: string | null }[]).map(

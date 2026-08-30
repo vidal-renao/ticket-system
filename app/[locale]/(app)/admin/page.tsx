@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { effectivePresence } from "@/lib/presence";
+import { isAssignable } from "@/lib/user-lifecycle";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { matchesTicketQuery, ticketRefTokens } from "@/lib/ticket-search";
 import { TicketSearch } from "@/components/tickets/TicketSearch";
@@ -63,6 +64,8 @@ type ProfileRow = {
   role: string;
   specialty: string | null;
   availability_status: "online" | "offline" | "busy" | null;
+  is_active: boolean | null;
+  deleted_at: string | null;
 };
 
 type CustomerInfo = { id: string; company_name: string };
@@ -150,7 +153,7 @@ export default async function AdminPage({
           return query.order("created_at", { ascending: false });
       }
     })(),
-    svc.from("hd_profiles").select("id, full_name, role, specialty, availability_status").eq("organization_id", orgId),
+    svc.from("hd_profiles").select("id, full_name, role, specialty, availability_status, is_active, deleted_at").eq("organization_id", orgId),
     svc.from("categories").select("id, name").eq("organization_id", orgId).order("name"),
     svc.from("teams").select("id, name").eq("organization_id", orgId).order("name"),
     svc.from("organizations").select("name, slug, plan, tier, settings").eq("id", orgId).single(),
@@ -199,8 +202,12 @@ export default async function AdminPage({
   ((customerInfosRaw ?? []) as CustomerInfo[]).forEach((c) => { if (c.company_name?.trim()) allCompanyNames.add(c.company_name.trim()); });
   if (organization?.name?.trim()) allCompanyNames.add(organization.name.trim());
   const companies = [...allCompanyNames].sort();
+  // Assignable agents, which is not the same set as "agents we can name".
+  // profileById above still holds everyone, so a ticket assigned to somebody
+  // since frozen or deleted keeps showing their name; they are simply no
+  // longer offered as somewhere to send new work.
   const allAgents = profiles
-    .filter((entry) => entry.role === "agent")
+    .filter((entry) => entry.role === "agent" && isAssignable(entry))
     .map((entry) => ({ id: entry.id, name: formatAgentIdentity(entry) }));
   const categoryNames = [...new Set([...categories.map((entry) => entry.name), ...Object.values(aiByTicket).filter((value): value is string => Boolean(value))])].sort();
 
@@ -228,7 +235,7 @@ export default async function AdminPage({
   const openCount = filtered.filter((ticket) => ticket.status === "open").length;
   const criticalCount = filtered.filter((ticket) => ticket.priority === "critical").length;
   const breachedCount = filtered.filter((ticket) => ticket.sla_breached).length;
-  const staffEntries = profiles.filter((entry) => entry.role === "agent");
+  const staffEntries = profiles.filter((entry) => entry.role === "agent" && isAssignable(entry));
 
   // Presence is only trusted when backed by a recent heartbeat, so "Team
   // online" reflects who is genuinely connected right now.

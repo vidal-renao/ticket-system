@@ -7,11 +7,18 @@ import { Button } from "@/components/ui/Button";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { CreateUserModal } from "@/components/admin/CreateUserModal";
 import {
+  PasswordResetDialog,
+  type PasswordResetOutcome,
+} from "@/components/admin/PasswordResetDialog";
+import {
   UserPlus, User, Building2, Search, Pencil, Trash2, CheckCircle2,
-  XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, MailQuestion,
+  ChevronDown, ChevronUp, Loader2, AlertTriangle, MailQuestion, KeyRound,
+  Snowflake, Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { hasNoFirstAccess, NO_FIRST_ACCESS_LABEL } from "@/lib/customer-onboarding";
+import { accountState, isActionableRole, type AccountState } from "@/lib/user-lifecycle";
+import { ConfirmDeleteAccount } from "@/components/admin/ConfirmDeleteAccount";
 
 interface UserRow {
   id: string;
@@ -28,6 +35,7 @@ interface UserRow {
   organization_id: string | null;
   invited_at: string | null;
   last_seen_at: string | null;
+  deleted_at: string | null;
 }
 
 interface Team {
@@ -57,7 +65,8 @@ type FilterRole =
   | "customer_individual"
   | "customer_company"
   | "incomplete"
-  | "no_first_access";
+  | "no_first_access"
+  | "deleted";
 
 function isIncompleteProfile(u: UserRow): boolean {
   if (!u.organization_id) return true;
@@ -73,6 +82,36 @@ function isIncompleteProfile(u: UserRow): boolean {
  */
 function isAwaitingFirstAccess(u: UserRow): boolean {
   return hasNoFirstAccess({ invitedAt: u.invited_at, lastSeenAt: u.last_seen_at });
+}
+
+/**
+ * Active, frozen or deleted, said the same way in the card and the table.
+ *
+ * There used to be two states here and the word for the second one was
+ * "Inactive", which described what it did to routing and said nothing about
+ * whether the person could still sign in -- they could. Both halves are real
+ * now, so the label has to carry the difference.
+ */
+function AccountStateLabel({ state, className = "" }: { state: AccountState; className?: string }) {
+  if (state === "deleted") {
+    return (
+      <span className={`flex items-center gap-1 text-xs text-red-400 ${className}`}>
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Deleted
+      </span>
+    );
+  }
+  if (state === "frozen") {
+    return (
+      <span className={`flex items-center gap-1 text-xs text-sky-300 ${className}`}>
+        <Snowflake className="h-3.5 w-3.5" aria-hidden="true" /> Frozen
+      </span>
+    );
+  }
+  return (
+    <span className={`flex items-center gap-1 text-xs text-green-400 ${className}`}>
+      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Active
+    </span>
+  );
 }
 
 export function UserManagementPanel({
@@ -91,9 +130,16 @@ export function UserManagementPanel({
   const [editSpecialty, setEditSpecialty] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [resetOutcome, setResetOutcome] = useState<PasswordResetOutcome | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UserRow | null>(null);
 
   const filtered = users
     .filter((u) => {
+      // Deleted accounts are loaded so they can be restored, but they are out
+      // of every other view: an administrator scanning the directory is asking
+      // about people who are still here.
+      if (filterRole === "deleted") return Boolean(u.deleted_at);
+      if (u.deleted_at) return false;
       if (filterRole === "all") return true;
       if (filterRole === "incomplete") return isIncompleteProfile(u);
       if (filterRole === "no_first_access") return isAwaitingFirstAccess(u);
@@ -139,22 +185,102 @@ export function UserManagementPanel({
     setSavingId(null);
   }
 
-  async function toggleActive(u: UserRow) {
+  /**
+   * Freeze or lift the freeze. One state with two halves -- out of routing and
+   * barred from signing in -- so it goes through the endpoint that keeps both
+   * in step, never a bare is_active write.
+   */
+  async function toggleFreeze(u: UserRow) {
+    const freezing = u.is_active !== false;
     setSavingId(u.id);
-    const res = await fetch(`/api/admin/users/${u.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: !u.is_active }),
-    });
-    if (!res.ok) {
-      toast.error("Failed to update status");
-    } else {
-      setUsers((prev) => prev.map((p) =>
-        p.id === u.id ? { ...p, is_active: !u.is_active } : p
-      ));
-      toast.success(u.is_active ? "Account deactivated" : "Account activated");
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/freeze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: freezing ? "freeze" : "unfreeze" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to update the account");
+        return;
+      }
+      setUsers((prev) => prev.map((p) => (p.id === u.id ? { ...p, is_active: !freezing } : p)));
+      toast.success(freezing ? "Account frozen \u2014 sign-in blocked" : "Account unfrozen");
+    } catch {
+      toast.error("Failed to update the account");
+    } finally {
+      setSavingId(null);
     }
-    setSavingId(null);
+  }
+
+  async function confirmDelete() {
+    const u = pendingDelete;
+    if (!u) return;
+    const action = u.deleted_at ? "restore" : "delete";
+    setSavingId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, confirmation: action.toUpperCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to update the account");
+        return;
+      }
+      setUsers((prev) =>
+        prev.map((p) =>
+          p.id === u.id
+            ? {
+                ...p,
+                deleted_at: action === "delete" ? new Date().toISOString() : null,
+                // Deleting freezes, and restoring leaves it frozen: the server
+                // says so and the row has to agree, or the freeze button would
+                // offer to freeze something already frozen.
+                is_active: false,
+              }
+            : p
+        )
+      );
+      toast.success(
+        action === "delete"
+          ? "Account deleted \u2014 history kept"
+          : "Account restored, still frozen"
+      );
+      setPendingDelete(null);
+    } catch {
+      toast.error("Failed to update the account");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  /**
+   * Start a recovery for somebody else. The administrator never sees or sets
+   * the password -- this only mints the link the person would have requested
+   * themselves, and the reset screen does the rest.
+   */
+  async function sendPasswordReset(u: UserRow) {
+    setSavingId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/password-reset`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not start the password reset");
+        return;
+      }
+      setResetOutcome({
+        name: u.full_name?.trim() || data.email,
+        email: data.email,
+        actionLink: data.action_link,
+        emailSent: Boolean(data.email_sent),
+      });
+    } catch {
+      toast.error("Could not start the password reset");
+    } finally {
+      setSavingId(null);
+    }
   }
 
   const inputCls =
@@ -188,6 +314,7 @@ export function UserManagementPanel({
           <option value="customer_company">Companies</option>
           <option value="incomplete">Incomplete profiles</option>
           <option value="no_first_access">{NO_FIRST_ACCESS_LABEL}</option>
+          <option value="deleted">Deleted</option>
         </select>
         <button
           type="button"
@@ -299,10 +426,7 @@ export function UserManagementPanel({
                       <MailQuestion className="h-3 w-3" /> {NO_FIRST_ACCESS_LABEL}
                     </span>
                   )}
-                  <span className={`ml-auto flex items-center gap-1 text-xs ${u.is_active !== false ? "text-green-400" : "text-[var(--color-text-muted)]"}`}>
-                    {u.is_active !== false ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                    {u.is_active !== false ? "Active" : "Inactive"}
-                  </span>
+                  <AccountStateLabel state={accountState(u)} className="ml-auto" />
                 </div>
               )}
 
@@ -322,19 +446,50 @@ export function UserManagementPanel({
                       <Button size="sm" variant="ghost" className="flex-1" onClick={() => startEdit(u)}>
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </Button>
-                      {!isSelf && (
+                      {/* Administrators and managers are out of scope on
+                          purpose: they are the people who would use this screen
+                          to recover, so the recovery must not run through it. */}
+                      {!isSelf && isActionableRole(u.role) && (
                         <Button
                           size="sm"
-                          variant={u.is_active !== false ? "danger" : "secondary"}
+                          variant="ghost"
                           className="flex-1"
-                          onClick={() => toggleActive(u)}
+                          onClick={() => sendPasswordReset(u)}
+                          disabled={isSaving}
+                        >
+                          {isSaving
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <><KeyRound className="h-3.5 w-3.5" /> Reset password</>
+                          }
+                        </Button>
+                      )}
+                      {!isSelf && isActionableRole(u.role) && !u.deleted_at && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => toggleFreeze(u)}
                           disabled={isSaving}
                         >
                           {isSaving
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             : u.is_active !== false
-                              ? <><Trash2 className="h-3.5 w-3.5" /> Deactivate</>
-                              : <><CheckCircle2 className="h-3.5 w-3.5" /> Activate</>
+                              ? <><Snowflake className="h-3.5 w-3.5" /> Freeze</>
+                              : <><CheckCircle2 className="h-3.5 w-3.5" /> Unfreeze</>
+                          }
+                        </Button>
+                      )}
+                      {!isSelf && isActionableRole(u.role) && (
+                        <Button
+                          size="sm"
+                          variant={u.deleted_at ? "secondary" : "danger"}
+                          className="flex-1"
+                          onClick={() => setPendingDelete(u)}
+                          disabled={isSaving}
+                        >
+                          {u.deleted_at
+                            ? <><Undo2 className="h-3.5 w-3.5" /> Restore</>
+                            : <><Trash2 className="h-3.5 w-3.5" /> Delete</>
                           }
                         </Button>
                       )}
@@ -433,15 +588,7 @@ export function UserManagementPanel({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {u.is_active !== false ? (
-                      <span className="flex items-center gap-1 text-xs text-green-400">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Active
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
-                        <XCircle className="w-3.5 h-3.5" /> Inactive
-                      </span>
-                    )}
+                    <AccountStateLabel state={accountState(u)} />
                   </td>
                   {isAdmin && (
                     <td className="px-4 py-3">
@@ -475,23 +622,55 @@ export function UserManagementPanel({
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
-                            {!isSelf && (
+                            {!isSelf && isActionableRole(u.role) && (
                               <button
                                 type="button"
-                                onClick={() => toggleActive(u)}
+                                onClick={() => sendPasswordReset(u)}
+                                disabled={isSaving}
+                                className="p-1.5 rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-indigo-500/10 hover:text-indigo-400"
+                                title="Send a password recovery link"
+                              >
+                                {isSaving
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <KeyRound className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                            )}
+                            {!isSelf && isActionableRole(u.role) && !u.deleted_at && (
+                              <button
+                                type="button"
+                                onClick={() => toggleFreeze(u)}
                                 disabled={isSaving}
                                 className={`p-1.5 rounded-lg transition-colors ${
                                   u.is_active !== false
-                                    ? "text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-500/10"
-                                    : "text-[var(--color-text-muted)] hover:text-green-400 hover:bg-green-500/10"
+                                    ? "text-[var(--color-text-muted)] hover:bg-sky-500/10 hover:text-sky-400"
+                                    : "text-[var(--color-text-muted)] hover:bg-green-500/10 hover:text-green-400"
                                 }`}
-                                title={u.is_active !== false ? "Deactivate" : "Activate"}
+                                title={u.is_active !== false ? "Freeze - blocks sign-in" : "Unfreeze"}
                               >
                                 {isSaving
                                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                   : u.is_active !== false
-                                    ? <Trash2 className="w-3.5 h-3.5" />
+                                    ? <Snowflake className="w-3.5 h-3.5" />
                                     : <CheckCircle2 className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                            )}
+                            {!isSelf && isActionableRole(u.role) && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingDelete(u)}
+                                disabled={isSaving}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  u.deleted_at
+                                    ? "text-[var(--color-text-muted)] hover:bg-emerald-500/10 hover:text-emerald-400"
+                                    : "text-[var(--color-text-muted)] hover:bg-red-500/10 hover:text-red-400"
+                                }`}
+                                title={u.deleted_at ? "Restore account" : "Delete account - history is kept"}
+                              >
+                                {u.deleted_at
+                                  ? <Undo2 className="w-3.5 h-3.5" />
+                                  : <Trash2 className="w-3.5 h-3.5" />
                                 }
                               </button>
                             )}
@@ -513,6 +692,18 @@ export function UserManagementPanel({
         onClose={() => setCreateOpen(false)}
         onSuccess={() => router.refresh()}
       />
+
+      <PasswordResetDialog outcome={resetOutcome} onClose={() => setResetOutcome(null)} />
+
+      {pendingDelete && (
+        <ConfirmDeleteAccount
+          name={pendingDelete.full_name?.trim() || pendingDelete.email || "this account"}
+          action={pendingDelete.deleted_at ? "restore" : "delete"}
+          pending={savingId === pendingDelete.id}
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

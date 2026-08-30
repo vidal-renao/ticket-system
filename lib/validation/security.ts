@@ -93,6 +93,24 @@ export const createIndividualCustomerSchema = z.object({
   link_existing_user: z.boolean().optional().default(false),
 });
 
+/**
+ * A ticket an administrator files for a customer.
+ *
+ * `customer_id` is the one field the portal route does not have and cannot
+ * have: there the author is the session. Everything else matches, so a ticket
+ * filed this way is indistinguishable downstream from one the customer typed.
+ * Note there is no organization_id and no assigned_to -- the tenant comes from
+ * the administrator's own profile and routing decides the owner, exactly as on
+ * the portal. Neither is readable from the request.
+ */
+export const adminTicketSchema = z.object({
+  customer_id: z.string().uuid("Select a customer"),
+  title: z.string().trim().min(1, "Title is required").max(300),
+  description: z.string().trim().min(1, "Description is required").max(10_000),
+  team_id: z.string().uuid().optional(),
+  priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+});
+
 // Phase 4A.14 §19: admin-created company customer. Deliberately has NO
 // tenant/role/code/customer_type fields -- those are server-imposed.
 export const createCompanyCustomerSchema = z.object({
