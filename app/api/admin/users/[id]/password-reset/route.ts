@@ -7,6 +7,7 @@ import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 import {
   REFUSAL_MESSAGE,
   REFUSAL_STATUS,
+  accountState,
   canAdministerUser,
 } from "@/lib/user-lifecycle";
 
@@ -54,7 +55,7 @@ export async function POST(
 
   const { data: target } = await svc
     .from("hd_profiles")
-    .select("id, role, organization_id, full_name, deleted_at")
+    .select("id, role, organization_id, full_name, is_active, deleted_at")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -72,11 +73,22 @@ export async function POST(
     );
   }
 
-  // A deleted account is barred from signing in, so a recovery link for one
-  // would end at a login it cannot pass. Restore first.
-  if (target!.deleted_at) {
+  // A closed account cannot be recovered into, and GoTrue will not even mint
+  // the link: /verify answers a banned user with
+  // `#error_code=user_banned`. Without this check the administrator would be
+  // shown a success dialog and hand over a link that dies on opening, and the
+  // recipient would be told to try another browser -- advice for a different
+  // problem entirely. Deleted and frozen are named separately because the
+  // remedy differs: one is Restore, the other Unfreeze.
+  const state = accountState(target!);
+  if (state !== "active") {
     return NextResponse.json(
-      { error: "This account is deleted. Restore it before sending a recovery link." },
+      {
+        error:
+          state === "deleted"
+            ? "This account is deleted. Restore it before sending a recovery link."
+            : "This account is frozen. Unfreeze it before sending a recovery link.",
+      },
       { status: 409 }
     );
   }
