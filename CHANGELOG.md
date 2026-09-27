@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Public landing audit (2026-09-27)
+
+### Fixed
+
+- Every "Request demo" button composed an email to `contact@vidallab.ch`, the fallback used when `NEXT_PUBLIC_CONTACT_EMAIL` is unset — and `vidallab.ch` does not exist in DNS (NXDOMAIN from Cloudflare and Google). Every request bounced. `lib/public-contact.ts` now uses a mailbox only when one is configured and valid, then an optional https `NEXT_PUBLIC_CONTACT_URL`, then the LinkedIn profile the footer already linked; the button reads "Get in touch" unless it really sends a demo request.
+- With the OS in light mode the landing headline was `#101827` on the page's fixed `#07101d` background — 1.07:1. The landing now pins its own dark token scale; measured 17.75:1 in both schemes, and axe reports no violations on `/`, `/en`, `/es`, `/login`, `/register`, `/forgot-password` in either scheme.
+- The hero was server-rendered at `opacity:0` and only appeared once framer-motion hydrated: blank without JavaScript, and LCP trailed FCP by ~2.6 s at 4× CPU throttling in production. The hero is now static (LCP = FCP locally); below-the-fold reveals honour reduced motion and are shown outright under `<noscript>`.
+- `/robots.txt`, `/sitemap.xml` and `/icon` redirected anonymous visitors to `/login`, and `/favicon.ico` returned the landing HTML. They bypass the middleware now (`lib/public-paths.ts`, matcher kept in step and tested), `/favicon.ico` serves the generated icon, and robots is generated from `appUrl()` instead of naming the unresolvable `helpdesk.vidallab.ch`.
+- Any unknown first path segment rendered the German landing page with a 200 (`/manifest.webmanifest`, for instance). The locale layout now returns 404 for a locale that is not configured.
+- "Forgot password?" on the sign-in form fell below 4.5:1 on the white day-mode surface.
+
+### Changed
+
+- The sitemap lists only the three public landing pages, each with hreflang alternates; it no longer advertises `/tickets`, `/queue` and `/dashboard`, which only redirect to sign-in.
+- Landing pages carry canonical and hreflang links (`/home` canonicalises to the locale root); sign-in, registration and password screens are `noindex, follow`. The home title is no longer "HelpDesk AI | HelpDesk AI".
+- Copy now claims only what the code does: the AI insights card describes category-acceptance, confidence and sentiment per organization (the "continuous model improvement on your data" line had no implementation behind it); the auth screens list technical controls instead of "Protected by DSG/nDSG"; the illustrative control panel is labelled "Example view" rather than "Live workflow".
+- The language switcher is visible on mobile, with 24px+ targets; the landing uses the same lightning mark as the app and favicon.
+
 ## Unreleased — Password recovery
 
 ### Fixed

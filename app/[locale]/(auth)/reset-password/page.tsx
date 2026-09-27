@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { getTranslations } from "next-intl/server";
+import { AUTH_SCREEN_ROBOTS } from "@/lib/seo";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { Zap } from "lucide-react";
 
 export async function generateMetadata() {
   const t = await getTranslations("auth");
-  return { title: t("resetPasswordTitle") };
+  return { title: t("resetPasswordTitle"), robots: AUTH_SCREEN_ROBOTS };
 }
 
 export default async function ResetPasswordPage() {
