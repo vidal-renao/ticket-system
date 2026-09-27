@@ -79,7 +79,8 @@ Key variables:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser/session key protected by RLS |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only privileged operations |
 | `NEXT_PUBLIC_APP_URL` | Canonical application URL |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | Public demo/contact CTA |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Optional. Landing CTA becomes a "Request demo" email; set only for a mailbox that receives mail |
+| `NEXT_PUBLIC_CONTACT_URL` | Optional https contact page; without either variable the CTA links the LinkedIn profile |
 | `ANTHROPIC_API_KEY` | Triage, translation and reply suggestions |
 | `OPENAI_API_KEY` | Optional RAG embeddings |
 | `CRON_SECRET` | Fail-closed SLA cron authentication |
