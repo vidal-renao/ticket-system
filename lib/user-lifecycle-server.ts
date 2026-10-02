@@ -1,5 +1,5 @@
 import type { createServiceClientStatic } from "@/lib/supabase/server";
-import { banDurationFor } from "@/lib/user-lifecycle";
+import { banDurationFor, type buildAccountAuditEntry } from "@/lib/user-lifecycle";
 
 type ServiceClient = ReturnType<typeof createServiceClientStatic>;
 
@@ -73,4 +73,26 @@ export async function setAccountFrozen(
   }
 
   return { ok: true };
+}
+
+/**
+ * Write the audit row for an account action that has already happened.
+ *
+ * Never fails the request: the freeze or deletion is done, and answering with
+ * an error now would tell the administrator it was not. A missing row is
+ * logged loudly instead, with ids only -- never an email or a name.
+ */
+export async function recordAccountLifecycle(
+  svc: ServiceClient,
+  entry: ReturnType<typeof buildAccountAuditEntry>
+): Promise<void> {
+  const { error } = await svc.from("hd_ticket_audit_logs").insert(entry);
+  if (error) {
+    console.error("[user-lifecycle] audit entry failed", {
+      action: entry.action,
+      targetId: entry.resource_id,
+      actorId: entry.actor_id,
+      message: error.message,
+    });
+  }
 }
