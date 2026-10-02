@@ -6,6 +6,10 @@
 
 - Freezing, unfreezing, deleting and restoring an account now writes a row to `hd_ticket_audit_logs` (`resource_type: "user"`, actions `user.frozen`, `user.unfrozen`, `user.deleted`, `user.restored`) naming the administrator, the target account id and role, and the before/after `is_active` / deleted state. Until now a freeze left no record of who applied it: the only trace was the ban timestamp in GoTrue. The row carries ids and role only, no email or name, because the table is readable by every staff member of the organization. The rows appear in the `/ops` activity feed with the other audit events. A failed audit write is logged and does not fail the request, because the account action has already happened. No migration: the table and its RLS are unchanged.
 
+### Fixed
+
+- `/ops` would have stopped showing SLA compliance from 2026-10-03. It parsed the percentage from the daily report subject ("N% compliance"), and vidal-helpdesk-mcp now writes "N% SLA" or "SLA not measured". The parser (`lib/ops/audit-subject.ts`, now tested) reads both formats. "SLA not measured" reads as no value instead of a number.
+
 ## Unreleased — Password recovery
 
 ### Fixed
