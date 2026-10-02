@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
-import { setAccountFrozen } from "@/lib/user-lifecycle-server";
+import { recordAccountLifecycle, setAccountFrozen } from "@/lib/user-lifecycle-server";
 import {
   REFUSAL_MESSAGE,
   REFUSAL_STATUS,
+  buildAccountAuditEntry,
   canAdministerUser,
 } from "@/lib/user-lifecycle";
 
@@ -52,7 +53,7 @@ export async function POST(
 
   const { data: target } = await svc
     .from("hd_profiles")
-    .select("id, role, organization_id, deleted_at")
+    .select("id, role, organization_id, deleted_at, is_active")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -134,6 +135,19 @@ export async function POST(
     }
     return NextResponse.json({ error: "Could not update the account" }, { status: 500 });
   }
+
+  await recordAccountLifecycle(
+    svc,
+    buildAccountAuditEntry({
+      action,
+      organizationId,
+      actorId: user.id,
+      actorRole: actor!.role,
+      targetId,
+      targetRole: permission.role,
+      wasActive: target!.is_active !== false,
+    })
+  );
 
   return NextResponse.json({
     ok: true,
