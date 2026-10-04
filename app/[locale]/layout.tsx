@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { NextIntlClientProvider, hasLocale } from "next-intl";
+import { notFound } from "next/navigation";
+import { getMessages, getTranslations } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
 import { HtmlLang } from "@/components/layout/HtmlLang";
@@ -31,8 +32,11 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "landing" });
   return {
-    title: { default: "HelpDesk AI", template: "%s | HelpDesk AI" },
+    // `absolute` so the root layout's "%s | HelpDesk AI" template is not
+    // applied on top of this one, which produced "HelpDesk AI | HelpDesk AI".
+    title: { absolute: `HelpDesk AI · ${t("heroLabel")}`, template: "%s | HelpDesk AI" },
     description: JSON_LD_DESCRIPTIONS[locale] ?? JSON_LD_DESCRIPTIONS.en,
     metadataBase: new URL(APP_URL),
     openGraph: {
@@ -52,6 +56,9 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  // Any first segment matches [locale]; without this, /manifest.webmanifest or
+  // /fr rendered the German landing page with a 200.
+  if (!hasLocale(routing.locales, locale)) notFound();
   const messages = await getMessages();
 
   const jsonLd = {

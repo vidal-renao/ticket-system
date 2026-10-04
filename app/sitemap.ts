@@ -1,21 +1,21 @@
 import type { MetadataRoute } from "next";
 import { appUrl } from "@/lib/app-url";
+import { localeAlternates, localeRootPath } from "@/lib/seo";
+import { routing } from "@/i18n/routing";
 
-const BASE_URL = appUrl();
-const LOCALES = ["de", "en", "es"] as const;
-
+// Only pages an anonymous visitor can read. Sign-in screens are noindex and
+// the application routes redirect to /login, so listing either would only
+// hand crawlers a redirect.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const publicRoutes = ["", "/home", "/login", "/register"] as const;
-  const appRoutes = ["/tickets", "/queue", "/dashboard"] as const;
+  const base = appUrl();
+  const languages = Object.fromEntries(
+    Object.entries(localeAlternates()).map(([lang, path]) => [lang, `${base}${path}`])
+  );
 
-  return LOCALES.flatMap((locale) => {
-    const prefix = locale === "de" ? "" : `/${locale}`;
-
-    return [...publicRoutes, ...appRoutes].map((route) => ({
-      url: `${BASE_URL}${prefix}${route}`,
-      lastModified: new Date(),
-      changeFrequency: route === "" ? "weekly" : "daily",
-      priority: route === "" ? 1 : route === "/login" || route === "/register" ? 0.6 : 0.8,
-    }));
-  });
+  return routing.locales.map((locale) => ({
+    url: `${base}${localeRootPath(locale)}`,
+    changeFrequency: "monthly",
+    priority: locale === routing.defaultLocale ? 1 : 0.8,
+    alternates: { languages },
+  }));
 }

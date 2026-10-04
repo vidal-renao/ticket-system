@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { getTranslations } from "next-intl/server";
+import { AUTH_SCREEN_ROBOTS } from "@/lib/seo";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Zap } from "lucide-react";
 
@@ -10,7 +11,7 @@ interface Props {
 
 export async function generateMetadata() {
   const t = await getTranslations("auth");
-  return { title: t("signIn") };
+  return { title: t("signIn"), robots: AUTH_SCREEN_ROBOTS };
 }
 
 export default async function LoginPage({ searchParams }: Props) {

@@ -2,6 +2,7 @@ import createIntlMiddleware from "next-intl/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { routing } from "@/i18n/routing";
+import { bypassesMiddleware } from "@/lib/public-paths";
 
 const handleI18nRouting = createIntlMiddleware(routing);
 
@@ -11,13 +12,8 @@ const AUTH_PATHS = ["/login", "/register", "/home", "/forgot-password", "/reset-
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // API routes and static assets must bypass i18n/auth middleware.
-  if (
-    path.startsWith("/api/") ||
-    path.startsWith("/_next/") ||
-    path.startsWith("/favicon") ||
-    /\.(?:svg|png|jpg|jpeg|gif|webp|ico)$/.test(path)
-  ) {
+  // API routes, static assets and metadata routes bypass i18n/auth middleware.
+  if (bypassesMiddleware(path)) {
     return NextResponse.next();
   }
 
@@ -76,7 +72,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Keep in step with lib/public-paths.ts.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|icon$|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

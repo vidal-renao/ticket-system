@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+  async rewrites() {
+    // Browsers and crawlers still ask for /favicon.ico by convention; without
+    // this it fell through to the locale router and returned the landing HTML.
+    return [{ source: "/favicon.ico", destination: "/icon" }];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

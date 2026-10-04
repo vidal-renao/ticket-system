@@ -132,6 +132,13 @@ body {
   opacity: 0.025;
 }
 
+/* A link sitting on the form surface, which is white in day mode:
+   indigo-400 there measured below 4.5:1. */
+.auth-inline-link { color: var(--color-brand-300); }
+.auth-inline-link:hover { color: var(--color-brand-200); }
+:root[data-theme="light"] .auth-inline-link { color: var(--color-brand-600); }
+:root[data-theme="light"] .auth-inline-link:hover { color: var(--color-brand-700); }
+
 .login-glass-card {
   background: rgba(255, 255, 255, 0.03);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
@@ -155,7 +162,22 @@ body {
   outline-offset: 3px;
 }
 
+/* The landing page is dark by design: its gradients and control panel are
+   fixed colours. It therefore pins the dark surface/text scale for itself;
+   otherwise day mode (above) flips the text to #101827 over #07101d and the
+   headline drops to 1.07:1 contrast. Values mirror the @theme defaults. */
 .landing-shell {
+  color-scheme: dark;
+  --color-surface-950: #07101d;
+  --color-surface-900: #0b1626;
+  --color-surface-850: #0e1b2d;
+  --color-surface-800: #122137;
+  --color-surface-700: #172a43;
+  --color-surface-600: #263b57;
+  --color-surface-500: #36506e;
+  --color-text-primary:   #f4f7fb;
+  --color-text-secondary: #a9b8ca;
+  --color-text-muted:     #71839a;
   background:
     radial-gradient(circle at 76% 8%, rgba(47, 111, 237, 0.14), transparent 32rem),
     linear-gradient(180deg, #07101d 0%, #081321 52%, #07101d 100%);

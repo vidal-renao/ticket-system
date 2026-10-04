@@ -16,6 +16,7 @@ import { getTranslations } from "next-intl/server";
 import { LandingNav } from "./LandingNav";
 import { AnimatedFeatureGrid } from "./AnimatedFeatureGrid";
 import { AnimatedSection } from "./AnimatedSection";
+import { GITHUB_URL, LINKEDIN_URL, publicContact } from "@/lib/public-contact";
 
 interface LandingPageProps {
   locale: string;
@@ -38,7 +39,7 @@ const CONTROL_COPY: Record<string, {
   builtFor: string;
 }> = {
   de: {
-    eyebrow: "Live-Arbeitsablauf",
+    eyebrow: "Beispielansicht",
     panelTitle: "Support-Leitstand",
     panelStatus: "Betriebsbereit",
     queue: "Aktive Warteschlange",
@@ -53,7 +54,7 @@ const CONTROL_COPY: Record<string, {
     builtFor: "Für Supportteams mit klaren Verantwortlichkeiten",
   },
   en: {
-    eyebrow: "Live workflow",
+    eyebrow: "Example view",
     panelTitle: "Support control room",
     panelStatus: "Operational",
     queue: "Active queue",
@@ -68,7 +69,7 @@ const CONTROL_COPY: Record<string, {
     builtFor: "For support teams with explicit ownership",
   },
   es: {
-    eyebrow: "Flujo en directo",
+    eyebrow: "Vista de ejemplo",
     panelTitle: "Centro de control",
     panelStatus: "Operativo",
     queue: "Cola activa",
@@ -92,8 +93,11 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
   const prefix = locale === "de" ? "" : `/${locale}`;
   const loginHref = `${prefix}/login`;
   const dashboardHref = `${prefix}/dashboard`;
-  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contact@vidallab.ch";
-  const demoHref = `mailto:${contactEmail}?subject=${encodeURIComponent("HelpDesk AI product demo")}`;
+  const contact = publicContact();
+  const contactLink = contact.kind === "profile"
+    ? { href: contact.href, target: "_blank", rel: "noreferrer" }
+    : { href: contact.href };
+  const contactLabel = contact.kind === "email" ? t("ctaPrimary") : t("ctaContact");
 
   const features = FEATURE_ICONS.map((iconName, index) => ({
     iconName,
@@ -114,13 +118,18 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
 
   return (
     <div className="landing-shell min-h-screen text-[var(--color-text-primary)]">
+      {/* Below-the-fold reveals start hidden until hydration; without
+          JavaScript they would stay hidden, so show them outright. */}
+      <noscript>
+        <style>{"[data-reveal]{opacity:1!important;transform:none!important}"}</style>
+      </noscript>
       <LandingNav locale={locale} isLoggedIn={isLoggedIn} />
 
       <main>
         <section className="relative overflow-hidden px-5 pb-20 pt-28 sm:px-8 lg:pb-28 lg:pt-36">
           <div className="landing-grid absolute inset-0" aria-hidden="true" />
           <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.92fr_1.08fr]">
-            <AnimatedSection className="relative z-10 max-w-2xl">
+            <div className="relative z-10 max-w-2xl">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--color-brand-400)]/25 bg-[var(--color-brand-500)]/8 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-200)]">
                 <span className="status-pulse h-2 w-2 rounded-full bg-[var(--color-success)]" />
                 {t("heroLabel")}
@@ -135,8 +144,8 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
                 {t("heroSub")}
               </p>
               <div className="mt-9 flex flex-wrap gap-3">
-                <a href={isLoggedIn ? dashboardHref : demoHref} className="control-cta control-cta-primary">
-                  {isLoggedIn ? t("ctaDashboard") : t("ctaPrimary")}
+                <a {...(isLoggedIn ? { href: dashboardHref } : contactLink)} className="control-cta control-cta-primary">
+                  {isLoggedIn ? t("ctaDashboard") : contactLabel}
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </a>
                 {!isLoggedIn && (
@@ -145,9 +154,9 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
                   </Link>
                 )}
               </div>
-            </AnimatedSection>
+            </div>
 
-            <AnimatedSection delay={0.12} className="relative z-10">
+            <div className="relative z-10">
               <div className="control-panel overflow-hidden rounded-[1.6rem] border border-white/10">
                 <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
                   <div>
@@ -193,7 +202,7 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
                   ))}
                 </div>
               </div>
-            </AnimatedSection>
+            </div>
           </div>
         </section>
 
@@ -265,10 +274,12 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
               <div>
                 <Sparkles className="h-5 w-5 text-[var(--color-brand-200)]" aria-hidden="true" />
                 <h2 className="font-display mt-5 text-4xl font-semibold tracking-[-0.035em]">{t("footerCtaTitle")}</h2>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--color-text-secondary)]">{t("footerCtaSub")}</p>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--color-text-secondary)]">
+                  {contact.kind === "email" ? t("footerCtaSub") : t("footerCtaSubContact")}
+                </p>
               </div>
-              <a href={demoHref} className="control-cta control-cta-primary">
-                {t("footerCtaBtn")}
+              <a {...contactLink} className="control-cta control-cta-primary">
+                {contact.kind === "email" ? t("footerCtaBtn") : contactLabel}
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </a>
             </div>
@@ -279,13 +290,13 @@ export async function LandingPage({ locale, isLoggedIn = false }: LandingPagePro
       <footer className="px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-white/8 pt-8 text-xs text-[var(--color-text-muted)] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-brand-500)] text-white"><Zap className="h-3 w-3" /></span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--color-brand-500)] text-white"><Zap className="h-3 w-3" aria-hidden="true" /></span>
             <span>{t("footerCopy")}</span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <Link href={loginHref} className="hover:text-[var(--color-text-primary)]">{t("footerLogin")}</Link>
-            <a href="https://github.com/vidal-renao" target="_blank" rel="noreferrer" className="hover:text-[var(--color-text-primary)]">{t("footerGitHub")}</a>
-            <a href="https://linkedin.com/in/vidalrenao" target="_blank" rel="noreferrer" className="hover:text-[var(--color-text-primary)]">{t("footerLinkedIn")}</a>
+            <Link href={loginHref} className="inline-flex min-h-6 items-center hover:text-[var(--color-text-primary)]">{t("footerLogin")}</Link>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center hover:text-[var(--color-text-primary)]">{t("footerGitHub")}</a>
+            <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center hover:text-[var(--color-text-primary)]">{t("footerLinkedIn")}</a>
             <span className="inline-flex items-center gap-1.5 text-[var(--color-success)]"><Globe2 className="h-3 w-3" />{t("footerDsg")}</span>
           </div>
         </div>
