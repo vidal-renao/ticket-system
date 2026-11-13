@@ -67,12 +67,10 @@ export function canReadInternalComments(role: string | null | undefined): boolea
   return role === "agent" || role === "manager" || role === "admin";
 }
 
-export function applyCommentVisibilityScope(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  query: any,
+export function applyCommentVisibilityScope<Q extends { eq(column: string, value: boolean): Q }>(
+  query: Q,
   role: string | null | undefined
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any {
+): Q {
   return canReadInternalComments(role) ? query : query.eq("is_internal", false);
 }
 
