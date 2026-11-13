@@ -218,7 +218,6 @@ export default async function TicketsPage({
     ((staffProfileRows ?? []) as { id: string; full_name: string | null; specialty: string | null }[]).map((row) => [row.id, row])
   );
 
-  const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const availableCategories = [...new Set(Object.values(aiCategoryMap).filter((value): value is string => Boolean(value)))].sort();
   const visibleStaffTickets = staffTickets.filter((ticket) =>
     matchesTicketQuery(filters.q, [
@@ -290,8 +289,8 @@ export default async function TicketsPage({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {profile.role === "agent"
-                  ? `${profile.full_name?.trim() || "Agent"} · ${companyCode}`
-                  : `${organization?.name ?? "Organization"} · ${companyCode}`}
+                  ? profile.full_name?.trim() || "Agent"
+                  : companyContextByCreator[user.id]?.company_name ?? organization?.name ?? "Organization"}
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
                 {profile.role === "agent"
@@ -457,7 +456,7 @@ export default async function TicketsPage({
                           <Link href={ticketPath} className="block text-sm text-[var(--color-text-primary)] transition-colors hover:text-indigo-300">
                             <span className="block truncate">{ticket.title}</span>
                             <span className="mt-1 block text-[11px] text-[var(--color-text-muted)]">
-                              {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                              {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyContext?.sector ?? "General"}
                             </span>
                           </Link>
                         </td>
@@ -530,7 +529,7 @@ export default async function TicketsPage({
                           <p className="mb-1 text-xs font-mono text-indigo-400">{formatTicketRef(ticket.ticket_number)}</p>
                           <p className="truncate text-sm font-medium text-[var(--color-text-primary)]">{ticket.title}</p>
                           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyContext?.sector ?? "General"}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
@@ -594,7 +593,7 @@ export default async function TicketsPage({
                         <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">{ticket.title}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-3">
                           <span className="text-[11px] text-[var(--color-text-muted)]">
-                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyCode} · {companyContext?.sector ?? "General"}
+                            {(companyContext?.company_name ?? organization?.name ?? "Organization")} · {companyContext?.sector ?? "General"}
                           </span>
                           {awaitingAvailability ? (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
