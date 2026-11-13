@@ -199,6 +199,21 @@
     "description": "Description",
     "slaDeadline": "SLA Deadline",
     "slaBreached": "SLA breached",
+    "sla": {
+      "response": "Response",
+      "resolution": "Resolution",
+      "responded": "Responded",
+      "respondedLate": "Responded late",
+      "resolvedOnTime": "Resolved on time",
+      "resolvedLate": "Resolved late",
+      "overdue": "Overdue",
+      "badge": {
+        "onTime": "On time",
+        "atRisk": "At risk",
+        "breached": "Breached",
+        "met": "SLA met"
+      }
+    },
     "piiWarning": "PII",
     "aiTriage": "AI Triage",
     "aiProcessing": "Processing...",
@@ -215,6 +230,9 @@
     "confirmDone": "Thank you! Ticket closed.",
     "reopenHint": "Issue not resolved?",
     "autoCloseNote": "Without a response, the ticket closes automatically 48h after resolution.",
+    "closedNote": "This ticket is closed. Open a new ticket if you need more help.",
+    "closedNewTicket": "New ticket",
+    "aiSuggestUnavailable": "AI suggestion is not available right now. Please write the reply yourself.",
     "aiReanalyze": "Re-run AI triage",
     "aiReanalyzing": "Running…",
     "aiReanalyzeDone": "AI triage completed",
@@ -250,6 +268,8 @@
   "aiChat": {
     "title": "AI Support Assistant",
     "statusNoAgents": "No agents available — AI Assistant active",
+    "statusUnavailable": "No agents available right now",
+    "unavailable": "The assistant is not available right now. A specialist will answer your ticket.",
     "statusAgentOnline": "An agent is now available",
     "placeholder": "Describe your issue...",
     "send": "Send",
