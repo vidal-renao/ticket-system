@@ -1,5 +1,6 @@
 import { createServiceClientStatic } from "@/lib/supabase/server";
 import { runAITriage } from "@/lib/ai/triage-runner";
+import { TRIAGE_STALE_AFTER_MINUTES } from "@/lib/ai/triage-constants";
 
 /**
  * Recovery sweep for tickets whose AI triage never landed.
@@ -13,8 +14,7 @@ import { runAITriage } from "@/lib/ai/triage-runner";
  * This makes the gap self-healing instead of permanent.
  */
 
-/** Triage itself times out at 30s, so anything older is not still in flight. */
-export const TRIAGE_STALE_AFTER_MINUTES = 15;
+export { TRIAGE_STALE_AFTER_MINUTES };
 
 /**
  * Bounded per run: the sweep shares the cron's 60s budget with the SLA pass and

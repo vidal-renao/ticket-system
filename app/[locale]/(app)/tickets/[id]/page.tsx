@@ -22,6 +22,7 @@ import { AlertTriangle, Clock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
 import { TicketWorkflowActions } from "@/components/tickets/TicketWorkflowActions";
 import { AdminForceCloseAction } from "@/components/tickets/AdminForceCloseAction";
+import { triageDisplayState } from "@/lib/ai/metrics";
 
 export default async function TicketDetailPage({
   params,
@@ -411,10 +412,14 @@ export default async function TicketDetailPage({
             <Card>
               <CardContent className="py-3">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] mb-1">{t("aiTriage")}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">{t("aiProcessing")}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {triageDisplayState(false, ticket.created_at) === "pending_review"
+                    ? t("aiPendingReview")
+                    : t("aiProcessing")}
+                </p>
                 {/* Triage runs as a background task at creation; if it never
-                    landed the cron sweep retries within the hour, and an admin
-                    can force it from here. */}
+                    landed, the daily cron sweep retries it and an admin can
+                    force it from here. */}
                 {profile.role === "admin" && <ReanalyzeButton ticketId={ticket.id} />}
               </CardContent>
             </Card>

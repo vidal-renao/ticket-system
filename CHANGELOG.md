@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Dashboard and triage coherence
+
+### Fixed
+
+- The executive dashboard's AI Performance card was hard-coded to 0% acceptance, 0% confidence and "0 analyzed tickets". It now aggregates the tenant's `hd_ai_analysis` rows, scoped through the organization's own ticket ids, and shows "—" instead of 0% when there is no data or no staff feedback yet.
+- Failure-path placeholders written by `runAITriage` (`model_used = "n/a"`, confidence 0) no longer count as analysed tickets or pull the average confidence down. Dashboard and Analytics share one helper (`lib/ai/metrics.ts`), so both report the same figures.
+- The dashboard card titled "By Category" listed priority counts; it is now labelled "By priority" (DE/EN/ES).
+- A ticket whose triage never landed no longer shows "Processing…" indefinitely. After the stale window it reads "AI triage did not complete — manual review needed", with the existing admin re-run action. The code comment now states the real cron cadence (daily).
+
 ## Unreleased — Password recovery
 
 ### Fixed
