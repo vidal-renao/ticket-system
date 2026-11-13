@@ -147,12 +147,29 @@ export function classifyRecoveryFailure(error: {
     // 422 on the PKCE grant is GoTrue's unprocessable-entity answer, and the
     // expired flow state is the only thing that produces it here: a missing
     // flow state is 404, a mismatched verifier 403, a malformed request 400.
-    error.status === 422
+    // Only when GoTrue sent no code: updateUser also answers 422, for password
+    // rules (same_password, weak_password), and those are not link problems.
+    (error.status === 422 && code === "")
   ) {
     return "expired";
   }
 
   return "invalid";
+}
+
+/** GoTrue codes for a password the server refused on its own rules. */
+export const PASSWORD_RULE_CODES = ["same_password", "weak_password"] as const;
+export type PasswordRuleCode = (typeof PASSWORD_RULE_CODES)[number];
+
+/**
+ * A refusal of the password itself. The session is fine, so the person stays
+ * on the form and is told what to change instead of being sent back to
+ * request a new link (which, on 2026-11-13, happened three times in a row for
+ * someone who was re-entering their current password).
+ */
+export function passwordRuleViolation(error: { code?: string | null }): PasswordRuleCode | null {
+  const code = (error.code ?? "").toLowerCase();
+  return (PASSWORD_RULE_CODES as readonly string[]).includes(code) ? (code as PasswordRuleCode) : null;
 }
 
 /**

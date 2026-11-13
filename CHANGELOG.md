@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Password reset: refused password shown as expired link
+
+### Fixed
+
+- Choosing a new password equal to the current one made `/reset-password` say the link had expired. GoTrue answers `updateUser` with 422 `same_password`, and the classifier treated every 422 as an expired PKCE flow, so the person was sent to request a new link that could never work. Password-rule refusals (`same_password`, `weak_password`) now keep the form open with a specific message (DE/EN/ES); a bare 422 from the PKCE grant still reads as expired. Found in the auth log on 2026-11-13: three successful recovery logins, each followed by `same_password`.
+
 ## Unreleased — Dashboard and triage coherence
 
 ### Fixed

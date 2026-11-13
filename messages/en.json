@@ -54,6 +54,8 @@
     "resetPasswordSuccess": "Password updated successfully! Redirecting...",
     "resetPasswordError": "Could not reset password.",
     "resetPasswordChecking": "Checking your link...",
+    "resetPasswordSame": "Choose a password different from your current one.",
+    "resetPasswordWeak": "This password is too weak. Choose a longer one with letters, numbers and symbols.",
     "resetPasswordExpired": "This link has expired. For security it is only valid for a few minutes — just request a new one.",
     "resetPasswordInvalid": "This link is invalid or has already been used. Open it in the same browser you requested it from, or request a new one.",
     "resetPasswordClosed": "This account has been closed. Please contact your administrator.",
