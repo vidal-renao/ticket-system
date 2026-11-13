@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Closed-ticket comment guard in the database
+
+### Security
+
+- Migration `202611140001_closed_ticket_comment_guard.sql`: a BEFORE INSERT trigger on `hd_ticket_comments` rejects customer comments on closed tickets (SQLSTATE 23514). The API already returned 409, but `authenticated` holds INSERT and the policy did not check the status, so a direct PostgREST call could still write. Staff are unaffected; `resolved` stays open for the customer. Covered by 3 new pgTAP assertions in the tickets-write-policies CI job. Rollback in the migration header.
+
 ## Unreleased — Ticket workflow fixes from the end-to-end run
 
 Found while running TK-0081 through the full lifecycle in production on 2026-11-13.
