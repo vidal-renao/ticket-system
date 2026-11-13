@@ -11,7 +11,7 @@
 ### Fixed
 
 - `<html lang>` was hard-coded to `de` on every page and only corrected in the browser after hydration. On `/en` pages Chrome treated the page as German and machine-translated it into the viewer's language (the login appeared in Spanish). The root layout now renders the request locale on the server; the client-side `HtmlLang` patch is removed.
-- CI database jobs: installing pgTAP/pgvector from PGDG upgraded `postgresql-17` inside the pinned 17.6 container, and the running server then failed to load `plpgsql.so` (`undefined symbol`). Server and client packages are now held at the image version before extensions are installed.
+- CI database jobs: installing pgTAP/pgvector from PGDG upgrades `postgresql-17` inside the 17.6 container (current pgTAP requires > 17.12), and the still-running server then failed to load `plpgsql.so` (`undefined symbol`). The container is now restarted after the extension install, so the server runs the same build as its libraries. CI therefore tests on the newest 17.x minor rather than exactly 17.6.
 
 ## Unreleased — Password reset: refused password shown as expired link
 

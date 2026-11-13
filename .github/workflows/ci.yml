@@ -122,7 +122,22 @@ jobs:
         run: |
           set -euo pipefail
           docker exec rag-ci-postgres bash -c \
-            "apt-mark hold postgresql-17 postgresql-client-17 libpq5 && apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgvector postgresql-17-pgtap"
+            "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgvector postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart rag-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec rag-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec rag-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server; ubuntu-latest's default repo only has an older client)
         run: |
@@ -219,7 +234,22 @@ jobs:
         run: |
           set -euo pipefail
           docker exec identity-ci-postgres bash -c \
-            "apt-mark hold postgresql-17 postgresql-client-17 libpq5 && apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+            "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart identity-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec identity-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec identity-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |
@@ -327,7 +357,22 @@ jobs:
         run: |
           set -euo pipefail
           docker exec tickets-ci-postgres bash -c \
-            "apt-mark hold postgresql-17 postgresql-client-17 libpq5 && apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+            "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart tickets-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec tickets-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec tickets-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |
