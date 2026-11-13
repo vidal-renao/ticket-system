@@ -11,6 +11,7 @@ import { createRecoveryClient } from "@/lib/supabase/client";
 import {
   classifyRecoveryFailure,
   landingAfterReset,
+  passwordRuleViolation,
   readRecoveryCredentials,
   type RecoveryFlow,
   type RecoveryLinkState,
@@ -145,6 +146,11 @@ export function ResetPasswordForm() {
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
+        const rule = passwordRuleViolation(error);
+        if (rule) {
+          toast.error(t(rule === "same_password" ? "resetPasswordSame" : "resetPasswordWeak"), { duration: 6000 });
+          return;
+        }
         // The session was there a moment ago, so a failure now is either the
         // password itself or an hour-old session. Send the second case back to
         // the link screen rather than leaving them retyping into a dead form.

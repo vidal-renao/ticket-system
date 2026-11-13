@@ -54,6 +54,8 @@
     "resetPasswordSuccess": "¡Contraseña actualizada correctamente! Redirigiendo...",
     "resetPasswordError": "No se pudo restablecer la contraseña.",
     "resetPasswordChecking": "Comprobando el enlace...",
+    "resetPasswordSame": "Elige una contraseña distinta de la actual.",
+    "resetPasswordWeak": "Esta contraseña es demasiado débil. Elige una más larga con letras, números y símbolos.",
     "resetPasswordExpired": "Este enlace ha caducado. Por seguridad solo es válido unos minutos: solicita uno nuevo.",
     "resetPasswordInvalid": "Este enlace no es válido o ya se ha utilizado. Ábrelo en el mismo navegador desde el que lo solicitaste, o solicita uno nuevo.",
     "resetPasswordClosed": "Esta cuenta está cerrada. Ponte en contacto con tu administrador.",
