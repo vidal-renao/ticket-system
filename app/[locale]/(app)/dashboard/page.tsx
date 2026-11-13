@@ -20,6 +20,7 @@ import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailability
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { summarizeAiAnalysis, type AiAnalysisMetricRow } from "@/lib/ai/metrics";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -753,7 +754,8 @@ async function CustomerDashboard({
           {(recentTickets ?? []).map((ticket, i) => {
             const ticketPath = `${prefix}/tickets/${ticket.id}`;
             const updatedAt = new Date(ticket.created_at).toLocaleDateString(
-              locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB"
+              locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB",
+              { timeZone: APP_TIME_ZONE }
             );
             return (
               <Link href={ticketPath} key={ticket.id}>

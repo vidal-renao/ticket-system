@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -86,11 +87,11 @@ export function formatRelativeTime(date: string | Date): string {
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-CH", { day: "numeric", month: "short" });
+  return d.toLocaleDateString("en-CH", { timeZone: APP_TIME_ZONE, day: "numeric", month: "short" });
 }
 
 export function formatDateTime(date: string | Date): string {
-  return new Date(date).toLocaleString("en-CH", {
+  return new Date(date).toLocaleString("en-CH", { timeZone: APP_TIME_ZONE,
     day: "2-digit",
     month: "short",
     year: "numeric",
