@@ -188,6 +188,7 @@
     "avgConfidence": "Confianza media",
     "aiBasedOn": "Basado en {count} tickets analizados",
     "byCategory": "Por Categoría",
+    "byPriority": "Por prioridad",
     "teamAvailability": "Disponibilidad del Equipo",
     "noData": "Sin datos aún",
     "viewAll": "Ver todos"
@@ -199,6 +200,7 @@
     "piiWarning": "PII",
     "aiTriage": "Triage IA",
     "aiProcessing": "Procesando...",
+    "aiPendingReview": "El triage con IA no se completó: revisión manual necesaria.",
     "uncategorized": "Sin categoría",
     "internal": "Interno",
     "messagesSection": "Mensajes",

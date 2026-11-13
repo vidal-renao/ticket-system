@@ -22,6 +22,7 @@ import { AlertTriangle, Clock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
 import { TicketWorkflowActions } from "@/components/tickets/TicketWorkflowActions";
 import { AdminForceCloseAction } from "@/components/tickets/AdminForceCloseAction";
+import { triageDisplayState } from "@/lib/ai/metrics";
 
 export default async function TicketDetailPage({
   params,
@@ -107,7 +108,7 @@ export default async function TicketDetailPage({
       .order("created_at", { ascending: true }),
     svc
       .from("organizations")
-      .select("name, slug")
+      .select("name")
       .eq("id", ticket.organization_id)
       .single(),
     svc
@@ -138,7 +139,6 @@ export default async function TicketDetailPage({
     creatorCompanyInfo?.company_name?.trim() ||
     organization?.name ||
     "Organization";
-  const companyCode = organization?.slug?.toUpperCase() ?? "ORG";
   const sector = creatorCompanyInfo?.industry?.trim() || "General";
   const creatorName = creator?.full_name?.trim() || "Requester";
   const creatorInitials = getInitials(creatorName);
@@ -211,9 +211,6 @@ export default async function TicketDetailPage({
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
             {companyName}
-          </Badge>
-          <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
-            {companyCode}
           </Badge>
           <Badge className="text-[var(--color-text-secondary)] border-[var(--color-surface-600)]">
             {sector}
@@ -411,10 +408,14 @@ export default async function TicketDetailPage({
             <Card>
               <CardContent className="py-3">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] mb-1">{t("aiTriage")}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">{t("aiProcessing")}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {triageDisplayState(false, ticket.created_at) === "pending_review"
+                    ? t("aiPendingReview")
+                    : t("aiProcessing")}
+                </p>
                 {/* Triage runs as a background task at creation; if it never
-                    landed the cron sweep retries within the hour, and an admin
-                    can force it from here. */}
+                    landed, the daily cron sweep retries it and an admin can
+                    force it from here. */}
                 {profile.role === "admin" && <ReanalyzeButton ticketId={ticket.id} />}
               </CardContent>
             </Card>

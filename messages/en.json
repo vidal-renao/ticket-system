@@ -188,6 +188,7 @@
     "avgConfidence": "Avg confidence",
     "aiBasedOn": "Based on {count} analyzed tickets",
     "byCategory": "By Category",
+    "byPriority": "By priority",
     "teamAvailability": "Team Availability",
     "noData": "No data yet",
     "viewAll": "View all"
@@ -199,6 +200,7 @@
     "piiWarning": "PII",
     "aiTriage": "AI Triage",
     "aiProcessing": "Processing...",
+    "aiPendingReview": "AI triage did not complete — manual review needed.",
     "uncategorized": "Uncategorized",
     "internal": "Internal",
     "messagesSection": "Messages",

@@ -153,6 +153,7 @@
     "piiWarning": "PII",
     "aiTriage": "KI-Zuweisung",
     "aiProcessing": "Wird verarbeitet...",
+    "aiPendingReview": "KI-Triage nicht abgeschlossen – manuelle Prüfung nötig.",
     "uncategorized": "Unkategorisiert",
     "internal": "Intern",
     "messagesSection": "Nachrichten",
@@ -344,6 +345,7 @@
     "avgConfidence": "Ø Konfidenz",
     "aiBasedOn": "Basierend auf {count} analysierten Anfragen",
     "byCategory": "Nach Kategorie",
+    "byPriority": "Nach Priorität",
     "teamAvailability": "Team-Verfügbarkeit",
     "noData": "Noch keine Daten",
     "viewAll": "Alle anzeigen"
