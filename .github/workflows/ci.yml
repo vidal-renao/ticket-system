@@ -409,6 +409,7 @@ jobs:
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/tickets_write_base.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202608040001_tickets_write_policies.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202608040002_fix_customer_update_guard.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202611140001_closed_ticket_comment_guard.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/tickets_write_policies.sql | tee tickets-pgtap.log
           # "not ok" is matched unanchored: psql indents NOTICE/output lines, and
           # an anchored ^not ok once let real pgTAP failures through as green.
