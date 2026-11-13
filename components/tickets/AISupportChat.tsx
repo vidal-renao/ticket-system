@@ -26,6 +26,10 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [agentCameOnline, setAgentCameOnline] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Set after a failed answer. There is no health check on load (that would
+  // call the provider on every page view); the panel learns it on first use
+  // and from then on says so instead of claiming to be active.
+  const [unavailable, setUnavailable] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
 
   async function sendMessage() {
     const text = input.trim();
-    if (!text || isTyping) return;
+    if (!text || isTyping || unavailable) return;
 
     const userMsg: Message = { role: "user", content: text };
     const nextMessages = [...messages, userMsg];
@@ -92,6 +96,7 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
     setInput("");
     setIsTyping(true);
 
+    let assistantText = "";
     try {
       const res = await fetch("/api/ai/wiki-chat", {
         method: "POST",
@@ -100,14 +105,14 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
       });
 
       if (!res.ok || !res.body) {
-        setIsTyping(false);
-        toast.error("AI response failed. Please try again.");
+        // The response body is deliberately not shown: whatever the cause,
+        // the customer gets the same honest message.
+        setUnavailable(true);
         return;
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let assistantText = "";
 
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
@@ -124,8 +129,21 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
           return updated;
         });
       }
+    } catch {
+      setUnavailable(true);
     } finally {
       setIsTyping(false);
+    }
+
+    // A stream that ended without any text is a failure too (the route ends
+    // the stream when the provider fails mid-answer). Drop the empty bubble.
+    if (!assistantText.trim()) {
+      setUnavailable(true);
+      setMessages((prev) =>
+        prev.length > 0 && prev[prev.length - 1].role === "assistant" && !prev[prev.length - 1].content
+          ? prev.slice(0, -1)
+          : prev
+      );
     }
   }
 
@@ -151,7 +169,9 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
           <p className="text-sm font-medium text-[var(--color-text-primary)]">
             {t("title")}
           </p>
-          <p className="text-[11px] text-indigo-400">{t("statusNoAgents")}</p>
+          <p className={`text-[11px] ${unavailable ? "text-[var(--color-text-muted)]" : "text-indigo-400"}`}>
+            {unavailable ? t("statusUnavailable") : t("statusNoAgents")}
+          </p>
         </div>
         {messages.length > 0 && !saved && (
           <button
@@ -232,6 +252,15 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
           </div>
         )}
 
+        {unavailable && (
+          <p
+            role="status"
+            className="rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-3 py-2 text-xs text-[var(--color-text-secondary)]"
+          >
+            {t("unavailable")}
+          </p>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -248,15 +277,17 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
             }
           }}
           placeholder={t("placeholder")}
+          aria-label={t("placeholder")}
           className={inputClass}
-          disabled={isTyping}
+          disabled={isTyping || unavailable}
         />
         <Button
           type="button"
           size="sm"
           onClick={sendMessage}
-          disabled={!input.trim() || isTyping}
+          disabled={!input.trim() || isTyping || unavailable}
           loading={isTyping}
+          aria-label={t("send")}
         >
           <Send className="w-3.5 h-3.5" />
         </Button>

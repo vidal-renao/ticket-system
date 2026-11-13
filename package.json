@@ -25,7 +25,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.503.0",
-    "next": "15.5.27",
+    "next": "15.5.29",
     "next-intl": "4.13.2",
     "openai": "^6.34.0",
     "react": "^19.0.0",
@@ -44,13 +44,15 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.20",
+    "eslint-config-next": "15.5.29",
     "tailwindcss": "^4.1.4",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "js-yaml": "^4.3.1",
-    "nanoid": "^3.3.17"
+    "js-yaml": "^4.3.2",
+    "nanoid": "^3.3.17",
+    "source-map-js": "^1.2.2",
+    "vite": "^8.3.8"
   }
 }

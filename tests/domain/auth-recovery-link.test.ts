@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyRecoveryFailure,
   landingAfterReset,
+  passwordRuleViolation,
   readRecoveryCredentials,
 } from "../../lib/auth-recovery-link";
 import { DEFAULT_APP_URL, appUrl, normalizeOrigin } from "../../lib/app-url";
@@ -175,5 +176,26 @@ describe("the one answer for this deployment's origin", () => {
     );
     expect(normalizeOrigin("ticket-system-sigma-pink.vercel.app")).toBe(DEFAULT_APP_URL);
     expect(normalizeOrigin("  https://a.ch//  ")).toBe("https://a.ch");
+  });
+});
+
+describe("a refused password is not an expired link", () => {
+  it("does not read same_password (422) as an expired link", () => {
+    const error = { code: "same_password", message: "New password should be different from the old password.", status: 422 };
+    expect(classifyRecoveryFailure(error)).not.toBe("expired");
+    expect(passwordRuleViolation(error)).toBe("same_password");
+  });
+
+  it("recognises weak_password", () => {
+    expect(passwordRuleViolation({ code: "weak_password" })).toBe("weak_password");
+  });
+
+  it("still reads a bare 422 from the PKCE grant as expired", () => {
+    expect(classifyRecoveryFailure({ status: 422 })).toBe("expired");
+  });
+
+  it("ignores codes that are not password rules", () => {
+    expect(passwordRuleViolation({ code: "otp_expired" })).toBeNull();
+    expect(passwordRuleViolation({})).toBeNull();
   });
 });

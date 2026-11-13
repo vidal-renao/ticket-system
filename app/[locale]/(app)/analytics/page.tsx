@@ -6,6 +6,7 @@ import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { BarChart3, Zap, AlertCircle, ShieldAlert, Clock, Timer, CheckCircle2, Target } from "lucide-react";
 import { formatTicketRef, sentimentIcon } from "@/lib/utils";
 import type { SentimentType, TicketPriority } from "@/lib/supabase/types";
+import { summarizeAiAnalysis } from "@/lib/ai/metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -77,9 +78,9 @@ export default async function AnalyticsPage({
       .in("status", ["open", "in_progress"]),
     ticketIds.length > 0
       ? svc.from("hd_ai_analysis")
-          .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected")
+          .select("ticket_id, sentiment, confidence_score, category_accepted, contains_pii_detected, model_used")
           .in("ticket_id", ticketIds)
-      : Promise.resolve({ data: [] as { ticket_id: string; sentiment: string | null; confidence_score: number | null; category_accepted: boolean | null; contains_pii_detected: boolean }[] }),
+      : Promise.resolve({ data: [] as { ticket_id: string; sentiment: string | null; confidence_score: number | null; category_accepted: boolean | null; contains_pii_detected: boolean; model_used: string | null }[] }),
   ]);
 
   // Compute sentiment distribution
@@ -87,27 +88,19 @@ export default async function AnalyticsPage({
     calm: 0, neutral: 0, frustrated: 0, urgent: 0, angry: 0,
   };
   let totalAI = 0, totalPIIDetected = 0;
-  let totalConfidence = 0, confidenceCount = 0;
-  let categoryAccepted = 0, feedbackTotal = 0;
 
   for (const ai of aiRows ?? []) {
     totalAI++;
     if (ai.sentiment && ai.sentiment in sentimentCounts) {
       sentimentCounts[ai.sentiment as SentimentType]++;
     }
-    if (ai.confidence_score != null) {
-      totalConfidence += ai.confidence_score;
-      confidenceCount++;
-    }
     if (ai.contains_pii_detected) totalPIIDetected++;
-    if (ai.category_accepted !== null && ai.category_accepted !== undefined) {
-      feedbackTotal++;
-      if (ai.category_accepted) categoryAccepted++;
-    }
   }
 
-  const avgConfidence   = confidenceCount > 0 ? Math.round(totalConfidence / confidenceCount) : 0;
-  const catAccuracyRate = feedbackTotal   > 0 ? Math.round((categoryAccepted / feedbackTotal) * 100) : 0;
+  // Same aggregation as the dashboard; failure placeholders are excluded.
+  const aiSummary       = summarizeAiAnalysis(aiRows ?? []);
+  const avgConfidence   = aiSummary.avgConfidence ?? 0;
+  const catAccuracyRate = aiSummary.acceptanceRate ?? 0;
   const maxSentiment    = Math.max(...Object.values(sentimentCounts), 1);
 
   // ITIL/ITSM metrics

@@ -10,6 +10,55 @@
 
 - `/ops` would have stopped showing SLA compliance from 2026-10-03. It parsed the percentage from the daily report subject ("N% compliance"), and vidal-helpdesk-mcp now writes "N% SLA" or "SLA not measured". The parser (`lib/ops/audit-subject.ts`, now tested) reads both formats. "SLA not measured" reads as no value instead of a number.
 
+## Unreleased — Ticket workflow fixes from the end-to-end run
+
+Found while running TK-0081 through the full lifecycle in production on 2026-11-13.
+
+### Security
+
+- Customers received internal notes in the ticket page payload. The page loads comments with the service client (RLS bypassed) and only the browser component hid internal ones. The query now excludes `is_internal` notes for every non-staff role (`applyCommentVisibilityScope`, fails closed). The realtime refetch in the browser was already protected by the `ticket_comments_read_authorized` policy.
+- AI provider errors no longer reach the browser: "AI Suggest Response" showed the raw provider message (billing state, request id) in a toast. Both AI features now return a generic error; the server log records stage, HTTP status and error class only.
+
+### Fixed
+
+- Presence showed an active agent as "Offline". The app shell marked the profile offline on `beforeunload`, which also fires on every reload and full-page navigation, and the heartbeat never restores the declared status — so one reload meant "Offline" until the next login. The unload beacon is removed; a closed tab still drops to offline after the 3-minute heartbeat window. Agents already affected recover at their next login or with the availability toggle in Settings.
+- The SLA card kept counting after the SLA was met: the Response countdown (with warning icon) ran on after the first response, and both countdowns ran on after resolution/closure. Finished targets now read "Responded" / "Resolved on time" (or late) with the time, and the header badge shows the final outcome ("SLA met" or "Breached"). Logic in `lib/sla-display.ts`, strings DE/EN/ES.
+- A closed ticket still offered the customer the reply box and "AI Support Assistant — No agents available — AI Assistant active". It now shows "This ticket is closed. Open a new ticket if you need more help." with a link to New Ticket, and no assistant. `POST /api/comments` and the AI-chat save reject customer comments on closed tickets (409). Resolved tickets keep the reply and Confirm/Reopen flow.
+- The customer AI assistant said "AI Assistant active" while the provider could not answer. On failure it now says "The assistant is not available right now. A specialist will answer your ticket." and disables its input. The route fails closed when no API key is configured. No provider call is made on page load.
+- Ticket page refresh after workflow actions: the page is now `force-dynamic` like the other authenticated pages, comments refresh the page (the first public reply stops the SLA response clock), the comment list takes the refreshed server data, and agent controls show a pending indicator until the refreshed render commits.
+
+## Unreleased — Security patch, page language and CI
+
+### Security
+
+- `next` 15.5.21 → 15.5.29 (patch release). Fixes the critical npm-audit finding, including unauthenticated RCE in the Image Optimization API with AVIF files. `eslint-config-next` aligned.
+- Overrides raised for `js-yaml` (^4.3.2), `source-map-js` (^1.2.2) and `vite` (^8.3.8, dev only).
+- `zod` stays on 3.x and is added to the dated triaged list in CI: the only fix is zod 4 (major, and `openai@6` still depends on zod 3).
+
+### Fixed
+
+- `<html lang>` was hard-coded to `de` on every page and only corrected in the browser after hydration. On `/en` pages Chrome treated the page as German and machine-translated it into the viewer's language (the login appeared in Spanish). The root layout now renders the request locale on the server; the client-side `HtmlLang` patch is removed.
+- CI database jobs: installing pgTAP/pgvector from PGDG upgrades `postgresql-17` inside the 17.6 container (current pgTAP requires > 17.12), and the still-running server then failed to load `plpgsql.so` (`undefined symbol`). The container is now restarted after the extension install, so the server runs the same build as its libraries. CI therefore tests on the newest 17.x minor rather than exactly 17.6.
+
+## Unreleased — Password reset: refused password shown as expired link
+
+### Fixed
+
+- Choosing a new password equal to the current one made `/reset-password` say the link had expired. GoTrue answers `updateUser` with 422 `same_password`, and the classifier treated every 422 as an expired PKCE flow, so the person was sent to request a new link that could never work. Password-rule refusals (`same_password`, `weak_password`) now keep the form open with a specific message (DE/EN/ES); a bare 422 from the PKCE grant still reads as expired. Found in the auth log on 2026-11-13: three successful recovery logins, each followed by `same_password`.
+
+## Unreleased — Dashboard and triage coherence
+
+### Fixed
+
+- The executive dashboard's AI Performance card was hard-coded to 0% acceptance, 0% confidence and "0 analyzed tickets". It now aggregates the tenant's `hd_ai_analysis` rows, scoped through the organization's own ticket ids, and shows "—" instead of 0% when there is no data or no staff feedback yet.
+- Failure-path placeholders written by `runAITriage` (`model_used = "n/a"`, confidence 0) no longer count as analysed tickets or pull the average confidence down. Dashboard and Analytics share one helper (`lib/ai/metrics.ts`), so both report the same figures.
+- The dashboard card titled "By Category" listed priority counts; it is now labelled "By priority" (DE/EN/ES).
+- A ticket whose triage never landed no longer shows "Processing…" indefinitely. After the stale window it reads "AI triage did not complete — manual review needed", with the existing admin re-run action. The code comment now states the real cron cadence (daily).
+- A failed triage stored the AI provider's raw error in `reasoning` (billing state, request id), and staff could read it in the ticket. The row now stores a generic reason (timeout or provider error); the full error stays in the server log only (AGENTS.md rule 10).
+- The AI Triage panel showed the failure placeholders (category "Other", 0% confidence, ~24h ETA) as if they were suggestions. A failed run now shows "Unavailable" and asks for a manual review. Existing failure rows are covered by the same check, so no data migration is needed.
+- Ticket headers, ticket rows and the agent workspace showed the tenant slug (e.g. "VIDAL-REAL-ESTATE") as a company code. In this single-tenant deployment it carried no information for staff and confused customers, so it is no longer shown. The customer portal header now names the customer's own company instead of the support organization. The slug itself is unchanged (it identifies the canonical tenant, ADR-015).
+- Completed chain-of-custody stages had no colour: `--color-signal-blue` was used by the progress bar, ticket references and the workflow panel but was never declared. It is now declared in `app/globals.css`.
+
 ## Unreleased — Password recovery
 
 ### Fixed
