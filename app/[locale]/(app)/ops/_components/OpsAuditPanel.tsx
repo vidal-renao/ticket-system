@@ -5,6 +5,7 @@ import { CalendarClock, MailCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import type { OpsAuditSummary } from "@/lib/ops/types";
 import { EmptyState, MonoText, Panel } from "./primitives";
 import { MONO, OPS } from "./tokens";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 function Sparkline({ points }: { points: number[] }) {
   if (points.length < 2) return null;
@@ -91,7 +92,7 @@ export function OpsAuditPanel({
 
   const formatDateTime = (iso: string | null) =>
     iso
-      ? new Date(iso).toLocaleString(locale, {
+      ? new Date(iso).toLocaleString(locale, { timeZone: APP_TIME_ZONE,
           day: "2-digit",
           month: "short",
           year: "numeric",

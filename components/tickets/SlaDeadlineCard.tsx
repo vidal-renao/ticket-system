@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SlaCountdown } from "@/components/tickets/SlaCountdown";
 import type { SlaDisplay, SlaOverallState, SlaTargetDisplay } from "@/lib/sla-display";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 const BADGE: Record<SlaOverallState, { key: "onTime" | "atRisk" | "breached" | "met"; className: string; Icon: typeof Clock }> = {
   on_time: { key: "onTime", className: "text-green-400 bg-green-400/10 border-green-400/20", Icon: Clock },
@@ -16,6 +17,7 @@ const BADGE: Record<SlaOverallState, { key: "onTime" | "atRisk" | "breached" | "
 
 function formatTimestamp(value: string, locale: string): string {
   return new Date(value).toLocaleString(`${locale}-CH`, {
+    timeZone: APP_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "2-digit",

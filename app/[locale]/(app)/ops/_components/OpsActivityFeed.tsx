@@ -20,6 +20,7 @@ import { PresenceMark } from "@/components/presence/PresenceMark";
 import type { EffectivePresence } from "@/lib/presence";
 import { EmptyState, MonoText, Tag } from "./primitives";
 import { EVENT_COLOR, MONO, OPS, PRIORITY_COLOR } from "./tokens";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 const EVENT_ICON: Record<OpsEventKind, typeof TicketIcon> = {
   created: TicketIcon,
@@ -155,7 +156,7 @@ export function OpsActivityFeed({
                     />
                   )}
                   {actor ? `${actor} · ` : ""}
-                  {new Date(event.at).toLocaleString(locale, {
+                  {new Date(event.at).toLocaleString(locale, { timeZone: APP_TIME_ZONE,
                     day: "2-digit",
                     month: "short",
                     hour: "2-digit",

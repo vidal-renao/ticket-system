@@ -10,6 +10,13 @@
 
 - `/ops` would have stopped showing SLA compliance from 2026-10-03. It parsed the percentage from the daily report subject ("N% compliance"), and vidal-helpdesk-mcp now writes "N% SLA" or "SLA not measured". The parser (`lib/ops/audit-subject.ts`, now tested) reads both formats. "SLA not measured" reads as no value instead of a number.
 
+## Unreleased — Swiss display time and honest new-ticket copy
+
+### Fixed
+
+- Timestamps were formatted in the runtime's zone: UTC on the server, local in the browser. On TK-0084 the same first response read "13 Nov, 23:38" after a full load and "14 Nov, 00:38" after a client refresh. All `toLocale*` calls now use `APP_TIME_ZONE` (`Europe/Zurich`, `lib/datetime.ts`).
+- The new-ticket form promised that "our AI will prioritize and route it automatically". With the AI service unavailable that was not true; the copy (DE/EN/ES) now says the request is prioritized and routed to a specialist, and that AI classification applies when the service is available.
+
 ## Unreleased — Closed-ticket comment guard in the database
 
 ### Security
