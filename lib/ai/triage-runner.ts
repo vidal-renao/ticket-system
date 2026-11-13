@@ -7,6 +7,7 @@ import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { buildSlaDeadlinePatch, getSlaPolicyForTicket } from "@/lib/sla";
 import { notifyTicketAssigned } from "@/lib/notifications";
 import { shouldApplyAiPriority } from "@/lib/ai/triage-policy";
+import { TRIAGE_FAILED_MODEL, triageFailureReasoning } from "@/lib/ai/triage-constants";
 import { routeTicket, ROUTING_AWAITING_AVAILABILITY, type RoutingCandidate } from "@/lib/ticket-routing";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
@@ -175,9 +176,9 @@ export async function runAITriage(
       keywords: [],
       smart_response: "",
       estimated_resolution_hours: 24,
-      reasoning: `Triage failed: ${err instanceof Error ? err.message : String(err)}`,
+      reasoning: triageFailureReasoning(err),
       contains_pii_detected: false,
-      model_used: "n/a",
+      model_used: TRIAGE_FAILED_MODEL,
       input_tokens: 0,
       output_tokens: 0,
       processing_time_ms: 0,

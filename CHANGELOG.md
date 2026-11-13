@@ -8,6 +8,8 @@
 - Failure-path placeholders written by `runAITriage` (`model_used = "n/a"`, confidence 0) no longer count as analysed tickets or pull the average confidence down. Dashboard and Analytics share one helper (`lib/ai/metrics.ts`), so both report the same figures.
 - The dashboard card titled "By Category" listed priority counts; it is now labelled "By priority" (DE/EN/ES).
 - A ticket whose triage never landed no longer shows "Processing…" indefinitely. After the stale window it reads "AI triage did not complete — manual review needed", with the existing admin re-run action. The code comment now states the real cron cadence (daily).
+- A failed triage stored the AI provider's raw error in `reasoning` (billing state, request id), and staff could read it in the ticket. The row now stores a generic reason (timeout or provider error); the full error stays in the server log only (AGENTS.md rule 10).
+- The AI Triage panel showed the failure placeholders (category "Other", 0% confidence, ~24h ETA) as if they were suggestions. A failed run now shows "Unavailable" and asks for a manual review. Existing failure rows are covered by the same check, so no data migration is needed.
 
 ## Unreleased — Password recovery
 

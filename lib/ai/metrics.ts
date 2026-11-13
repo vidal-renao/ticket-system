@@ -1,4 +1,4 @@
-import { TRIAGE_STALE_AFTER_MINUTES } from "@/lib/ai/triage-constants";
+import { TRIAGE_STALE_AFTER_MINUTES, isFailedTriage } from "@/lib/ai/triage-constants";
 
 /** Columns of `hd_ai_analysis` needed for aggregate AI metrics. */
 export interface AiAnalysisMetricRow {
@@ -23,7 +23,7 @@ export interface AiAnalysisSummary {
  * how many tickets were really analysed.
  */
 function isRealAnalysis(row: AiAnalysisMetricRow): boolean {
-  return row.model_used !== "n/a";
+  return !isFailedTriage(row);
 }
 
 export function summarizeAiAnalysis(rows: readonly AiAnalysisMetricRow[]): AiAnalysisSummary {
