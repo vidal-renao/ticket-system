@@ -10,6 +10,22 @@
 
 - `/ops` would have stopped showing SLA compliance from 2026-10-03. It parsed the percentage from the daily report subject ("N% compliance"), and vidal-helpdesk-mcp now writes "N% SLA" or "SLA not measured". The parser (`lib/ops/audit-subject.ts`, now tested) reads both formats. "SLA not measured" reads as no value instead of a number.
 
+## Unreleased — Closed-ticket comment guard in the database
+
+### Security
+
+- Migration `202611140001_closed_ticket_comment_guard.sql`: a BEFORE INSERT trigger on `hd_ticket_comments` rejects customer comments on closed tickets (SQLSTATE 23514). The API already returned 409, but `authenticated` holds INSERT and the policy did not check the status, so a direct PostgREST call could still write. Staff are unaffected; `resolved` stays open for the customer. Covered by 3 new pgTAP assertions in the tickets-write-policies CI job. Rollback in the migration header.
+
+## Unreleased — Admin user manual
+
+### Added
+
+- `/admin/manual`: a step-by-step staff manual for the ticket lifecycle (TK-xxxx), structured by the six chain-of-custody stages (Intake, Routing, Execution, Admin OK, Resolved, Customer OK), with roles, a table of contents, exact button labels, the resulting status per stage, screenshots and a "Good to know" section (SLA card, AI triage "Unavailable", internal notes, Force close).
+- Administrator-only, enforced on the server from the authenticated profile (non-admins, including managers, are redirected). Entry points: "User manual" in the Admin Panel header and "Manual" in the sidebar, both shown to administrators only.
+- Text in DE/EN/ES under the new `manual` message namespace. Every statement was checked against the code; the 48h reopen/auto-close window is shared through `lib/manual-content.ts` and a test fails if the reopen route, the customer card or the SLA cron drift from it.
+- Screenshots in `public/manual/` as cropped WebP (4–41 KB each). Customer e-mail addresses are blurred; areas showing UI defects under repair (SLA countdown after response, presence) are cropped out. Note: files in `public/` are served without authentication.
+- Tests: identical `manual` key sets across DE/EN/ES, every rendered key present, no "ß" in DE, every screenshot shipped.
+
 ## Unreleased — Ticket workflow fixes from the end-to-end run
 
 Found while running TK-0081 through the full lifecycle in production on 2026-11-13.

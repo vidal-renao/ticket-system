@@ -15,7 +15,7 @@
 SET search_path = pg_catalog, public, extensions;
 
 BEGIN;
-SELECT plan(19);
+SELECT plan(22);
 
 -- ---------------------------------------------------------------------------
 -- Helper: run a statement as a given actor and report what happened.
@@ -209,6 +209,44 @@ SELECT is(
   'rows=1',
   'an admin with their own JWT may close a ticket'
 );
+
+-- ---------------------------------------------------------------------------
+-- 202611140001: customers cannot comment on a closed ticket; staff can.
+-- The ticket is closed outside attempt() (as the test owner) and reopened
+-- afterwards, so the other assertions keep their starting state.
+-- ---------------------------------------------------------------------------
+SELECT is(
+  pg_temp.attempt('00000000-0000-4000-8000-0000000000cc',
+                  $$ INSERT INTO public.hd_ticket_comments (ticket_id, author_id, content)
+                     VALUES ('00000000-0000-4000-8000-000000007c01',
+                             '00000000-0000-4000-8000-0000000000cc', 'still open') $$),
+  'rows=1',
+  'a customer may comment on their own open ticket'
+);
+
+UPDATE public.hd_tickets SET status = 'closed', closed_at = now()
+ WHERE id = '00000000-0000-4000-8000-000000007c01';
+
+SELECT is(
+  pg_temp.attempt('00000000-0000-4000-8000-0000000000cc',
+                  $$ INSERT INTO public.hd_ticket_comments (ticket_id, author_id, content)
+                     VALUES ('00000000-0000-4000-8000-000000007c01',
+                             '00000000-0000-4000-8000-0000000000cc', 'after close') $$),
+  '23514',
+  'a customer may not comment on a closed ticket from the browser'
+);
+
+SELECT is(
+  pg_temp.attempt('00000000-0000-4000-8000-0000000000ad',
+                  $$ INSERT INTO public.hd_ticket_comments (ticket_id, author_id, content)
+                     VALUES ('00000000-0000-4000-8000-000000007c01',
+                             '00000000-0000-4000-8000-0000000000ad', 'staff note') $$),
+  'rows=1',
+  'an admin may still comment on a closed ticket'
+);
+
+UPDATE public.hd_tickets SET status = 'open', closed_at = NULL
+ WHERE id = '00000000-0000-4000-8000-000000007c01';
 
 SELECT * FROM finish();
 ROLLBACK;
