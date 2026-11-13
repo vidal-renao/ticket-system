@@ -144,14 +144,14 @@ export function AppShell({
     return () => window.clearInterval(interval);
   }, [refreshNotifications]);
 
-  // Set status offline when tab/window closes (sendBeacon is fire-and-forget)
-  useEffect(() => {
-    function handleUnload() {
-      navigator.sendBeacon("/api/profile/offline");
-    }
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, []);
+  // No "offline on unload" beacon. `beforeunload` also fires on every reload,
+  // on full-page navigations and when one of several open tabs is closed, and
+  // the beacon overwrote the *declared* availability_status with "offline".
+  // The heartbeat only refreshes last_seen_at, so nothing set it back until
+  // the next login: an agent who reloaded once showed "Offline" for the rest
+  // of the day while working. A closed tab is already covered by the
+  // heartbeat window (PRESENCE_STALE_MS in lib/presence.ts). Explicit sign-out
+  // and the inactivity timeout still mark the profile offline.
 
   // Realtime: a notification addressed to this user lands on the socket, so
   // the bell reacts at once instead of up to NOTIFICATIONS_POLL_MS later.

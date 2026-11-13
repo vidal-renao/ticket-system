@@ -3,6 +3,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
+import { summarizeProviderError } from "@/lib/ai/provider-error";
+
+/** Generic by design; the UI shows its own translated message for it. */
+const AI_UNAVAILABLE = "AI suggestion unavailable";
 
 const LANG_NAMES: Record<string, string> = {
   de: "German",
@@ -57,15 +61,24 @@ export async function suggestReply(
     ? "The customer is upset or frustrated. Start by explicitly acknowledging their frustration with empathy. Be especially conciliatory and understanding. Avoid any defensive or dismissive language. Reassure them the issue has full priority."
     : "Maintain a professional, helpful, solution-oriented tone. Swiss business standard: precise, warm, and efficient.";
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  // Provider failures (no credit, rate limit, outage, missing key) end here
+  // with one generic error. The detail goes to the server log as status and
+  // type only, never the message or ticket content (AGENTS.md rules 1, 10).
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("[suggestReply] AI provider unavailable", { stage: "config" });
+    return { error: AI_UNAVAILABLE };
+  }
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 512,
-    messages: [
-      {
-        role: "user",
-        content: `You are a professional IT support agent at a Swiss SME. Write a support reply to this ticket.
+  let response: Anthropic.Messages.Message;
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 512,
+      messages: [
+        {
+          role: "user",
+          content: `You are a professional IT support agent at a Swiss SME. Write a support reply to this ticket.
 
 TICKET TITLE: ${ticket.title}
 TICKET DESCRIPTION: ${ticket.description}
@@ -79,11 +92,19 @@ STRICT INSTRUCTIONS:
 - ${toneInstruction}
 - State clearly what action will be taken next and give a realistic timeframe
 - Do NOT repeat PII (names, emails, IPs) from the ticket description`,
-      },
-    ],
-  });
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("[suggestReply] AI provider unavailable", {
+      stage: "request",
+      ...summarizeProviderError(error),
+    });
+    return { error: AI_UNAVAILABLE };
+  }
 
-  if (response.content[0].type !== "text") return { error: "AI returned no text" };
+  const first = response.content[0];
+  if (!first || first.type !== "text" || !first.text.trim()) return { error: AI_UNAVAILABLE };
 
-  return { suggestion: response.content[0].text.trim() };
+  return { suggestion: first.text.trim() };
 }

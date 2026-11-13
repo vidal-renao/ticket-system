@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
@@ -32,6 +32,11 @@ interface TicketCommentsProps {
   comments: Comment[];
   currentUserId: string;
   isStaff: boolean;
+  /**
+   * When set, replaces the reply form. The page passes it for a customer on a
+   * closed ticket; the comments route rejects such a post regardless.
+   */
+  closedNotice?: ReactNode;
 }
 
 const ROLE_BADGE: Record<string, string> = {
@@ -46,10 +51,20 @@ export function TicketComments({
   comments: initial,
   currentUserId,
   isStaff,
+  closedNotice = null,
 }: TicketCommentsProps) {
   const router = useRouter();
   const t = useTranslations("ticket");
   const [comments, setComments] = useState(initial);
+
+  // After router.refresh() the server sends the authoritative list. Merge it
+  // in, keeping anything realtime delivered that the render has not seen yet.
+  useEffect(() => {
+    setComments((prev) => {
+      const known = new Set(initial.map((c) => c.id));
+      return [...initial, ...prev.filter((c) => !known.has(c.id))];
+    });
+  }, [initial]);
   const [content, setContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -150,14 +165,21 @@ export function TicketComments({
 
   async function handleAISuggest() {
     setSuggesting(true);
-    const result = await suggestReply(ticketId);
-    if ("error" in result) {
-      toast.error(`AI suggestion failed: ${result.error}`);
-    } else {
-      setContent(result.suggestion);
-      toast.success("AI suggestion loaded — review and edit before sending");
+    try {
+      const result = await suggestReply(ticketId);
+      if ("error" in result) {
+        // Generic on purpose: the action's error never carries provider
+        // detail, and the reason is in the server log (AGENTS.md rule 10).
+        toast.error(t("aiSuggestUnavailable"));
+      } else {
+        setContent(result.suggestion);
+        toast.success("AI suggestion loaded — review and edit before sending");
+      }
+    } catch {
+      toast.error(t("aiSuggestUnavailable"));
+    } finally {
+      setSuggesting(false);
     }
-    setSuggesting(false);
   }
 
   async function submitComment(waitForCustomer: boolean) {
@@ -192,7 +214,10 @@ export function TicketComments({
             ? "Internal note added"
             : "Reply sent"
       );
-      if (waitForCustomer) router.refresh();
+      // A comment can change server state shown elsewhere on the page: the
+      // first public staff reply stops the SLA response clock, and "send for
+      // company review" changes the status. Refresh in every case.
+      router.refresh();
     }
     setLoading(false);
   }
@@ -317,6 +342,9 @@ export function TicketComments({
         )}
 
         {/* ── Reply form ──────────────────────────────────────────────── */}
+        {closedNotice ? (
+          <div className="pt-2 border-t border-[var(--color-surface-600)]">{closedNotice}</div>
+        ) : (
         <form
           onSubmit={handleSubmit}
           className="space-y-3 pt-2 border-t border-[var(--color-surface-600)]"
@@ -404,6 +432,7 @@ export function TicketComments({
             </div>
           </div>
         </form>
+        )}
       </CardContent>
     </Card>
   );

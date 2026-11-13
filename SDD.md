@@ -253,3 +253,52 @@ Profiles had no public, non-sequential identifier (the existing `employee_id` is
 - 42 real pgTAP assertions, `identity-foundation` CI job (ephemeral PostgreSQL 17.6).
 - Vitest: Zod contract tests proving role/organization_id/customer_type/reference_code cannot be injected through any of the new schemas.
 - Pending: production migration application, backfill count verification, Vercel production deploy and non-destructive smoke tests.
+
+---
+
+# Active Specification: Ticket Workflow Fixes from the End-to-End Run
+
+Status: implemented; production verification pending
+Owner: Senior Software Development
+Started: 2026-11-13
+
+## Context
+
+On 2026-11-13 the full lifecycle ran in production on TK-0081: admin creates for a customer, assigns to an agent, agent starts work, writes an internal note and a public reply, requests admin OK, admin approves and resolves, customer confirms, ticket closed. The lifecycle works; the run surfaced five defects on the ticket detail page (`app/[locale]/(app)/tickets/[id]/page.tsx`) and its components, plus one leak found in review: the page loaded internal notes for customers with the service client and hid them only in the browser.
+
+## Requirements
+
+0. **Internal notes stay on the server for customers.** The comments query on the ticket page excludes `is_internal = true` for any non-staff role (fail closed). Acceptance: a customer's page payload contains no internal note; staff still see them; the realtime refetch is covered by the `ticket_comments_read_authorized` RLS policy.
+1. **Workflow actions refresh the page.** After Start work, Wait for customer, Wait for supplier, Resume, Ready for admin OK, Approve and resolve, Request changes, Force close, customer Confirm/Reopen and any comment, the status badge, chain of custody, SLA card and controls show the new state without a manual reload, and the controls stay disabled until the refreshed render has committed. Acceptance: no reload needed; no stale button can be clicked in between.
+2. **The SLA card stops counting finished targets.** Acceptance: with `first_response_at` set the Response row reads "Responded" (or "Responded late") with the time and no countdown or warning icon; once resolved/closed the Resolution row reads "Resolved on time"/"Resolved late" with the time; the header badge shows the final outcome ("SLA met" or "Breached"), never live "At risk"/"On time" on a finished ticket. Decision logic is a pure function with unit tests for: open without response, responded, resolved on time, resolved late, closed, breached. Strings in DE/EN/ES.
+3. **An active agent is shown as online.** Acceptance: a working agent who reloads a page or closes one of several tabs keeps their declared availability; presence still drops to offline when heartbeats stop (closed laptop, last tab closed) after `PRESENCE_STALE_MS`; explicit sign-out and inactivity sign-out still set offline.
+4. **A closed ticket takes no further customer input.** Acceptance: on a `closed` ticket the customer sees "This ticket is closed. Open a new ticket if you need more help." with a link to New Ticket instead of the reply box, and no AI assistant panel; `POST /api/comments` and the AI-chat save action reject a customer comment on a closed ticket (409 / error); a `resolved` ticket keeps the reply box and the Confirm/Reopen actions.
+5. **AI features fail honestly.** Acceptance: when the provider fails (no credit, outage, missing key) the customer assistant shows "The assistant is not available right now. A specialist will answer your ticket.", stops claiming "AI Assistant active" and disables its input; staff "AI Suggest Response" shows a generic toast. No provider message, request id or ticket content reaches the browser or the log; logs carry stage, HTTP status and error class only. No provider call on page load.
+
+## Constraints
+
+- No schema change, no new environment variable.
+- Reuse existing helpers: `router.refresh()` as every other mutation component, `effectivePresence`/heartbeat, `resolveTicketAccess`, `assessSla` breach semantics.
+- AGENTS.md rules 3, 10, 12: tenant/owner predicates unchanged; generic customer-visible errors.
+
+## Design
+
+- **0:** `applyCommentVisibilityScope(query, role)` in `lib/ticket-visibility.ts` adds `.eq("is_internal", false)` unless the role is staff. Production RLS (`ticket_comments_read_authorized`, checked 2026-11-13) already excludes internal notes for customers on the user client, so the realtime refetch needs no change.
+- **1:** All workflow components already called `router.refresh()`; the same pattern was reproduced on Next 15.5.29 and refreshes correctly, so no framework workaround is added. The page joins the other authenticated pages with `dynamic = "force-dynamic"`; `TicketComments` now refreshes after every comment and merges refreshed server comments into its local list (it previously ignored them); the agent controls show a pending indicator while the refresh is in flight; the SLA countdown is keyed on its due date.
+- **2:** `deriveSlaDisplay(ticket, now)` in `lib/sla-display.ts` returns per-target state (`running`, `at_risk`, `overdue`, `met`, `missed`) and an overall state (`on_time`, `at_risk`, `breached`, `met`). `SlaDeadlineCard` renders it; only `running`/`at_risk` rows use the live countdown.
+- **3:** Root cause: `AppShell` sent `/api/profile/offline` on `beforeunload`, which also fires on reload and full-page navigation, overwriting the declared `availability_status` with `offline`. The heartbeat only updates `last_seen_at`, so the agent stayed "Offline" until the next login (production showed Lena Brunner `availability_status = offline` with a heartbeat a minute old). The unload beacon is removed; the heartbeat window already covers closed tabs.
+- **4:** `canPostTicketComment(role, status)` in `lib/ticket-workflow.ts` (customers: not on `closed`; staff unrestricted) is used by the page, `POST /api/comments` and `saveAiChatNote`.
+- **5:** `/api/ai/wiki-chat` fails closed without a key, catches provider errors before streaming (503 `assistant_unavailable`) and ends the stream on mid-answer errors; `AISupportChat` switches to an unavailable state on any failure or empty answer. `suggestReply` returns one generic error. `summarizeProviderError` (`lib/ai/provider-error.ts`) defines what may be logged.
+
+Rejected: a provider health check on page load (cost and latency on every view, and it can still pass right before a failure); restoring the declared status from the heartbeat (it would override an agent who deliberately set themselves offline).
+
+## Implementation
+
+One change set on `fix/ticket-workflow-e2e`. Files: `app/[locale]/(app)/tickets/[id]/page.tsx`, `components/tickets/{TicketComments,TicketWorkflowActions,SlaCountdown,SlaDeadlineCard,AISupportChat}.tsx`, `components/layout/AppShell.tsx`, `app/api/comments/route.ts`, `app/api/ai/wiki-chat/route.ts`, `app/actions/{suggest-reply,save-ai-chat}.ts`, `lib/{sla-display,ticket-visibility,ticket-workflow}.ts`, `lib/ai/provider-error.ts`, `messages/{de,en,es}.json`.
+
+## Validation
+
+- Vitest: `tests/domain/sla-display.test.ts` (requirement 2), `tests/domain/ticket-access.test.ts` comment scope (0), `tests/domain/ticket-workflow.test.ts` `canPostTicketComment` (4), `tests/domain/presence-lifecycle.test.ts` (3, fails against the previous `AppShell`), `tests/domain/ai-unavailable.test.ts` (5: generic 503, fail closed without key, mid-stream failure, generic suggestion error, no provider text in logs).
+- Requirement 1: refresh pattern reproduced locally against Next 15.5.29 in a headless browser; production confirmation pending.
+- Agents whose declared status was already overwritten to `offline` recover at their next login or via the availability toggle in Settings.
+- Pending: production rerun of the TK-0081 lifecycle after deploy.

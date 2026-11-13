@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { canPostTicketComment } from "@/lib/ticket-workflow";
 
 export async function saveAiChatNote(
   ticketId: string,
@@ -17,13 +18,15 @@ export async function saveAiChatNote(
   // Verify the user owns this ticket (customers can only save on their own tickets)
   const { data: ticket } = await svc
     .from("hd_tickets")
-    .select("id")
+    .select("id, status")
     .eq("id", ticketId)
     .eq("created_by", user.id)
     .is("deleted_at", null)
     .single();
 
   if (!ticket) return { error: "Access denied" };
+  // The chat is only offered on open tickets; a closed one takes no new notes.
+  if (!canPostTicketComment("customer", ticket.status)) return { error: "Ticket closed" };
 
   const { error } = await svc.from("hd_ticket_comments").insert({
     ticket_id: ticketId,
