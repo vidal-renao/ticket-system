@@ -19,6 +19,7 @@ import {
   MessageSquare,
   History,
   ChevronLeft,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/lib/supabase/types";
@@ -39,9 +40,12 @@ type NavKey =
   | "inbox"
   | "history";
 
+/** Labels outside the `nav` namespace, resolved from their own namespace. */
+type ManualNavKey = "manual";
+
 interface NavItem {
   href: string;
-  labelKey: NavKey;
+  labelKey: NavKey | ManualNavKey;
   icon: React.ElementType;
   roles: UserRole[];
 }
@@ -56,6 +60,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/analytics/predictive", labelKey: "predictive", icon: TrendingUp, roles: ["manager", "admin"] },
   { href: "/team", labelKey: "team", icon: Users, roles: ["manager", "admin"] },
   { href: "/admin", labelKey: "admin", icon: Building2, roles: ["manager", "admin"] },
+  // Convenience link only: the page itself redirects anyone who is not admin.
+  { href: "/admin/manual", labelKey: "manual", icon: BookOpen, roles: ["admin"] },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare, roles: ["admin", "manager", "agent", "customer"] },
   { href: "/history", labelKey: "history", icon: History, roles: ["admin", "manager", "agent", "customer"] },
   { href: "/settings", labelKey: "settings", icon: Settings, roles: ["admin", "manager", "agent", "customer"] },
@@ -111,6 +117,8 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
+  const tManual = useTranslations("manual");
+  const navLabel = (key: NavKey | ManualNavKey) => (key === "manual" ? tManual("navLabel") : t(key));
 
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
   const hasExactMatch = visibleItems.some((item) => pathname === item.href);
@@ -166,7 +174,7 @@ export function Sidebar({
               href={item.href}
               onClick={onNavigate}
               aria-current={isActive ? "page" : undefined}
-              title={collapsed ? t(labelKey) : undefined}
+              title={collapsed ? navLabel(labelKey) : undefined}
               className={cn(
                 "app-sidebar__row relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
                 isActive
@@ -175,7 +183,7 @@ export function Sidebar({
               )}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="app-sidebar__label">{t(labelKey)}</span>
+              <span className="app-sidebar__label">{navLabel(labelKey)}</span>
               {item.href === "/inbox" && inboxUnreadCount > 0 && (
                 <span className="app-sidebar__badge ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-brand-500)] text-white text-[10px] font-semibold flex items-center justify-center">
                   {inboxUnreadCount > 9 ? "9+" : inboxUnreadCount}

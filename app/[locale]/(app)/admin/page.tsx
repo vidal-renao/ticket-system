@@ -25,6 +25,7 @@ import {
   Users,
   BriefcaseBusiness,
   UserCog,
+  BookOpen,
 } from "lucide-react";
 import { formatRelativeTime, formatTicketRef, statusColor } from "@/lib/utils";
 import { effectivePresence } from "@/lib/presence";
@@ -96,6 +97,7 @@ export default async function AdminPage({
   const t = await getTranslations("admin");
   const tp = await getTranslations("priority");
   const ts = await getTranslations("status");
+  const tm = await getTranslations("manual");
 
   const supabase = await createClient();
   const {
@@ -314,6 +316,15 @@ export default async function AdminPage({
             <UserCog className="h-3.5 w-3.5" />
             Manage Users
           </Link>
+          {profile.role === "admin" && (
+            <Link
+              href={locale === "de" ? "/admin/manual" : `/${locale}/admin/manual`}
+              className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[var(--color-surface-600)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] transition-colors hover:border-indigo-500/30 hover:text-indigo-300 sm:flex-none"
+            >
+              <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+              {tm("openButton")}
+            </Link>
+          )}
           {profile.role === "admin" && <AdminPageControls teams={teams} />}
           {profile.role === "admin" && (
             <TicketCleanupControls isTrash={filters.stage === "trash"} all />

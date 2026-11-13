@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Admin user manual
+
+### Added
+
+- `/admin/manual`: a step-by-step staff manual for the ticket lifecycle (TK-xxxx), structured by the six chain-of-custody stages (Intake, Routing, Execution, Admin OK, Resolved, Customer OK), with roles, a table of contents, exact button labels, the resulting status per stage, screenshots and a "Good to know" section (SLA card, AI triage "Unavailable", internal notes, Force close).
+- Administrator-only, enforced on the server from the authenticated profile (non-admins, including managers, are redirected). Entry points: "User manual" in the Admin Panel header and "Manual" in the sidebar, both shown to administrators only.
+- Text in DE/EN/ES under the new `manual` message namespace. Every statement was checked against the code; the 48h reopen/auto-close window is shared through `lib/manual-content.ts` and a test fails if the reopen route, the customer card or the SLA cron drift from it.
+- Screenshots in `public/manual/` as cropped WebP (4–41 KB each). Customer e-mail addresses are blurred; areas showing UI defects under repair (SLA countdown after response, presence) are cropped out. Note: files in `public/` are served without authentication.
+- Tests: identical `manual` key sets across DE/EN/ES, every rendered key present, no "ß" in DE, every screenshot shipped.
+
 ## Unreleased — Ticket workflow fixes from the end-to-end run
 
 Found while running TK-0081 through the full lifecycle in production on 2026-11-13.
