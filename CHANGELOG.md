@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Security patch, page language and CI
+
+### Security
+
+- `next` 15.5.21 → 15.5.29 (patch release). Fixes the critical npm-audit finding, including unauthenticated RCE in the Image Optimization API with AVIF files. `eslint-config-next` aligned.
+- Overrides raised for `js-yaml` (^4.3.2), `source-map-js` (^1.2.2) and `vite` (^8.3.8, dev only).
+- `zod` stays on 3.x and is added to the dated triaged list in CI: the only fix is zod 4 (major, and `openai@6` still depends on zod 3).
+
+### Fixed
+
+- `<html lang>` was hard-coded to `de` on every page and only corrected in the browser after hydration. On `/en` pages Chrome treated the page as German and machine-translated it into the viewer's language (the login appeared in Spanish). The root layout now renders the request locale on the server; the client-side `HtmlLang` patch is removed.
+- CI database jobs: installing pgTAP/pgvector from PGDG upgrades `postgresql-17` inside the 17.6 container (current pgTAP requires > 17.12), and the still-running server then failed to load `plpgsql.so` (`undefined symbol`). The container is now restarted after the extension install, so the server runs the same build as its libraries. CI therefore tests on the newest 17.x minor rather than exactly 17.6.
+
 ## Unreleased — Password reset: refused password shown as expired link
 
 ### Fixed

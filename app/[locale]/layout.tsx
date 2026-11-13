@@ -3,7 +3,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
-import { HtmlLang } from "@/components/layout/HtmlLang";
 import { appUrl } from "@/lib/app-url";
 import "../globals.css";
 
@@ -67,7 +66,6 @@ export default async function LocaleLayout({
 
   return (
     <>
-      <HtmlLang locale={locale} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

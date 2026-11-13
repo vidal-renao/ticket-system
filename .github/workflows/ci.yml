@@ -44,7 +44,13 @@ jobs:
             // unrelated parts of the eslint dependency tree far more than they
             // fixed. Revisit once Next.js publishes a 15.x patch. Critical-severity
             // findings are never allowed through this list, regardless of name.
-            const knownHighWithNoSafeFix = new Set(["next", "postcss", "sharp", "brace-expansion"]);
+            //
+            // Updated 2026-11-13: next itself left the list (15.5.29 fixes the
+            // critical image-optimizer RCE). zod joins it: the only fix is zod 4,
+            // a major migration (openai@6 still pulls zod 3). Exposure is
+            // server-side validation of oversized collections; the API routes
+            // already cap request bodies. Revisit with the zod 4 migration.
+            const knownHighWithNoSafeFix = new Set(["postcss", "sharp", "brace-expansion", "zod"]);
 
             let criticalCount = 0;
             const unexpected = [];
@@ -117,6 +123,21 @@ jobs:
           set -euo pipefail
           docker exec rag-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgvector postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart rag-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec rag-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec rag-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server; ubuntu-latest's default repo only has an older client)
         run: |
@@ -214,6 +235,21 @@ jobs:
           set -euo pipefail
           docker exec identity-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart identity-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec identity-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec identity-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |
@@ -322,6 +358,21 @@ jobs:
           set -euo pipefail
           docker exec tickets-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart tickets-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec tickets-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec tickets-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |

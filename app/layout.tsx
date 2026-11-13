@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getLocale } from "next-intl/server";
 import { appUrl } from "@/lib/app-url";
 
 const APP_URL = appUrl();
@@ -51,13 +52,18 @@ const THEME_BOOT_SCRIPT = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Rendered on the server so the first byte already carries the page's real
+  // language. A static lang="de" on /en pages made Chrome offer (or apply) a
+  // German-to-user-language translation, which rewrote the English login into
+  // machine-translated Spanish.
+  const locale = await getLocale();
   return (
-    <html lang="de" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {children}
