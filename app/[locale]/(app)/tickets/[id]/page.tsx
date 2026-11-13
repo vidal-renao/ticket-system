@@ -2,7 +2,12 @@ import { forbidden, notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile, isStaffRole } from "@/lib/authz";
-import { formatAgentIdentity, getInitials, resolveTicketAccess } from "@/lib/ticket-visibility";
+import {
+  applyCommentVisibilityScope,
+  formatAgentIdentity,
+  getInitials,
+  resolveTicketAccess,
+} from "@/lib/ticket-visibility";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -10,7 +15,7 @@ import { TicketComments } from "@/components/tickets/TicketComments";
 import { AITriagePanel } from "@/components/ai/AITriagePanel";
 import { ReanalyzeButton } from "@/components/tickets/ReanalyzeButton";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
-import { SlaCountdown } from "@/components/tickets/SlaCountdown";
+import { SlaDeadlineCard } from "@/components/tickets/SlaDeadlineCard";
 import { CustomerResolutionActions } from "@/components/tickets/CustomerResolutionActions";
 import { PresenceAvatar } from "@/components/ui/PresenceAvatar";
 import { TicketAssigneeSelect } from "@/components/tickets/TicketAssigneeSelect";
@@ -18,11 +23,18 @@ import { effectivePresence } from "@/lib/presence";
 import { sortAgentOptions, type AgentOption } from "@/lib/agent-options";
 import { getLastSeenMap } from "@/lib/presence-server";
 import { formatTicketRef, priorityColor, statusColor, formatRelativeTime } from "@/lib/utils";
-import { AlertTriangle, Clock, Shield } from "lucide-react";
+import { AlertTriangle, Clock, Lock, Shield } from "lucide-react";
 import { AISupportChat } from "@/components/tickets/AISupportChat";
 import { TicketWorkflowActions } from "@/components/tickets/TicketWorkflowActions";
 import { AdminForceCloseAction } from "@/components/tickets/AdminForceCloseAction";
 import { triageDisplayState } from "@/lib/ai/metrics";
+import { deriveSlaDisplay } from "@/lib/sla-display";
+import { canPostTicketComment } from "@/lib/ticket-workflow";
+import { Link } from "@/i18n/navigation";
+
+// Every workflow action on this page ends in router.refresh(); like the other
+// authenticated pages, this one must never be served from a route cache.
+export const dynamic = "force-dynamic";
 
 export default async function TicketDetailPage({
   params,
@@ -74,9 +86,10 @@ export default async function TicketDetailPage({
     .eq("ticket_id", ticket.id)
     .eq("is_read", false);
 
-  const slaStatus = getSlaStatus(ticket);
-  const responseDueAt = ticket.response_due_at ?? ticket.sla_first_response_due;
-  const resolutionDueAt = ticket.resolution_due_at ?? ticket.sla_resolution_due;
+  const slaDisplay = deriveSlaDisplay(ticket);
+  // Customers cannot add to a closed ticket (the comments route enforces the
+  // same rule); staff keep their controls.
+  const canComment = canPostTicketComment(profile.role, ticket.status);
 
   // Fetch related data as separate flat queries
   const [
@@ -102,10 +115,14 @@ export default async function TicketDetailPage({
     isStaff
       ? svc.from("hd_ai_analysis").select("*").eq("ticket_id", id).single()
       : Promise.resolve({ data: null }),
-    svc.from("hd_ticket_comments")
-      .select("*, profiles:author_id(full_name, avatar_url, role)")
-      .eq("ticket_id", id)
-      .order("created_at", { ascending: true }),
+    // Internal notes never leave the server for a customer: the service
+    // client bypasses RLS, so the filter is part of the query itself.
+    applyCommentVisibilityScope(
+      svc.from("hd_ticket_comments")
+        .select("*, profiles:author_id(full_name, avatar_url, role)")
+        .eq("ticket_id", id),
+      profile.role
+    ).order("created_at", { ascending: true }),
     svc
       .from("organizations")
       .select("name")
@@ -121,7 +138,7 @@ export default async function TicketDetailPage({
   // For customers: check if any staff is genuinely online (heartbeat-verified)
   // to decide whether to show the AI chat fallback.
   let onlineAgentCount: number | null = null;
-  if (!isStaff && ticket.organization_id) {
+  if (!isStaff && canComment && ticket.organization_id) {
     const { data: staffRows } = await svc
       .from("hd_profiles")
       .select("id, availability_status")
@@ -295,6 +312,22 @@ export default async function TicketDetailPage({
             comments={comments ?? []}
             currentUserId={currentUserId}
             isStaff={isStaff}
+            closedNotice={
+              canComment ? null : (
+                <div className="flex items-start gap-2 rounded-lg border border-[var(--color-surface-600)] bg-[var(--color-surface-800)] px-3 py-3 text-sm text-[var(--color-text-secondary)]">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-text-muted)]" aria-hidden="true" />
+                  <p>
+                    {t("closedNote")}{" "}
+                    <Link
+                      href="/tickets/new"
+                      className="font-medium text-indigo-400 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                    >
+                      {t("closedNewTicket")}
+                    </Link>
+                  </p>
+                </div>
+              )
+            }
           />
         </div>
 
@@ -365,40 +398,7 @@ export default async function TicketDetailPage({
             </Card>
           )}
 
-          {(responseDueAt || resolutionDueAt) && (
-            <Card>
-              <CardContent className="py-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs font-medium text-[var(--color-text-muted)]">{t("slaDeadline")}</p>
-                  {slaStatus && (
-                    <Badge className={slaStatus.className}>
-                      {slaStatus.icon}
-                      {slaStatus.label}
-                    </Badge>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  {responseDueAt && (
-                    <SlaCountdown
-                      dueAt={responseDueAt}
-                      label="Response"
-                      breached={ticket.sla_breached ?? false}
-                    />
-                  )}
-                  {resolutionDueAt && (
-                    <SlaCountdown
-                      dueAt={resolutionDueAt}
-                      label="Resolution"
-                      breached={ticket.sla_breached ?? false}
-                    />
-                  )}
-                </div>
-                {ticket.sla_breached && (
-                  <p className="text-xs text-red-400 mt-1">{t("slaBreached")}</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          <SlaDeadlineCard display={slaDisplay} locale={locale} />
 
           {isStaff && aiAnalysis && (
             <AITriagePanel analysis={aiAnalysis} />
@@ -421,7 +421,8 @@ export default async function TicketDetailPage({
             </Card>
           )}
 
-          {/* AI Support Chat — shown to customers when no agents are online */}
+          {/* AI Support Chat — shown to customers when no agents are online,
+              and never on a closed ticket (onlineAgentCount stays null). */}
           {!isStaff && onlineAgentCount === 0 && (
             <AISupportChat
               ticketId={ticket.id}
@@ -445,75 +446,4 @@ export default async function TicketDetailPage({
       </div>
     </div>
   );
-}
-
-function getSlaStatus(ticket: {
-  created_at: string;
-  status: string;
-  resolved_at: string | null;
-  sla_breached?: boolean | null;
-  sla_response_breached?: boolean | null;
-  sla_resolution_breached?: boolean | null;
-  sla_first_response_due?: string | null;
-  sla_resolution_due?: string | null;
-  response_due_at?: string | null;
-  resolution_due_at?: string | null;
-  first_response_at?: string | null;
-  first_agent_response_at?: string | null;
-}) {
-  const now = Date.now();
-  const firstResponseAt = ticket.first_agent_response_at ?? ticket.first_response_at;
-  const responseDue = ticket.response_due_at ?? ticket.sla_first_response_due;
-  const resolutionDue = ticket.resolution_due_at ?? ticket.sla_resolution_due;
-  const isResolved = ticket.status === "resolved" || ticket.status === "closed";
-
-  const responseBreached = Boolean(
-    responseDue &&
-      !firstResponseAt &&
-      now > new Date(responseDue).getTime()
-  );
-  const resolutionBreached = Boolean(
-    resolutionDue &&
-      !isResolved &&
-      now > new Date(resolutionDue).getTime()
-  );
-
-  if (ticket.sla_breached || ticket.sla_response_breached || ticket.sla_resolution_breached || responseBreached || resolutionBreached) {
-    return {
-      label: "Breached",
-      icon: <AlertTriangle className="w-3 h-3" />,
-      className: "text-red-400 bg-red-400/10 border-red-400/20",
-    };
-  }
-
-  const activeDueDates = [!firstResponseAt ? responseDue : null, !isResolved ? resolutionDue : null]
-    .filter(Boolean)
-    .map((date) => new Date(date as string).getTime());
-
-  if (activeDueDates.length === 0) {
-    return {
-      label: "On time",
-      icon: <Clock className="w-3 h-3" />,
-      className: "text-green-400 bg-green-400/10 border-green-400/20",
-    };
-  }
-
-  const nextDue = Math.min(...activeDueDates);
-  const totalWindow = nextDue - new Date(ticket.created_at).getTime();
-  const remaining = nextDue - now;
-  const oneHour = 60 * 60 * 1000;
-
-  if (remaining <= oneHour || (totalWindow > 0 && remaining / totalWindow <= 0.25)) {
-    return {
-      label: "At risk",
-      icon: <AlertTriangle className="w-3 h-3" />,
-      className: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-    };
-  }
-
-  return {
-    label: "On time",
-    icon: <Clock className="w-3 h-3" />,
-    className: "text-green-400 bg-green-400/10 border-green-400/20",
-  };
 }

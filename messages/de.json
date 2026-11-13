@@ -152,6 +152,21 @@
     "description": "Beschreibung",
     "slaDeadline": "SLA-Frist",
     "slaBreached": "SLA verletzt",
+    "sla": {
+      "response": "Antwort",
+      "resolution": "Lösung",
+      "responded": "Beantwortet",
+      "respondedLate": "Verspätet beantwortet",
+      "resolvedOnTime": "Fristgerecht gelöst",
+      "resolvedLate": "Verspätet gelöst",
+      "overdue": "Überfällig",
+      "badge": {
+        "onTime": "Im Plan",
+        "atRisk": "Gefährdet",
+        "breached": "Verletzt",
+        "met": "SLA erfüllt"
+      }
+    },
     "piiWarning": "PII",
     "aiTriage": "KI-Zuweisung",
     "aiProcessing": "Wird verarbeitet...",
@@ -168,6 +183,9 @@
     "confirmDone": "Danke! Ticket geschlossen.",
     "reopenHint": "Problem nicht gelöst?",
     "autoCloseNote": "Ohne Rückmeldung wird das Ticket 48h nach der Lösung automatisch geschlossen.",
+    "closedNote": "Dieses Ticket ist geschlossen. Eröffnen Sie ein neues Ticket, wenn Sie weitere Hilfe benötigen.",
+    "closedNewTicket": "Neues Ticket",
+    "aiSuggestUnavailable": "Der KI-Vorschlag ist gerade nicht verfügbar. Bitte verfassen Sie die Antwort selbst.",
     "aiReanalyze": "KI-Triage erneut ausführen",
     "aiReanalyzing": "Läuft…",
     "aiReanalyzeDone": "KI-Triage abgeschlossen",
@@ -203,6 +221,8 @@
   "aiChat": {
     "title": "KI-Support-Assistent",
     "statusNoAgents": "Kein Agent verfügbar — KI-Assistent aktiv",
+    "statusUnavailable": "Derzeit kein Agent verfügbar",
+    "unavailable": "Der Assistent ist gerade nicht verfügbar. Eine Fachperson beantwortet Ihr Ticket.",
     "statusAgentOnline": "Ein Agent ist jetzt verfügbar",
     "placeholder": "Beschreiben Sie Ihr Problem...",
     "send": "Senden",

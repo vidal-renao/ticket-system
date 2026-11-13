@@ -10,6 +10,23 @@
 - Screenshots in `public/manual/` as cropped WebP (4–41 KB each). Customer e-mail addresses are blurred; areas showing UI defects under repair (SLA countdown after response, presence) are cropped out. Note: files in `public/` are served without authentication.
 - Tests: identical `manual` key sets across DE/EN/ES, every rendered key present, no "ß" in DE, every screenshot shipped.
 
+## Unreleased — Ticket workflow fixes from the end-to-end run
+
+Found while running TK-0081 through the full lifecycle in production on 2026-11-13.
+
+### Security
+
+- Customers received internal notes in the ticket page payload. The page loads comments with the service client (RLS bypassed) and only the browser component hid internal ones. The query now excludes `is_internal` notes for every non-staff role (`applyCommentVisibilityScope`, fails closed). The realtime refetch in the browser was already protected by the `ticket_comments_read_authorized` policy.
+- AI provider errors no longer reach the browser: "AI Suggest Response" showed the raw provider message (billing state, request id) in a toast. Both AI features now return a generic error; the server log records stage, HTTP status and error class only.
+
+### Fixed
+
+- Presence showed an active agent as "Offline". The app shell marked the profile offline on `beforeunload`, which also fires on every reload and full-page navigation, and the heartbeat never restores the declared status — so one reload meant "Offline" until the next login. The unload beacon is removed; a closed tab still drops to offline after the 3-minute heartbeat window. Agents already affected recover at their next login or with the availability toggle in Settings.
+- The SLA card kept counting after the SLA was met: the Response countdown (with warning icon) ran on after the first response, and both countdowns ran on after resolution/closure. Finished targets now read "Responded" / "Resolved on time" (or late) with the time, and the header badge shows the final outcome ("SLA met" or "Breached"). Logic in `lib/sla-display.ts`, strings DE/EN/ES.
+- A closed ticket still offered the customer the reply box and "AI Support Assistant — No agents available — AI Assistant active". It now shows "This ticket is closed. Open a new ticket if you need more help." with a link to New Ticket, and no assistant. `POST /api/comments` and the AI-chat save reject customer comments on closed tickets (409). Resolved tickets keep the reply and Confirm/Reopen flow.
+- The customer AI assistant said "AI Assistant active" while the provider could not answer. On failure it now says "The assistant is not available right now. A specialist will answer your ticket." and disables its input. The route fails closed when no API key is configured. No provider call is made on page load.
+- Ticket page refresh after workflow actions: the page is now `force-dynamic` like the other authenticated pages, comments refresh the page (the first public reply stops the SLA response clock), the comment list takes the refreshed server data, and agent controls show a pending indicator until the refreshed render commits.
+
 ## Unreleased — Security patch, page language and CI
 
 ### Security
