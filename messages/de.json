@@ -533,5 +533,105 @@
       "busy": "{name} ist beschäftigt",
       "offline": "{name} ist offline"
     }
+  },
+  "manual": {
+    "navLabel": "Handbuch",
+    "openButton": "Benutzerhandbuch",
+    "title": "Benutzerhandbuch: Lebenszyklus eines Tickets",
+    "subtitle": "Wie ein Ticket (TK-0000) Schritt für Schritt von der Erfassung bis zum Abschluss gelangt. Für die Mitarbeitenden der Organisation; nur für Administratoren sichtbar.",
+    "back": "Zurück zum Admin-Panel",
+    "tocTitle": "Inhalt",
+    "stageLabel": "Phase {number}",
+    "whoLabel": "Wer",
+    "stepsLabel": "Schritte",
+    "resultLabel": "Was sich ändert",
+    "intro": {
+      "title": "Rollen",
+      "body": "Jedes Ticket durchläuft sechs Phasen, die auf der Ticketseite als Chain of custody angezeigt werden: Intake, Routed, Execution, Admin OK, Resolved und Customer OK. Beteiligt sind drei Rollen:",
+      "admin": "<b>Administrator</b>: erfasst Tickets für Kunden, weist sie zu, genehmigt abgeschlossene Arbeiten oder gibt sie zurück und kann als einzige Rolle eine Schliessung erzwingen.",
+      "specialist": "<b>Spezialist</b> (Agent): sieht nur die ihm zugewiesenen Tickets, führt die Arbeit aus und meldet sie zur Genehmigung.",
+      "customer": "<b>Kunde</b>: eröffnet Tickets, erhält öffentliche Antworten und gibt die abschliessende Bestätigung."
+    },
+    "roles": {
+      "admin": "Administrator",
+      "specialist": "Spezialist",
+      "customer": "Kunde"
+    },
+    "stages": {
+      "intake": {
+        "title": "Erfassung",
+        "summary": "Ein Ticket wird entweder vom Kunden im Portal oder von einem Administrator im Namen des Kunden erstellt. Jedes Ticket erhält eine Referenz im Format TK-0000.",
+        "step1": "Kunden eröffnen ein Ticket selbst über <b>Neue Anfrage</b> in der Seitenleiste.",
+        "step2": "Administratoren erfassen ein Ticket für einen Kunden: Admin-Panel → <b>Ticket for Customer</b>. Kunden wählen (<b>Existing</b>, <b>New individual</b> oder <b>New company</b>), Kurzbeschreibung und Beschreibung eingeben, Priorität und optional ein Team wählen. Standard ist <b>Let routing decide</b>.",
+        "step3": "Auf <b>Create ticket for customer</b> klicken. Das Ticket wird im Namen des Kunden erfasst und durchläuft dasselbe Routing, dieselben SLA-Fristen und dieselbe KI-Triage wie ein vom Kunden erfasstes Ticket.",
+        "result": "Status <b>Offen</b>. Die Chain of custody zeigt Intake als abgeschlossen. Die SLA-Fristen für Reaktion und Lösung werden aus der Priorität gesetzt; die KI-Triage läuft im Hintergrund.",
+        "img1Alt": "Formular «New ticket for a customer» mit Kundenauswahl, Anfrage, Priorität und Team. E-Mail-Adressen der Kunden sind unkenntlich gemacht.",
+        "img2Alt": "Ticketdetail in der Administratoransicht: Kopfzeile mit Status Offen, Chain of custody mit Intake und Routed, Karte Zuständig, Karte SLA-Frist und KI-Triage-Karte mit Unavailable."
+      },
+      "routing": {
+        "title": "Routing und Zuweisung",
+        "summary": "Beim Erstellen versucht das System, das Ticket automatisch zuzuweisen: zuerst an einen Agenten mit passender Spezialisierung oder passendem Team, sonst an den verfügbaren Agenten mit den wenigsten aktiven Tickets. Berücksichtigt werden nur Agenten, die gerade online sind. Ist niemand verfügbar, bleibt das Ticket unzugewiesen und die Administratoren erhalten die Benachrichtigung «Ticket needs routing».",
+        "step1": "Admin-Panel öffnen. Der Tab <b>New</b> listet unzugewiesene Tickets, <b>Assigned</b> zugewiesene Tickets, an denen die Arbeit noch nicht begonnen hat.",
+        "step2": "Den Spezialisten im Auswahlfeld der Spalte <b>Actions</b> wählen. Auf der Ticketseite bewirkt die Auswahl in der Karte <b>Zuständig</b> dasselbe.",
+        "step3": "Der Spezialist wird benachrichtigt. Nur Administratoren können Tickets zuweisen oder neu zuweisen; Spezialisten können sich Tickets nicht selbst zuweisen.",
+        "result": "Der Status bleibt <b>Offen</b>. Die Chain of custody zeigt Routed als abgeschlossen.",
+        "img1Alt": "Admin-Panel mit Schaltflächen in der Kopfzeile, Zählern, Workflow-Tabs (Active, New, Assigned, In progress, Waiting, Ready for OK, Processed, Trash) und Ticketliste mit Zuweisungsfeld pro Zeile."
+      },
+      "execution": {
+        "title": "Bearbeitung",
+        "summary": "Der zugewiesene Spezialist bearbeitet das Ticket und kommuniziert mit dem Kunden.",
+        "step1": "Der Spezialist öffnet das Ticket über <b>Queue</b> oder <b>Meine Anfragen</b> und klickt auf <b>Start work</b>.",
+        "step2": "Öffentliche Antwort: Text eingeben und auf <b>Send Reply</b> klicken. Der Kunde sieht die Antwort (mit dem Badge AGENT) und erhält eine E-Mail. Die erste öffentliche Antwort des Personals gilt als SLA-Reaktion.",
+        "step3": "Interne Notiz: <b>Internal note</b> ankreuzen und auf <b>Add Note</b> klicken. Die Notiz erscheint im gelben Bereich Interne Notizen, den nur das Personal sieht. Der Kunde erhält keine E-Mail.",
+        "step4": "Braucht es Angaben vom Kunden, auf <b>Wait for customer</b> klicken; <b>Send for company review</b> sendet eine Antwort und setzt denselben Status in einem Schritt. Ist ein externer Lieferant beteiligt, auf <b>Wait for supplier</b> klicken. <b>Resume work</b> setzt das Ticket wieder auf In Bearbeitung.",
+        "result": "<b>Start work</b> setzt den Status auf <b>In Bearbeitung</b> und schliesst Execution in der Chain of custody ab. Warten setzt <b>Warte auf Kunde</b> oder <b>Warte auf Dritte</b>; beide Zustände bleiben getrennt und erscheinen im Tab <b>Waiting</b> des Admin-Panels.",
+        "img1Alt": "Spezialistenansicht eines neuen Tickets mit der Schaltfläche Start work in der Chain of custody.",
+        "img2Alt": "Ticket in Bearbeitung mit den Schaltflächen Wait for customer, Wait for supplier und Ready for admin OK.",
+        "img3Alt": "Aktivitätsbereich mit einer öffentlichen Antwort (AGENT) und darunter einer gelben internen Notiz, die nur das Personal sieht."
+      },
+      "adminOk": {
+        "title": "Admin OK",
+        "summary": "Abgeschlossene Arbeit wird von einem Administrator geprüft, bevor der Kunde über die Lösung informiert wird.",
+        "step1": "Ist die Arbeit erledigt, klickt der Spezialist auf <b>Ready for admin OK</b> und danach auf <b>Confirm</b>. Das kann nur der zugewiesene Spezialist und nur solange das Ticket in Bearbeitung ist.",
+        "step2": "Das Ticket zeigt «Submitted for administrator review. Execution controls are locked until a decision.» Administratoren und Manager werden benachrichtigt («Ready for admin OK»); das Ticket erscheint im Tab <b>Ready for OK</b> des Admin-Panels.",
+        "step3": "Der Administrator prüft Antworten und interne Notizen auf der Ticketseite, klickt auf <b>Approve and resolve</b> oder <b>Request changes</b> und danach auf <b>Confirm</b>. In der Liste des Admin-Panels treffen die Schaltflächen <b>OK</b> und <b>Changes</b> dieselben Entscheide direkt, ohne Bestätigungsschritt.",
+        "step4": "<b>Request changes</b> gibt das Ticket mit Status In Bearbeitung an den Spezialisten zurück; der Spezialist wird benachrichtigt.",
+        "result": "Solange die Prüfung aussteht, zeigt die Chain of custody Admin OK als abgeschlossen, und die Bearbeitungsschaltflächen des Spezialisten sind ausgeblendet.",
+        "img1Alt": "Bestätigung «Confirm that the work is complete and ready for administrator approval.» mit Confirm und Cancel.",
+        "img2Alt": "Spezialistenansicht nach dem Einreichen: «Submitted for administrator review. Execution controls are locked until a decision.»",
+        "img3Alt": "Administratoransicht mit den Schaltflächen Approve and resolve und Request changes, darunter Schliessung erzwingen.",
+        "img4Alt": "Bestätigung «Approve this work and notify the customer that the ticket is resolved?» mit Confirm und Cancel."
+      },
+      "resolved": {
+        "title": "Gelöst",
+        "summary": "Die Genehmigung löst das Ticket und informiert den Kunden.",
+        "step1": "Nach <b>Approve and resolve</b> und <b>Confirm</b> wechselt der Status auf <b>Gelöst</b>.",
+        "step2": "Der Kunde erhält eine Benachrichtigung und eine E-Mail, dass das Ticket gelöst wurde. Der Spezialist erhält die Benachrichtigung «Work approved».",
+        "step3": "Ein Ticket kann nur über diese Genehmigung gelöst werden: Das System lehnt das Lösen ohne genehmigte Prüfung ab.",
+        "result": "Status <b>Gelöst</b>. Die Chain of custody zeigt fünf von sechs Phasen als abgeschlossen; Customer OK steht noch aus.",
+        "img1Alt": "Administratoransicht des gelösten Tickets: Status Gelöst, fünf Phasen der Chain of custody abgeschlossen."
+      },
+      "customerOk": {
+        "title": "Bestätigung durch den Kunden",
+        "summary": "Der Kunde gibt die abschliessende Bestätigung oder eröffnet das Ticket erneut.",
+        "step1": "Auf dem gelösten Ticket sieht der Kunde «Alles gelöst?» mit <b>Bestätigen — alles in Ordnung</b> und, solange das Zeitfenster offen ist, <b>Problem nicht gelöst?</b> mit den verbleibenden Stunden.",
+        "step2": "<b>Bestätigen — alles in Ordnung</b> schliesst das Ticket: Status <b>Geschlossen</b>, die Chain of custody ist vollständig.",
+        "step3": "<b>Problem nicht gelöst?</b> steht während {hours} Stunden nach der Lösung zur Verfügung. Das Ticket wird wieder auf In Bearbeitung gesetzt, die Prüfung als «Änderungen verlangt» markiert, eine neue Lösungsfrist ab dem Zeitpunkt der Wiedereröffnung berechnet und der zugewiesene Spezialist benachrichtigt.",
+        "step4": "Ohne Rückmeldung schliesst ein geplanter Job gelöste Tickets automatisch, sobald seit der Lösung {hours} Stunden vergangen sind. Der Job läuft einmal täglich; die automatische Schliessung kann daher bis zu einem Tag später erfolgen.",
+        "step5": "Unter <b>Meine Anfragen</b> sehen Kunden Zähler nach Phase und die Liste ihrer eigenen Tickets.",
+        "result": "Status <b>Geschlossen</b> nach Bestätigung oder automatischer Schliessung; Status <b>In Bearbeitung</b> nach Wiedereröffnung.",
+        "img1Alt": "Kundenkarte «Is everything resolved?» mit den Schaltflächen Confirm — all good und Issue not resolved? (47h) sowie dem Hinweis zur automatischen Schliessung (englische Oberfläche).",
+        "img2Alt": "Kundenansicht des Tickets mit Status Geschlossen.",
+        "img3Alt": "Kundenportal Meine Anfragen mit den Zählern Received, In progress, Waiting und Resolved und der Liste offener Tickets."
+      }
+    },
+    "goodToKnow": {
+      "title": "Gut zu wissen",
+      "sla": "<b>Karte SLA-Frist</b>: zeigt zwei Fristen, die aus der Priorität abgeleitet werden. Response läuft bis zur ersten öffentlichen Antwort des Personals, Resolution bis das Ticket gelöst ist. Das Badge zeigt On time, At risk (eine Stunde oder weniger bzw. höchstens 25 % des Zeitfensters übrig) oder Breached, sobald eine Frist überschritten ist.",
+      "ai": "<b>KI-Triage «Unavailable»</b>: Die KI-Analyse wurde nicht abgeschlossen. Kategorie und Priorität müssen manuell geprüft werden. Wurde gar keine Analyse gespeichert, versucht es der tägliche Job erneut, und Administratoren können sie über die Karte neu starten.",
+      "internal": "<b>Interne Notizen</b> werden nur dem Personal angezeigt. Sie erscheinen nicht in der Kundenansicht und lösen keine E-Mail an den Kunden aus.",
+      "forceClose": "<b>Schliessung erzwingen</b> ist Administratoren vorbehalten. Damit werden Bearbeitung, Admin OK und die Bestätigung des Kunden übersprungen; eine Begründung von mindestens {min} Zeichen ist Pflicht, und der Vorgang wird im Audit-Log festgehalten.",
+      "labels": "Die Schaltflächen der Ticket-Bearbeitung, die Chain of custody und die Schaltflächen im Admin-Panel werden in der Anwendung derzeit auf Englisch angezeigt; dieses Handbuch zitiert sie so, wie sie erscheinen."
+    }
   }
 }

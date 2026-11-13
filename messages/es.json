@@ -533,5 +533,105 @@
       "busy": "{name} está ocupado",
       "offline": "{name} está desconectado"
     }
+  },
+  "manual": {
+    "navLabel": "Manual",
+    "openButton": "Manual de usuario",
+    "title": "Manual de usuario: ciclo de vida de un ticket",
+    "subtitle": "Cómo avanza un ticket (TK-0000) desde la entrada hasta el cierre, paso a paso. Para el personal de la organización; visible solo para administradores.",
+    "back": "Volver al panel de administración",
+    "tocTitle": "Contenido",
+    "stageLabel": "Fase {number}",
+    "whoLabel": "Quién",
+    "stepsLabel": "Pasos",
+    "resultLabel": "Qué cambia",
+    "intro": {
+      "title": "Roles",
+      "body": "Cada ticket pasa por seis fases, que la página del ticket muestra como Chain of custody: Intake, Routed, Execution, Admin OK, Resolved y Customer OK. Intervienen tres roles:",
+      "admin": "<b>Administrador</b>: registra tickets para clientes, los asigna, aprueba o devuelve el trabajo terminado y es el único rol que puede forzar el cierre.",
+      "specialist": "<b>Especialista</b> (agente): solo ve los tickets que tiene asignados, realiza el trabajo y lo marca como listo para aprobación.",
+      "customer": "<b>Cliente</b>: abre tickets, recibe las respuestas públicas y da la confirmación final."
+    },
+    "roles": {
+      "admin": "Administrador",
+      "specialist": "Especialista",
+      "customer": "Cliente"
+    },
+    "stages": {
+      "intake": {
+        "title": "Entrada",
+        "summary": "El ticket lo crea el cliente en el portal o un administrador en nombre del cliente. Cada ticket recibe una referencia con el formato TK-0000.",
+        "step1": "Los clientes abren un ticket con <b>Nuevo Ticket</b> en la barra lateral.",
+        "step2": "Los administradores registran un ticket para un cliente: panel de administración → <b>Ticket for Customer</b>. Elegir el cliente (<b>Existing</b>, <b>New individual</b> o <b>New company</b>), escribir un resumen breve y la descripción, elegir la prioridad y, opcionalmente, un equipo. El valor por defecto es <b>Let routing decide</b>.",
+        "step3": "Pulsar <b>Create ticket for customer</b>. El ticket queda registrado a nombre del cliente y sigue el mismo enrutamiento, los mismos plazos SLA y el mismo triage con IA que un ticket abierto por el cliente.",
+        "result": "Estado <b>Abierto</b>. La Chain of custody muestra Intake como completada. Los plazos SLA de respuesta y de resolución se fijan según la prioridad, y el triage con IA se ejecuta en segundo plano.",
+        "img1Alt": "Formulario «New ticket for a customer» con selección de cliente, solicitud, prioridad y equipo. Las direcciones de correo de los clientes están difuminadas.",
+        "img2Alt": "Detalle del ticket en la vista de administrador: cabecera con estado Abierto, Chain of custody con Intake y Routed, tarjeta Responsable, tarjeta Plazo SLA y tarjeta de triage con IA marcada como Unavailable."
+      },
+      "routing": {
+        "title": "Enrutamiento y asignación",
+        "summary": "Al crear el ticket, el sistema intenta asignarlo automáticamente: primero a un agente cuya especialidad o equipo coincida y, si no hay, al agente disponible con menos tickets activos. Solo se tienen en cuenta los agentes conectados en ese momento. Si no hay nadie disponible, el ticket queda sin asignar y los administradores reciben la notificación «Ticket needs routing».",
+        "step1": "Abrir el panel de administración. La pestaña <b>New</b> muestra los tickets sin asignar; <b>Assigned</b>, los asignados en los que aún no se ha empezado a trabajar.",
+        "step2": "Elegir el especialista en el desplegable de la columna <b>Actions</b>. En la página del ticket, el selector de la tarjeta <b>Responsable</b> hace lo mismo.",
+        "step3": "El especialista recibe una notificación. Solo los administradores pueden asignar o reasignar tickets; los especialistas no pueden asignarse tickets a sí mismos.",
+        "result": "El estado sigue siendo <b>Abierto</b>. La Chain of custody muestra Routed como completada.",
+        "img1Alt": "Panel de administración con los botones de la cabecera, contadores, pestañas de flujo (Active, New, Assigned, In progress, Waiting, Ready for OK, Processed, Trash) y la lista de tickets con un desplegable de asignación por fila."
+      },
+      "execution": {
+        "title": "Ejecución",
+        "summary": "El especialista asignado trabaja en el ticket y se comunica con el cliente.",
+        "step1": "El especialista abre el ticket desde <b>Queue</b> o <b>Mis Tickets</b> y pulsa <b>Start work</b>.",
+        "step2": "Respuesta pública: escribir en el campo de texto y pulsar <b>Send Reply</b>. El cliente ve la respuesta (con la etiqueta AGENT) y recibe un correo. La primera respuesta pública del personal cuenta como respuesta SLA.",
+        "step3": "Nota interna: marcar <b>Internal note</b> y pulsar <b>Add Note</b>. La nota aparece en la sección amarilla Notas internas, que solo ve el personal. El cliente no recibe ningún correo.",
+        "step4": "Si hace falta información del cliente, pulsar <b>Wait for customer</b>; <b>Send for company review</b> envía una respuesta y fija el mismo estado en un solo paso. Si interviene un proveedor externo, pulsar <b>Wait for supplier</b>. <b>Resume work</b> devuelve el ticket a En progreso.",
+        "result": "<b>Start work</b> cambia el estado a <b>En progreso</b> y completa Execution en la Chain of custody. La espera fija <b>Esperando cliente</b> o <b>Esperando tercero</b>; ambos estados se mantienen separados y aparecen en la pestaña <b>Waiting</b> del panel de administración.",
+        "img1Alt": "Vista del especialista de un ticket nuevo con el botón Start work en la Chain of custody.",
+        "img2Alt": "Ticket en progreso con los botones Wait for customer, Wait for supplier y Ready for admin OK.",
+        "img3Alt": "Sección de actividad con una respuesta pública marcada como AGENT y, debajo, una nota interna amarilla visible solo para el personal."
+      },
+      "adminOk": {
+        "title": "Admin OK",
+        "summary": "Un administrador revisa el trabajo terminado antes de comunicar al cliente que está resuelto.",
+        "step1": "Cuando el trabajo está hecho, el especialista pulsa <b>Ready for admin OK</b> y después <b>Confirm</b>. Solo puede hacerlo el especialista asignado y solo mientras el ticket está En progreso.",
+        "step2": "El ticket muestra «Submitted for administrator review. Execution controls are locked until a decision.» Los administradores y los managers reciben una notificación («Ready for admin OK»); el ticket aparece en la pestaña <b>Ready for OK</b> del panel de administración.",
+        "step3": "El administrador revisa las respuestas y las notas internas en la página del ticket, pulsa <b>Approve and resolve</b> o <b>Request changes</b> y después <b>Confirm</b>. En la lista del panel de administración, los botones <b>OK</b> y <b>Changes</b> toman las mismas decisiones directamente, sin paso de confirmación.",
+        "step4": "<b>Request changes</b> devuelve el ticket al especialista con estado En progreso, y el especialista recibe una notificación.",
+        "result": "Mientras la revisión está pendiente, la Chain of custody muestra Admin OK como completada y los botones de ejecución del especialista se ocultan.",
+        "img1Alt": "Confirmación «Confirm that the work is complete and ready for administrator approval.» con Confirm y Cancel.",
+        "img2Alt": "Vista del especialista tras el envío: «Submitted for administrator review. Execution controls are locked until a decision.»",
+        "img3Alt": "Vista del administrador con los botones Approve and resolve y Request changes y, debajo, Forzar cierre.",
+        "img4Alt": "Confirmación «Approve this work and notify the customer that the ticket is resolved?» con Confirm y Cancel."
+      },
+      "resolved": {
+        "title": "Resuelto",
+        "summary": "La aprobación resuelve el ticket e informa al cliente.",
+        "step1": "Tras <b>Approve and resolve</b> y <b>Confirm</b>, el estado cambia a <b>Resuelto</b>.",
+        "step2": "El cliente recibe una notificación y un correo indicando que el ticket se ha resuelto. El especialista recibe la notificación «Work approved».",
+        "step3": "Un ticket solo puede resolverse mediante esta aprobación: el sistema rechaza resolver un ticket sin una revisión aprobada.",
+        "result": "Estado <b>Resuelto</b>. La Chain of custody muestra cinco de seis fases completadas; Customer OK sigue pendiente.",
+        "img1Alt": "Vista del administrador del ticket resuelto: estado Resuelto y cinco fases de la Chain of custody completadas."
+      },
+      "customerOk": {
+        "title": "Confirmación del cliente",
+        "summary": "El cliente da la confirmación final o reabre el ticket.",
+        "step1": "En el ticket resuelto, el cliente ve «¿Todo resuelto?» con <b>Confirmar — todo correcto</b> y, mientras el plazo está abierto, <b>¿No está resuelto?</b> con las horas restantes.",
+        "step2": "<b>Confirmar — todo correcto</b> cierra el ticket: estado <b>Cerrado</b>, y la Chain of custody queda completa.",
+        "step3": "<b>¿No está resuelto?</b> está disponible durante {hours} horas tras la resolución. Devuelve el ticket a En progreso, marca la revisión como cambios solicitados, calcula un nuevo plazo de resolución desde el momento de la reapertura y notifica al especialista asignado.",
+        "step4": "Sin respuesta, una tarea programada cierra automáticamente los tickets resueltos cuando han pasado {hours} horas desde la resolución. La tarea se ejecuta una vez al día, por lo que el cierre automático puede producirse hasta un día después.",
+        "step5": "En <b>Mis Tickets</b>, los clientes ven contadores por fase y la lista de sus propios tickets.",
+        "result": "Estado <b>Cerrado</b> tras la confirmación o el cierre automático; estado <b>En progreso</b> tras la reapertura.",
+        "img1Alt": "Tarjeta del cliente «Is everything resolved?» con los botones Confirm — all good e Issue not resolved? (47h) y la nota sobre el cierre automático (interfaz en inglés).",
+        "img2Alt": "Vista del cliente del ticket con estado Cerrado.",
+        "img3Alt": "Portal del cliente Mis Tickets con los contadores Received, In progress, Waiting y Resolved y la lista de tickets abiertos."
+      }
+    },
+    "goodToKnow": {
+      "title": "Conviene saber",
+      "sla": "<b>Tarjeta Plazo SLA</b>: muestra dos plazos derivados de la prioridad. Response corre hasta la primera respuesta pública del personal; Resolution, hasta que el ticket se resuelve. La etiqueta indica On time, At risk (una hora o menos, o como máximo el 25 % del plazo restante) o Breached cuando un plazo ha vencido.",
+      "ai": "<b>Triage con IA «Unavailable»</b>: el análisis con IA no se completó. La categoría y la prioridad deben revisarse manualmente. Si no se guardó ningún análisis, la tarea diaria lo reintenta y los administradores pueden relanzarlo desde la tarjeta.",
+      "internal": "<b>Las notas internas</b> solo se muestran al personal. No aparecen en la vista del cliente ni generan un correo al cliente.",
+      "forceClose": "<b>Forzar cierre</b> está reservado a los administradores. Omite la ejecución, el Admin OK y la confirmación del cliente, exige un motivo de al menos {min} caracteres y queda registrado en el registro de auditoría.",
+      "labels": "Los botones de trabajo del ticket, la Chain of custody y los botones del panel de administración se muestran actualmente en inglés en la aplicación; este manual los cita tal como aparecen."
+    }
   }
 }

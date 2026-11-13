@@ -533,5 +533,105 @@
       "busy": "{name} is busy",
       "offline": "{name} is offline"
     }
+  },
+  "manual": {
+    "navLabel": "Manual",
+    "openButton": "User manual",
+    "title": "User manual: ticket lifecycle",
+    "subtitle": "How a ticket (TK-0000) moves from intake to closure, step by step. For the organisation’s staff; visible to administrators only.",
+    "back": "Back to Admin Panel",
+    "tocTitle": "Contents",
+    "stageLabel": "Stage {number}",
+    "whoLabel": "Who",
+    "stepsLabel": "Steps",
+    "resultLabel": "What changes",
+    "intro": {
+      "title": "Roles",
+      "body": "Every ticket passes through six stages, shown on the ticket page as the chain of custody: Intake, Routed, Execution, Admin OK, Resolved and Customer OK. Three roles take part:",
+      "admin": "<b>Administrator</b>: files tickets for customers, assigns them, approves or returns completed work and is the only role that can force close.",
+      "specialist": "<b>Specialist</b> (agent): sees only the tickets assigned to them, carries out the work and reports it as ready for approval.",
+      "customer": "<b>Customer</b>: opens tickets, receives public replies and gives the final confirmation."
+    },
+    "roles": {
+      "admin": "Administrator",
+      "specialist": "Specialist",
+      "customer": "Customer"
+    },
+    "stages": {
+      "intake": {
+        "title": "Intake",
+        "summary": "A ticket is created either by the customer in the portal or by an administrator on the customer’s behalf. Each ticket receives a reference in the form TK-0000.",
+        "step1": "Customers open a ticket themselves with <b>New Ticket</b> in the sidebar.",
+        "step2": "Administrators file a ticket for a customer: Admin Panel → <b>Ticket for Customer</b>. Choose the customer (<b>Existing</b>, <b>New individual</b> or <b>New company</b>), enter a short summary and the description, choose the priority and, optionally, a team. The default is <b>Let routing decide</b>.",
+        "step3": "Click <b>Create ticket for customer</b>. The ticket is filed in the customer’s name and goes through the same routing, SLA deadlines and AI triage as a ticket the customer filed.",
+        "result": "Status <b>Open</b>. The chain of custody shows Intake as complete. The SLA response and resolution deadlines are set from the priority, and AI triage runs in the background.",
+        "img1Alt": "Form “New ticket for a customer” with customer selection, request, priority and team. Customer e-mail addresses are blurred.",
+        "img2Alt": "Ticket detail in the administrator view: header with status Open, chain of custody with Intake and Routed, Assigned to card, SLA Deadline card and AI Triage card marked Unavailable."
+      },
+      "routing": {
+        "title": "Routing and assignment",
+        "summary": "When a ticket is created, the system tries to assign it automatically: first to an agent whose specialty or team matches, otherwise to the available agent with the fewest active tickets. Only agents who are currently online are considered. If nobody is available, the ticket stays unassigned and administrators receive the notification “Ticket needs routing”.",
+        "step1": "Open the Admin Panel. The <b>New</b> tab lists unassigned tickets; <b>Assigned</b> lists assigned tickets on which work has not started.",
+        "step2": "Choose the specialist in the dropdown in the <b>Actions</b> column. On the ticket page, the selection in the <b>Assigned to</b> card does the same.",
+        "step3": "The specialist is notified. Only administrators can assign or reassign tickets; specialists cannot assign tickets to themselves.",
+        "result": "The status remains <b>Open</b>. The chain of custody shows Routed as complete.",
+        "img1Alt": "Admin Panel with header buttons, counters, workflow tabs (Active, New, Assigned, In progress, Waiting, Ready for OK, Processed, Trash) and the ticket list with an assignment dropdown per row."
+      },
+      "execution": {
+        "title": "Execution",
+        "summary": "The assigned specialist works on the ticket and communicates with the customer.",
+        "step1": "The specialist opens the ticket from <b>Queue</b> or <b>My Tickets</b> and clicks <b>Start work</b>.",
+        "step2": "Public reply: write in the text field and click <b>Send Reply</b>. The customer sees the reply (marked with the AGENT badge) and receives an e-mail. The first public reply from staff counts as the SLA response.",
+        "step3": "Internal note: tick <b>Internal note</b> and click <b>Add Note</b>. The note appears in the yellow Internal notes section, which only staff can see. No e-mail is sent to the customer.",
+        "step4": "If the customer needs to provide information, click <b>Wait for customer</b>; <b>Send for company review</b> sends a reply and sets the same status in one step. If an external supplier is involved, click <b>Wait for supplier</b>. <b>Resume work</b> returns the ticket to In progress.",
+        "result": "<b>Start work</b> sets the status to <b>In progress</b> and completes Execution in the chain of custody. Waiting sets <b>Pending customer</b> or <b>Pending 3rd party</b>; the two are kept separate and both appear in the <b>Waiting</b> tab of the Admin Panel.",
+        "img1Alt": "Specialist view of a new ticket with the Start work button in the chain of custody.",
+        "img2Alt": "Ticket in progress with the buttons Wait for customer, Wait for supplier and Ready for admin OK.",
+        "img3Alt": "Activity section with a public reply marked AGENT and, below it, a yellow internal note visible to staff only."
+      },
+      "adminOk": {
+        "title": "Admin OK",
+        "summary": "Completed work is checked by an administrator before the customer is told it is resolved.",
+        "step1": "When the work is done, the specialist clicks <b>Ready for admin OK</b> and then <b>Confirm</b>. Only the assigned specialist can do this, and only while the ticket is In progress.",
+        "step2": "The ticket shows “Submitted for administrator review. Execution controls are locked until a decision.” Administrators and managers are notified (“Ready for admin OK”); the ticket appears in the <b>Ready for OK</b> tab of the Admin Panel.",
+        "step3": "The administrator reviews replies and internal notes on the ticket page, clicks <b>Approve and resolve</b> or <b>Request changes</b>, and then <b>Confirm</b>. In the Admin Panel list, the <b>OK</b> and <b>Changes</b> buttons take the same decisions directly, without a confirmation step.",
+        "step4": "<b>Request changes</b> returns the ticket to the specialist with status In progress, and the specialist is notified.",
+        "result": "While the review is pending, the chain of custody shows Admin OK as complete and the specialist’s execution buttons are hidden.",
+        "img1Alt": "Confirmation “Confirm that the work is complete and ready for administrator approval.” with Confirm and Cancel.",
+        "img2Alt": "Specialist view after submission: “Submitted for administrator review. Execution controls are locked until a decision.”",
+        "img3Alt": "Administrator view with the buttons Approve and resolve and Request changes, and Force close below them.",
+        "img4Alt": "Confirmation “Approve this work and notify the customer that the ticket is resolved?” with Confirm and Cancel."
+      },
+      "resolved": {
+        "title": "Resolved",
+        "summary": "Approval resolves the ticket and informs the customer.",
+        "step1": "After <b>Approve and resolve</b> and <b>Confirm</b>, the status changes to <b>Resolved</b>.",
+        "step2": "The customer receives a notification and an e-mail saying that the ticket has been resolved. The specialist receives the notification “Work approved”.",
+        "step3": "A ticket can only be resolved through this approval: the system rejects resolving a ticket without an approved review.",
+        "result": "Status <b>Resolved</b>. The chain of custody shows five of six stages complete; Customer OK is still open.",
+        "img1Alt": "Administrator view of the resolved ticket: status Resolved, five stages of the chain of custody complete."
+      },
+      "customerOk": {
+        "title": "Customer OK",
+        "summary": "The customer gives the final confirmation or reopens the ticket.",
+        "step1": "On the resolved ticket, the customer sees “Is everything resolved?” with <b>Confirm — all good</b> and, while the window is open, <b>Issue not resolved?</b> with the remaining hours.",
+        "step2": "<b>Confirm — all good</b> closes the ticket: status <b>Closed</b>, and the chain of custody is complete.",
+        "step3": "<b>Issue not resolved?</b> is available for {hours} hours after resolution. It sets the ticket back to In progress, marks the review as changes requested, calculates a new resolution deadline from the time of reopening and notifies the assigned specialist.",
+        "step4": "Without a response, a scheduled job closes resolved tickets automatically once {hours} hours have passed since resolution. The job runs once a day, so the automatic close can happen up to one day later.",
+        "step5": "In <b>My Tickets</b>, customers see counters by stage and the list of their own tickets.",
+        "result": "Status <b>Closed</b> after confirmation or automatic closing; status <b>In progress</b> after reopening.",
+        "img1Alt": "Customer card “Is everything resolved?” with the buttons Confirm — all good and Issue not resolved? (47h), and the note on automatic closing.",
+        "img2Alt": "Customer view of the ticket with status Closed.",
+        "img3Alt": "Customer portal My Tickets with the counters Received, In progress, Waiting and Resolved and the list of open tickets."
+      }
+    },
+    "goodToKnow": {
+      "title": "Good to know",
+      "sla": "<b>SLA Deadline card</b>: shows two deadlines derived from the priority. Response runs until the first public reply from staff, Resolution until the ticket is resolved. The badge reads On time, At risk (one hour or less, or at most 25% of the time window left) or Breached once a deadline has passed.",
+      "ai": "<b>AI Triage “Unavailable”</b>: the AI analysis did not complete. Category and priority must be reviewed manually. If no analysis was recorded at all, the daily job tries again and administrators can restart it from the card.",
+      "internal": "<b>Internal notes</b> are shown to staff only. They are not displayed in the customer’s view and do not trigger an e-mail to the customer.",
+      "forceClose": "<b>Force close</b> is reserved for administrators. It skips execution, Admin OK and the customer’s confirmation, requires a reason of at least {min} characters and is recorded in the audit log.",
+      "labels": "Button labels in this manual are quoted exactly as they appear in the application."
+    }
   }
 }
