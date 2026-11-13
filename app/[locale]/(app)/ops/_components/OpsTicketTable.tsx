@@ -13,6 +13,7 @@ import { PresenceMark } from "@/components/presence/PresenceMark";
 import type { EffectivePresence } from "@/lib/presence";
 import { MonoText, Tag } from "./primitives";
 import { MONO, OPS, PRIORITY_COLOR, STATUS_COLOR } from "./tokens";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 function Chip({
   label,
@@ -62,7 +63,7 @@ export function OpsTicketTable({
   const t = useTranslations("ops");
 
   const formatDate = (iso: string) =>
-    new Date(iso).toLocaleString(undefined, {
+    new Date(iso).toLocaleString(undefined, { timeZone: APP_TIME_ZONE,
       day: "2-digit",
       month: "short",
       year: "2-digit",

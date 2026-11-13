@@ -5,6 +5,7 @@ import { TrendingUp, Activity, Zap, BarChart3, Target, ChevronDown, ChevronUp } 
 import { runPredictor, reconstructAt, type PredictorOutput } from "@/lib/math/predictor-engine";
 import { DATASETS, type DatasetKey } from "@/lib/math/mock-datasets";
 import { cn } from "@/lib/utils";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 // ─── Chart helpers ─────────────────────────────────────────────────────────
 const W = 800, H = 280, PX = 48, PY = 24;
@@ -137,7 +138,7 @@ export function PredictiveEngine() {
   const ticks = Array.from({ length: tickCount }, (_, i) => {
     const t = minT + ((maxT - minT) * i) / (tickCount - 1);
     const d = new Date(t);
-    return { x: scX(d, minT, maxT), label: d.toLocaleDateString("de-CH", { month: "short", year: "2-digit" }) };
+    return { x: scX(d, minT, maxT), label: d.toLocaleDateString("de-CH", { timeZone: APP_TIME_ZONE, month: "short", year: "2-digit" }) };
   });
 
   const fmt = dataset.formatValue;
@@ -402,7 +403,7 @@ export function PredictiveEngine() {
                 {fmt(current.nextPeak.estimatedValue)}
               </p>
               <p className="text-[11px] text-white/40 font-mono mt-0.5">
-                {current.nextPeak.date.toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" })}
+                {current.nextPeak.date.toLocaleDateString("de-CH", { timeZone: APP_TIME_ZONE, day: "numeric", month: "short", year: "numeric" })}
               </p>
             </div>
           )}
