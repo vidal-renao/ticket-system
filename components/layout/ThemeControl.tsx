@@ -2,17 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun, SunMoon } from "lucide-react";
+import { DAY_START_HOUR, NIGHT_START_HOUR, resolveAutoTheme } from "@/lib/theme-schedule";
 
 type ThemeMode = "auto" | "light" | "dark";
 
 const THEME_KEY = "hd_theme";
 const BRIGHTNESS_KEY = "hd_brightness";
+/** How often Auto re-checks the clock so it flips at the boundary without reload. */
+const AUTO_RECHECK_MS = 60_000;
 
-/** Resolve auto → light/dark from the OS (sunlight ⇒ users run light mode). */
+function readStoredMode(): ThemeMode {
+  const stored = localStorage.getItem(THEME_KEY);
+  return stored === "light" || stored === "dark" ? stored : "auto";
+}
+
+/** Auto follows the viewer's local time of day (lib/theme-schedule.ts). */
 function resolveTheme(mode: ThemeMode): "light" | "dark" {
-  if (mode !== "auto") return mode;
-  if (typeof window === "undefined") return "dark";
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return mode === "auto" ? resolveAutoTheme(new Date()) : mode;
 }
 
 function applyTheme(mode: ThemeMode) {
@@ -36,21 +42,30 @@ export function ThemeControl() {
   const [brightness, setBrightness] = useState(50);
 
   useEffect(() => {
-    const storedMode = (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? "auto";
+    const storedMode = readStoredMode();
     const storedBrightness = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? "50");
+    const safeBrightness = Number.isFinite(storedBrightness) ? storedBrightness : 50;
     setMode(storedMode);
-    setBrightness(Number.isFinite(storedBrightness) ? storedBrightness : 50);
+    setBrightness(safeBrightness);
     applyTheme(storedMode);
-    applyBrightness(storedBrightness);
-
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const onSystemChange = () => {
-      const current = (localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? "auto";
-      if (current === "auto") applyTheme("auto");
-    };
-    media.addEventListener("change", onSystemChange);
-    return () => media.removeEventListener("change", onSystemChange);
+    applyBrightness(safeBrightness);
   }, []);
+
+  // While Auto is selected, re-evaluate every minute and when the tab becomes
+  // visible again. Picking Day/Night tears this down.
+  useEffect(() => {
+    if (mode !== "auto") return;
+    const recheck = () => applyTheme("auto");
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") recheck();
+    };
+    const timer = window.setInterval(recheck, AUTO_RECHECK_MS);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [mode]);
 
   function handleMode(next: ThemeMode) {
     setMode(next);
@@ -64,22 +79,28 @@ export function ThemeControl() {
     applyBrightness(next);
   }
 
-  const MODES: { value: ThemeMode; label: string; icon: React.ElementType }[] = [
-    { value: "auto",  label: "Auto",  icon: SunMoon },
-    { value: "light", label: "Day",   icon: Sun },
-    { value: "dark",  label: "Night", icon: Moon },
+  const pad = (hour: number) => String(hour).padStart(2, "0");
+  const MODES: { value: ThemeMode; label: string; title: string; icon: React.ElementType }[] = [
+    {
+      value: "auto",
+      label: "Auto",
+      title: `Auto: light by day (${pad(DAY_START_HOUR)}:00–${pad(NIGHT_START_HOUR)}:00), dark at night`,
+      icon: SunMoon,
+    },
+    { value: "light", label: "Day",   title: "Day mode: always light", icon: Sun },
+    { value: "dark",  label: "Night", title: "Night mode: always dark", icon: Moon },
   ];
 
   return (
     <div className="px-3 py-2 space-y-2">
       <div role="group" aria-label="Theme" className="flex items-center gap-1">
-        {MODES.map(({ value, label, icon: Icon }) => (
+        {MODES.map(({ value, label, title, icon: Icon }) => (
           <button
             key={value}
             type="button"
             onClick={() => handleMode(value)}
             aria-pressed={mode === value}
-            title={`${label} mode`}
+            title={title}
             className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
               mode === value
                 ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
