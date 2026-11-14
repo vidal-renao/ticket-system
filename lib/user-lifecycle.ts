@@ -139,3 +139,75 @@ export const UNFREEZE_BAN_DURATION = "none";
 export function banDurationFor(action: "freeze" | "unfreeze"): string {
   return action === "freeze" ? FREEZE_BAN_DURATION : UNFREEZE_BAN_DURATION;
 }
+
+// ─── Audit trail ────────────────────────────────────────────────────────────
+
+export type AccountLifecycleAction = "freeze" | "unfreeze" | "delete" | "restore";
+
+/**
+ * Freezing an account bans it from signing in, and before this existed the
+ * only trace of who did it was the ban's own timestamp in GoTrue -- an account
+ * locked out by somebody, at some point, for no recorded reason. Every
+ * administrator action on an account now leaves a row in the same audit table
+ * the ticket actions use, so the operations feed and any later investigation
+ * read one history.
+ *
+ * The row names the target by id and role only. No email or display name:
+ * the audit table is readable by every staff member of the organization, and
+ * the id is enough to resolve the person for anyone allowed to.
+ */
+const AUDIT_ACTION: Record<AccountLifecycleAction, string> = {
+  freeze: "user.frozen",
+  unfreeze: "user.unfrozen",
+  delete: "user.deleted",
+  restore: "user.restored",
+};
+
+export function buildAccountAuditEntry(input: {
+  action: AccountLifecycleAction;
+  organizationId: string;
+  actorId: string;
+  actorRole: string;
+  targetId: string;
+  targetRole: ActionableRole;
+  /** The account's `is_active` before the action, as read from the profile. */
+  wasActive: boolean;
+}) {
+  const before: Record<string, unknown> = { role: input.targetRole };
+  const after: Record<string, unknown> = { role: input.targetRole };
+
+  switch (input.action) {
+    case "freeze":
+      before.is_active = input.wasActive;
+      after.is_active = false;
+      break;
+    case "unfreeze":
+      before.is_active = input.wasActive;
+      after.is_active = true;
+      break;
+    case "delete":
+      // Deleting freezes too (see the delete route), so both facts change.
+      before.deleted = false;
+      before.is_active = input.wasActive;
+      after.deleted = true;
+      after.is_active = false;
+      break;
+    case "restore":
+      // Restoring deliberately leaves the account frozen.
+      before.deleted = true;
+      after.deleted = false;
+      after.is_active = false;
+      break;
+  }
+
+  return {
+    organization_id: input.organizationId,
+    actor_id: input.actorId,
+    actor_role: input.actorRole,
+    action: AUDIT_ACTION[input.action],
+    resource_type: "user",
+    resource_id: input.targetId,
+    old_values: before,
+    new_values: after,
+  };
+}

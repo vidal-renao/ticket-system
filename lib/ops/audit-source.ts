@@ -1,4 +1,5 @@
 import { createServiceClientStatic } from "@/lib/supabase/server";
+import { complianceFromSnapshot } from "@/lib/ops/audit-subject";
 import type { OpsAuditDelivery, OpsAuditSummary } from "@/lib/ops/types";
 
 /**
@@ -26,21 +27,6 @@ interface AuditRunRow {
   provider_message_id: string | null;
   payload_snapshot: unknown;
   created_at: string | null;
-}
-
-/**
- * The compliance percentage is only carried in the delivered email subject
- * ("VIDAL Daily SLA Report: 100% compliance - 2026-08-01"), so it is parsed
- * from the payload snapshot rather than read from a column.
- */
-function complianceFromSnapshot(snapshot: unknown): number | null {
-  if (!snapshot || typeof snapshot !== "object") return null;
-  const subject = (snapshot as { subject?: unknown }).subject;
-  if (typeof subject !== "string") return null;
-  const match = subject.match(/(\d+(?:[.,]\d+)?)\s*%\s*compliance/i);
-  if (!match) return null;
-  const value = Number.parseFloat(match[1].replace(",", "."));
-  return Number.isFinite(value) ? value : null;
 }
 
 function toDelivery(row: AuditRunRow): OpsAuditDelivery {

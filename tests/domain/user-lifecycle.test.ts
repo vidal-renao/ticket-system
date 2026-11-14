@@ -3,6 +3,7 @@ import {
   REFUSAL_STATUS,
   accountState,
   banDurationFor,
+  buildAccountAuditEntry,
   canAdministerUser,
   isActionableRole,
   isAssignable,
@@ -155,5 +156,55 @@ describe("the ban durations handed to GoTrue", () => {
     // string, not null, either of which silently leaves the ban in place.
     expect(banDurationFor("freeze")).toBe("876000h");
     expect(banDurationFor("unfreeze")).toBe("none");
+  });
+});
+
+describe("the audit row an account action leaves", () => {
+  const base = {
+    organizationId: ORG,
+    actorId: "admin-1",
+    actorRole: "admin",
+    targetId: "target-1",
+    targetRole: "customer" as const,
+    wasActive: true,
+  };
+
+  it("records who froze which account, scoped to the organization", () => {
+    expect(buildAccountAuditEntry({ ...base, action: "freeze" })).toEqual({
+      organization_id: ORG,
+      actor_id: "admin-1",
+      actor_role: "admin",
+      action: "user.frozen",
+      resource_type: "user",
+      resource_id: "target-1",
+      old_values: { role: "customer", is_active: true },
+      new_values: { role: "customer", is_active: false },
+    });
+  });
+
+  it("records an unfreeze with the state it lifted", () => {
+    const entry = buildAccountAuditEntry({ ...base, action: "unfreeze", wasActive: false });
+    expect(entry.action).toBe("user.unfrozen");
+    expect(entry.old_values).toEqual({ role: "customer", is_active: false });
+    expect(entry.new_values).toEqual({ role: "customer", is_active: true });
+  });
+
+  it("records that deleting also freezes", () => {
+    const entry = buildAccountAuditEntry({ ...base, action: "delete" });
+    expect(entry.action).toBe("user.deleted");
+    expect(entry.new_values).toEqual({ role: "customer", deleted: true, is_active: false });
+  });
+
+  it("records that restoring leaves the account frozen", () => {
+    const entry = buildAccountAuditEntry({ ...base, action: "restore", wasActive: false });
+    expect(entry.action).toBe("user.restored");
+    expect(entry.new_values).toEqual({ role: "customer", deleted: false, is_active: false });
+  });
+
+  it("never carries an email or a name, only ids and role", () => {
+    for (const action of ["freeze", "unfreeze", "delete", "restore"] as const) {
+      const serialized = JSON.stringify(buildAccountAuditEntry({ ...base, action }));
+      expect(serialized).not.toMatch(/@|email|name/i);
+    }
   });
 });
