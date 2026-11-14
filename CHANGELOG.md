@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Theme Auto follows time of day
+
+### Changed
+
+- The sidebar theme control's "Auto" setting now follows the viewer's local time of day instead of the operating system's colour scheme: light from 07:00 to 18:59, dark from 19:00 to 06:59. Before this, Auto showed the light theme at 01:00 whenever the OS was in light mode.
+- The boundaries live in one place, `lib/theme-schedule.ts` (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `resolveAutoTheme`). The pre-paint boot script moved to `lib/theme-boot-script.ts` and takes the hours from those constants, so first paint and the client control cannot drift apart.
+- While Auto is selected, the theme is checked again every minute and whenever the tab becomes visible, so it switches at the boundary without a reload. Choosing Day or Night stops these checks.
+- Day and Night still force light/dark. Stored `hd_theme` values stay valid; an unrecognised value falls back to Auto. Sidebar state and brightness handling in the boot script are unchanged.
+- Button tooltips now describe each mode (e.g. "Auto: light by day (07:00–19:00), dark at night").
+- Tests: rule edges (00:00, 06:59, 07:00, 18:59, 19:00, 23:59), and the boot script run in a sandbox, checked against the same rule, forced modes, sidebar and brightness.
+
 ## Unreleased — Swiss display time and honest new-ticket copy
 
 ### Fixed
