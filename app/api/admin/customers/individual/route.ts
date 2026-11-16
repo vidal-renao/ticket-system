@@ -11,8 +11,11 @@ import {
   NEEDS_CONFIRMATION_MESSAGE,
   LINKED_ACCOUNT_NOTICE,
   INVITED_ACCOUNT_NOTICE,
+  INVITE_HANDOFF_NOTICE,
 } from "@/lib/customer-onboarding";
 import { appUrl } from "@/lib/app-url";
+import { inviteCustomerAccount } from "@/lib/customer-invite";
+import { decideLinkHandoff, logLinkIssuance } from "@/lib/link-handoff";
 
 const APP_URL = appUrl();
 
@@ -127,40 +130,49 @@ export async function POST(request: Request) {
   const invitationState: "invited" | "linked_existing_user" =
     plan.kind === "link_existing" ? "linked_existing_user" : "invited";
 
+  let inviteEmailDelivered = false;
+  let inviteLink: string | null = null;
+
   if (plan.kind === "link_existing") {
     userId = plan.userId;
   } else {
-    const { data: invited, error: inviteError } = await svc.auth.admin.inviteUserByEmail(
+    // Invites by email. If -- and only if -- GoTrue could not send the mail
+    // and ADMIN_LINK_HANDOFF is on, the account is created without mail and
+    // its invite link becomes eligible for hand-off (lib/customer-invite.ts).
+    // The destination is the set-password screen, not /api/auth/callback: an
+    // admin-generated invite has no PKCE verifier in the recipient's browser,
+    // so GoTrue returns the credentials in the URL fragment, which never
+    // reaches a server route.
+    const invite = await inviteCustomerAccount(
+      svc,
       input.email,
-      {
-        data: { full_name: fullName },
-        // Straight to the set-password screen, the same destination the
-        // password reset uses. Not /api/auth/callback: that route reads a
-        // `code` query parameter, and an admin-generated invite has no PKCE
-        // verifier in the recipient's browser, so GoTrue completes it as an
-        // implicit grant and returns the credentials in the URL *fragment*.
-        // Fragments never reach the server, so the callback saw no code and
-        // bounced every invitee to /login?error=missing_code.
-        redirectTo: `${APP_URL}/reset-password`,
-      }
+      { data: { full_name: fullName }, redirectTo: `${APP_URL}/reset-password` },
+      process.env.ADMIN_LINK_HANDOFF
     );
-    if (inviteError || !invited?.user) {
+    if (!invite.ok) {
       // Never swallowed. GoTrue reports a duplicate address as a generic
-      // "Database error saving new user" with no hint of which address, which
-      // is unreadable from the outside; the address and the driver's own
-      // message have to reach the log or the next diagnosis starts from zero.
+      // "Database error saving new user" with no hint of which address, so
+      // the driver's own message has to reach the log.
       console.error("[admin/customers/individual] invite failed", {
         email: input.email,
-        status: inviteError?.status ?? null,
-        code: inviteError?.code ?? null,
-        message: inviteError?.message ?? "invite returned no user",
+        status: invite.error?.status ?? null,
+        code: invite.error?.code ?? null,
+        message: invite.error?.message ?? "invite returned no user",
+        emailFailure: invite.emailFailure,
       });
       return NextResponse.json(
-        { error: normalizeSupabaseErrorMessage(inviteError) },
-        { status: 400 }
+        {
+          error: invite.emailFailure
+            ? "The invitation email could not be sent, so no account was created. Try again later."
+            : normalizeSupabaseErrorMessage(invite.error),
+          email_sent: false,
+        },
+        { status: invite.emailFailure ? 502 : 400 }
       );
     }
-    userId = invited.user.id;
+    userId = invite.userId;
+    inviteEmailDelivered = invite.emailDelivered;
+    inviteLink = invite.link;
   }
 
   // See profileWriteMode: an invited account already has the trigger's bare
@@ -212,30 +224,27 @@ export async function POST(request: Request) {
     .eq("id", userId)
     .single();
 
-  // The admin always leaves holding a working way in, on both paths. A linked
-  // account never received an invitation at all; an invited one received an
-  // email that may be rate-limited into oblivion and ends at a set-password
-  // screen nobody supervises. The link is generated, never sent -- there is no
-  // verified sender domain, so an automatic send would fail silently.
-  //
-  // Safe to mint next to the invitation: auth.one_time_tokens is unique on
-  // (user_id, token_type), and an invite occupies confirmation_token while a
-  // magic link occupies recovery_token. Different rows; the invitation email
-  // keeps working.
-  const { data: link, error: linkError } = await svc.auth.admin.generateLink({
-    type: "magiclink",
-    email: input.email,
-    options: { redirectTo: `${APP_URL}/tickets` },
+  // SEC-02 / ADR-016. No sign-in link is minted for the admin any more:
+  //   - linked account: it has its own credentials and was sent nothing;
+  //   - invited, mail accepted by Supabase Auth: the invitation is the way in;
+  //   - invited, mail failed, ADMIN_LINK_HANDOFF=true: the invite link itself.
+  const handoff = decideLinkHandoff({
+    kind: plan.kind === "link_existing" ? "link_existing" : "invite",
+    emailDelivered: inviteEmailDelivered,
+    flag: process.env.ADMIN_LINK_HANDOFF,
+    link: inviteLink,
   });
-  if (linkError) {
-    // The customer exists and is correct; only the convenience link is
-    // missing, so this does not fail the request.
-    console.error("[admin/customers/individual] magic link failed", {
-      email: input.email,
-      message: linkError.message,
+  if (plan.kind === "invite") {
+    logLinkIssuance({
+      source: "admin/customers/individual",
+      actorId: user.id,
+      targetUserId: userId,
+      organizationId,
+      linkType: "invite",
+      emailDelivered: inviteEmailDelivered,
+      decision: handoff,
     });
   }
-  const accessLink = link?.properties?.action_link ?? null;
 
   return NextResponse.json({
     user: {
@@ -245,7 +254,15 @@ export async function POST(request: Request) {
       reference_code: profileRow?.reference_code ?? null,
     },
     invitationState,
-    notice: plan.kind === "link_existing" ? LINKED_ACCOUNT_NOTICE : INVITED_ACCOUNT_NOTICE,
-    access_link: accessLink,
+    notice:
+      plan.kind === "link_existing"
+        ? LINKED_ACCOUNT_NOTICE
+        : handoff.handedToAdmin
+          ? INVITE_HANDOFF_NOTICE
+          : INVITED_ACCOUNT_NOTICE,
+    // null for a linked account: nothing was sent and nothing was meant to be.
+    email_sent: plan.kind === "invite" ? inviteEmailDelivered : null,
+    access_link: handoff.link,
+    link_handoff: handoff.reason,
   });
 }

@@ -39,6 +39,11 @@ const supabaseClient = {
 };
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => supabaseClient,
+  // The AI quota store: always "allowed" here, this suite is about failures
+  // of the provider, not of the quota.
+  createServiceClientStatic: () => ({
+    rpc: async () => ({ data: [{ allowed: true, retry_after_seconds: 0, reason: "ok" }], error: null }),
+  }),
 }));
 
 function logged(spy: ReturnType<typeof vi.spyOn>): string {
@@ -63,6 +68,20 @@ describe("summarizeProviderError", () => {
 });
 
 describe("customer AI assistant (/api/ai/wiki-chat)", () => {
+  beforeEach(() => {
+    supabaseClient.from.mockImplementation(() =>
+      chain({
+        data: {
+          id: "user-1",
+          role: "customer",
+          organization_id: "org-1",
+          is_active: true,
+          deleted_at: null,
+        },
+      })
+    );
+  });
+
   async function post() {
     const { POST } = await import("../../app/api/ai/wiki-chat/route");
     return POST(

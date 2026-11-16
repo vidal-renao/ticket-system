@@ -434,7 +434,27 @@
     "allAgents": "Alle Agenten",
     "noTickets": "Keine Anfragen entsprechen Ihren Filtern",
     "totalShowing": "{count} Anfragen",
-    "clearFilters": "Filter zurücksetzen"
+    "clearFilters": "Filter zurücksetzen",
+    "linkHandoff": {
+      "invitedEmailSent": "Kunde angelegt. Die Einladung wurde per E-Mail versendet.",
+      "invitedEmailFailed": "Kunde angelegt, aber die Einladungs-E-Mail konnte nicht versendet werden.",
+      "linkedTitle": "Mit einem bestehenden Konto verknüpft. Es wurde keine Einladung versendet.",
+      "invitedNotice": "Hier wird kein Anmeldelink angezeigt. Falls das Passwort nie gesetzt wird, starten Sie in der Benutzerverwaltung eine Passwortzurücksetzung.",
+      "linkedNotice": "Das Passwort bleibt unverändert – die Anmeldung erfolgt mit den bestehenden Zugangsdaten. Für verknüpfte Konten wird kein Anmeldelink ausgestellt.",
+      "inviteHandoffNotice": "Geben Sie diesen Einladungslink selbst über einen vertrauenswürdigen Kanal weiter. Damit lässt sich das Passwort setzen – behandeln Sie ihn wie ein Passwort.",
+      "copyInviteLink": "Einladungslink kopieren",
+      "copyLink": "Link kopieren",
+      "copied": "Kopiert",
+      "resetTitle": "Passwortzurücksetzung für {name}",
+      "resetEmailSent": "Der Wiederherstellungslink wurde an diese Adresse gesendet. Er wird hier nicht angezeigt.",
+      "resetEmailFailedNoLink": "Die Wiederherstellungs-E-Mail konnte nicht versendet werden, und die Weitergabe von Links an Administratoren ist in dieser Umgebung deaktiviert. Beheben Sie den E-Mail-Versand und versuchen Sie es erneut.",
+      "resetHandoff": "Die Wiederherstellungs-E-Mail konnte nicht versendet werden. Geben Sie diesen Link selbst über einen vertrauenswürdigen Kanal weiter.",
+      "resetExpiry": "Der Link läuft kurz nach dem ersten Öffnen ab. Das aktuelle Passwort bleibt gültig, bis ein neues gesetzt wird.",
+      "done": "Fertig",
+      "close": "Schliessen",
+      "ticketCustomerInvited": "Kunde angelegt. Die Einladung wurde per E-Mail versendet.",
+      "ticketCustomerHandoff": "Kunde angelegt, aber die Einladungs-E-Mail ist fehlgeschlagen. Starten Sie in der Benutzerverwaltung eine Passwortzurücksetzung."
+    }
   },
   "ops": {
     "title": "Live-Betriebskonsole",

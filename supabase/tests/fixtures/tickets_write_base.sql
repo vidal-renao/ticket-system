@@ -186,14 +186,14 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_
 -- Seed: one organization, one admin, one customer, one ticket
 -- ---------------------------------------------------------------------------
 INSERT INTO public.organizations (id, name, slug) VALUES
-  ('921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'Vidal Real Estate', 'vidal-real-estate');
+  ('00000000-0000-4000-8000-00000000c1a0', 'Vidal Real Estate', 'vidal-real-estate');
 
 INSERT INTO public.hd_profiles (id, organization_id, role, full_name) VALUES
-  ('00000000-0000-4000-8000-0000000000ad', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', 'CI Admin'),
-  ('00000000-0000-4000-8000-0000000000cc', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'CI Customer'),
-  ('00000000-0000-4000-8000-0000000000a9', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'agent', 'CI Agent');
+  ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-00000000c1a0', 'admin', 'CI Admin'),
+  ('00000000-0000-4000-8000-0000000000cc', '00000000-0000-4000-8000-00000000c1a0', 'customer', 'CI Customer'),
+  ('00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-00000000c1a0', 'agent', 'CI Agent');
 
 INSERT INTO public.hd_tickets (id, organization_id, created_by, assigned_to, title, status, priority) VALUES
-  ('00000000-0000-4000-8000-000000007c01', '921f56a8-b2fe-4f24-bae9-fdf4863d4240',
+  ('00000000-0000-4000-8000-000000007c01', '00000000-0000-4000-8000-00000000c1a0',
    '00000000-0000-4000-8000-0000000000cc', '00000000-0000-4000-8000-0000000000a9',
    'CI ticket', 'open', 'medium');

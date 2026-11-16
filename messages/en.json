@@ -434,7 +434,27 @@
     "allAgents": "All Agents",
     "noTickets": "No tickets match your filters",
     "totalShowing": "{count} tickets",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "linkHandoff": {
+      "invitedEmailSent": "Customer created. The invitation was emailed.",
+      "invitedEmailFailed": "Customer created, but the invitation email could not be sent.",
+      "linkedTitle": "Linked to an existing account. No invitation was sent.",
+      "invitedNotice": "No sign-in link is shown here. If they never finish setting a password, start a password reset for them from the user directory.",
+      "linkedNotice": "Their password is unchanged — they sign in with the credentials they already have. No sign-in link is issued for a linked account.",
+      "inviteHandoffNotice": "Hand this invitation link over yourself, through a channel you trust. It lets them set their password, so treat it like one.",
+      "copyInviteLink": "Copy invitation link",
+      "copyLink": "Copy link",
+      "copied": "Copied",
+      "resetTitle": "Password reset for {name}",
+      "resetEmailSent": "The recovery link was emailed to this address. It is not shown here.",
+      "resetEmailFailedNoLink": "The recovery email could not be sent, and handing links to administrators is disabled in this environment. Fix outbound email and try again.",
+      "resetHandoff": "The recovery email could not be sent. Hand this link over yourself, through a channel you trust.",
+      "resetExpiry": "The link expires shortly after it is first opened. Their current password keeps working until a new one is set.",
+      "done": "Done",
+      "close": "Close",
+      "ticketCustomerInvited": "Customer created. The invitation was emailed.",
+      "ticketCustomerHandoff": "Customer created, but the invitation email failed. Start a password reset for them from the user directory."
+    }
   },
   "ops": {
     "title": "Live Operations Console",
