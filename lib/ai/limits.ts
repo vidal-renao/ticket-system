@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Bounds for the interactive AI endpoints (/api/translate, /api/ai/wiki-chat
- * and the translateText action). Approved in Phase 0, DECISIONS.md ADR-020.
+ * and the translateText action). Approved in Phase 0, DECISIONS.md ADR-017.
  *
  * The request counts are enforced in PostgreSQL by hd_consume_ai_quota; the
  * size bounds are enforced here, before the provider is called, because the

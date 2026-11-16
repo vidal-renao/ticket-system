@@ -6,7 +6,7 @@ import type { TranslationLanguage } from "@/lib/ai/limits";
  * The one translation call behind both /api/translate and the translateText
  * action. They used to be two copies with different models (Haiku and Sonnet)
  * and different prompts; a translation of a support message does not need the
- * larger model, so both now run on Haiku (DECISIONS.md ADR-020).
+ * larger model, so both now run on Haiku (DECISIONS.md ADR-017).
  *
  * Callers are responsible for authorization, input bounds and quota -- this
  * function only talks to the provider.

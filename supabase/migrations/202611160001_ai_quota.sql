@@ -3,7 +3,7 @@
 -- /api/translate, /api/ai/wiki-chat and the translateText action called the
 -- AI provider for any signed-in account, as often as it asked. On an instance
 -- shared with other applications that is a billing exposure with no brake
--- (audit 2026-11-16, SEC-01 / SCL-04; spec REQ-F0-03; DECISIONS.md ADR-020).
+-- (audit 2026-11-16, SEC-01 / SCL-04; spec REQ-F0-03; DECISIONS.md ADR-017).
 --
 -- WHAT THIS ADDS
 -- --------------

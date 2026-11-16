@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Phase 0 hardening
+
+### Security
+
+- **AI endpoints (SEC-01).** `/api/translate`, `/api/ai/wiki-chat` and the `translateText` action now require an active profile with an organization (401 / 403), validate input with Zod (400: text ≤ 5000 characters; chat ≤ 20 messages, ≤ 12000 characters, roles `user`/`assistant`) and consume a quota before calling the provider (429 with `Retry-After`: 30/hour and 200/day per user, 1000/day per organization). Provider and quota failures return a generic 503.
+- **AI quota store.** Migration `202611160001_ai_quota.sql`: table `hd_ai_usage` (RLS on, no policies) and `hd_consume_ai_quota` (SECURITY DEFINER, pinned `search_path`, `service_role` only, atomic, 7-day retention). **Must be applied before deploying this code** — without it the AI endpoints answer 503. Rollback in the migration header.
+- **Access links (SEC-02).** The customer onboarding routes no longer return a magic link, and never for a linked account. The password-reset route no longer returns the recovery link when the email was sent. A link reaches the administrator only when the email failed **and** `ADMIN_LINK_HANDOFF=true`; every issuance is logged without the link (ADR-016).
+- **`hd_customers_info` RLS (SEC-03).** Migration `202611160002_customers_info_rls.sql` replaces the four `codex_*` policies, which had no organization filter, with owner-or-same-organization rules (SELECT: staff of the customer's organization; INSERT/UPDATE: its admin; DELETE: its admin only). The application is unaffected (it writes with `service_role`). Rollback in the migration header.
+- **Fixtures (SEC-10).** The production organization UUID was replaced by a fictitious one in `supabase/tests`.
+
+### Changed
+
+- API contract: `POST /api/admin/customers/{individual,company}` now returns `email_sent` (`true`/`false`, `null` for a linked account) and `link_handoff`; `access_link` is `null` unless handed off. A failed invitation email returns 502 when hand-off is disabled. `POST /api/admin/users/[id]/password-reset` returns `action_link: null` unless handed off, plus `link_handoff`.
+- `translateText` uses Haiku through the shared `lib/ai/translate.ts` and rejects unsupported locales instead of defaulting to English.
+- Admin customer forms, the admin ticket form and the password-reset dialog show the email status when there is no link; new `admin.linkHandoff` messages in DE/EN/ES.
+- New environment variable `ADMIN_LINK_HANDOFF` (default `false`).
+
+### Tests
+
+- Vitest: AI guard, schemas, quota helper, the three AI entry points, link hand-off decision, invite fallback (290 → 350 tests).
+- pgTAP: `supabase/tests/ai_quota.sql` (36) and `supabase/tests/customers_info_rls.sql` (38, two organizations), on the new `fixtures/phase0_base.sql`, added to the `tickets-write-policies` CI job.
+
 ## Unreleased — Theme Auto follows time of day
 
 ### Changed
