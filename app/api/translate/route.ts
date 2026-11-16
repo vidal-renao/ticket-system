@@ -1,46 +1,39 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { denialResponse, requireActiveAiMember } from "@/lib/ai/guard";
+import { translateRequestSchema } from "@/lib/ai/limits";
+import { consumeAiQuota } from "@/lib/ai/quota";
+import { translateSupportText } from "@/lib/ai/translate";
 
-const LANG_NAMES: Record<string, string> = {
-  de: "German",
-  en: "English",
-  es: "Spanish",
-};
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // 1. Who: an active member of an organization, read from their own profile.
+  const member = await requireActiveAiMember(await createClient());
+  if (!member.ok) return denialResponse(member);
 
-  let body: { text?: string; targetLanguage?: string };
+  // 2. What: bounded input, checked before any budget is spent on it.
+  let rawBody: unknown;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  const parsed = translateRequestSchema.safeParse(rawBody);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { text, targetLanguage } = body;
-  if (!text?.trim()) return NextResponse.json({ error: "Missing text" }, { status: 400 });
-  if (!targetLanguage) return NextResponse.json({ error: "Missing targetLanguage" }, { status: 400 });
-
-  const langName = LANG_NAMES[targetLanguage];
-  if (!langName) return NextResponse.json({ error: "Unsupported language" }, { status: 400 });
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    system: `Translate the following IT support text to ${langName}. Return only the translated text, no explanation.`,
-    messages: [{ role: "user", content: text }],
+  // 3. How often: per-user and per-organization quota, counted atomically.
+  const quota = await consumeAiQuota(createServiceClientStatic(), {
+    userId: member.userId,
+    organizationId: member.organizationId,
+    endpoint: "translate",
   });
+  if (!quota.allowed) return denialResponse({ ok: false, ...quota });
 
-  if (response.content[0].type !== "text") {
-    return NextResponse.json({ error: "Translation failed" }, { status: 500 });
+  const translation = await translateSupportText(parsed.data.text, parsed.data.targetLanguage);
+  if (!translation.ok) {
+    return NextResponse.json({ error: "Translation unavailable" }, { status: 503 });
   }
 
-  return NextResponse.json({ translatedText: response.content[0].text.trim() });
+  return NextResponse.json({ translatedText: translation.text });
 }

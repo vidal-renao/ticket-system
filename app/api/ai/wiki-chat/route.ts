@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { summarizeProviderError } from "@/lib/ai/provider-error";
+import { denialResponse, requireActiveAiMember } from "@/lib/ai/guard";
+import { wikiChatRequestSchema } from "@/lib/ai/limits";
+import { consumeAiQuota } from "@/lib/ai/quota";
 
 export const runtime = "nodejs";
 
@@ -24,29 +27,39 @@ function logProviderFailure(stage: string, error: unknown) {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Active member of an organization, read from the caller's own profile.
+  const member = await requireActiveAiMember(await createClient());
+  if (!member.ok) return denialResponse(member);
 
-  let body: { messages: Array<{ role: string; content: string }> };
+  let rawBody: unknown;
   try {
-    body = await request.json();
+    rawBody = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { messages } = body;
-  if (!messages?.length) {
-    return NextResponse.json({ error: "messages required" }, { status: 400 });
+  // Bounded history, and only user/assistant turns: the system prompt is the
+  // server's. Unknown keys (the panel also sends `locale`) are dropped.
+  const parsed = wikiChatRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
+  const { messages } = parsed.data;
 
   // Fail closed without configuration instead of letting the SDK throw.
   if (!process.env.ANTHROPIC_API_KEY) {
     logProviderFailure("config", new Error("ANTHROPIC_API_KEY missing"));
     return NextResponse.json(UNAVAILABLE, { status: 503 });
   }
+
+  // Counted only once the request could actually be served. A quota store
+  // that cannot answer is the same generic 503 the panel already understands.
+  const quota = await consumeAiQuota(createServiceClientStatic(), {
+    userId: member.userId,
+    organizationId: member.organizationId,
+    endpoint: "wiki_chat",
+  });
+  if (!quota.allowed) return denialResponse({ ok: false, ...quota });
 
   let stream: AsyncIterable<Anthropic.Messages.RawMessageStreamEvent>;
   try {
@@ -57,10 +70,7 @@ export async function POST(request: Request) {
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages: messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
+      messages,
       stream: true,
     });
   } catch (error) {

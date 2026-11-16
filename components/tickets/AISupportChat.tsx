@@ -101,7 +101,10 @@ export function AISupportChat({ ticketId, orgId, locale }: AISupportChatProps) {
       const res = await fetch("/api/ai/wiki-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, locale }),
+        // The server accepts at most 20 turns (lib/ai/limits.ts). An odd
+        // window off the end of an alternating history starts on a user turn,
+        // which the provider requires.
+        body: JSON.stringify({ messages: nextMessages.slice(-19), locale }),
       });
 
       if (!res.ok || !res.body) {

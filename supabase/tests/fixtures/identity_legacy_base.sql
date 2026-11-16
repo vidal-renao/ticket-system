@@ -120,4 +120,4 @@ GRANT SELECT ON storage.buckets TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
 
 INSERT INTO public.organizations (id, name, slug) VALUES
-  ('921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'Vidal Real Estate', 'vidal-real-estate');
+  ('00000000-0000-4000-8000-00000000c1a0', 'Vidal Real Estate', 'vidal-real-estate');

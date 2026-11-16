@@ -26,12 +26,20 @@ Public registration creates customers only. Staff accounts are created by authen
 - Company logos use a new `logos` Storage bucket, deliberately mirroring the existing `avatars` bucket's already-reviewed pattern (public read, folder-scoped RLS keyed to `auth.uid()`) rather than a new mechanism. Upload also verifies the real file signature (magic bytes) client-side before upload, since `File.type` is client-asserted and not authoritative.
 - New customer onboarding uses `supabase.auth.admin.inviteUserByEmail` — no admin ever sees a temporary password for a customer account (agent/employee onboarding is unchanged and still uses an admin-set temporary password).
 
+## Access and Recovery Links (Phase 0, ADR-016)
+
+- A link that signs somebody in is treated as a credential. Onboarding and administrator password reset deliver it by email only.
+- An administrator receives the link only when the email could not be sent **and** `ADMIN_LINK_HANDOFF` is exactly `"true"`. It is never issued for an account linked to an existing login. Keep the flag `false` in production.
+- "Email failed" is: for password reset, `sendEmail()` did not deliver; for onboarding, Supabase Auth refused the invitation because it could not send the mail (rate limit or SMTP error). Later bounces are not detectable.
+- Every issuance is written to the server log as `[audit] access link issued` with actor, target, organization, type and outcome. The link and email addresses are never logged. A queryable admin audit table is not implemented yet.
+
 ## Multi-Tenancy
 
 - Prefer session clients and RLS.
 - Service clients bypass RLS and require explicit tenant/owner predicates.
 - Child resources inherit access from the parent ticket.
 - Apply `docs/migration_security_hardening.sql` followed by `docs/migration_enterprise_ticket_workflow.sql`, then test with at least two tenants before production promotion.
+- `hd_customers_info` RLS is organization-scoped (migration `202611160002`): staff read only their own organization's customers, only that organization's admin writes or deletes, a customer reaches only their own row.
 - Customers are creator-scoped, agents are assignee-scoped, and only administrators can route, approve or soft-delete tickets.
 
 ## Data and AI
@@ -45,13 +53,21 @@ The new RAG tables use composite organization foreign keys as well as forced RLS
 Source/document archive or soft deletion is enforced as immediate retrieval exclusion, not as a synchronous descendant rewrite. Keeping child chunks physically unchanged avoids lock amplification while every authorized retrieval path still checks parent lifecycle state. Exact fixture cleanup and later compaction are separate operational concerns; neither weakens the retrieval invariant.
 
 
+### AI endpoint controls (Phase 0, ADR-017)
+
+- `/api/translate`, `/api/ai/wiki-chat` and `translateText` require an active profile with an organization; the organization and user are read from the caller's own `hd_profiles` row.
+- Input is bounded before the provider is called: text ≤ 5000 characters; chat ≤ 20 messages and ≤ 12000 characters, roles `user`/`assistant` only.
+- Rate limit and quota are implemented in PostgreSQL (`hd_ai_usage`, `hd_consume_ai_quota`): 30 requests/hour and 200/day per user, 1000/day per organization, shared by the three endpoints. Excess requests get 429 with `Retry-After`. The store fails closed (503).
+- Not covered: ticket triage and staff "suggest reply" calls, which have their own paths and no quota yet.
+
 ## Logging
 
 Logs must not include tokens, passwords, cookies, authorization headers, service keys or full ticket content. Use stable request/event identifiers and generic client errors.
 
 ## Missing Production Controls
 
-- Durable distributed rate limiting for auth, registration, AI and webhook routes.
+- Durable rate limiting for auth, registration and webhook routes, and for the AI paths outside the three interactive endpoints (triage, suggest reply). The interactive AI endpoints are rate limited since Phase 0.
+- A queryable audit trail for administrator account actions (link issuance is currently a structured log line).
 - Automated secret scanning and SAST in CI.
 - Disposable-database RLS integration tests.
 - Documented incident response, retention execution and access review cadence.

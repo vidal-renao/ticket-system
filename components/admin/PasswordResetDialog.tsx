@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Copy, KeyRound, MailCheck, MailWarning, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 /**
  * What came back from starting a recovery for somebody else.
  *
- * `emailSent` is reported rather than assumed. Resend is only configured in
- * some environments and can refuse a send outright, and an administrator who
- * believes a mail went out will wait for one that never arrives -- the same
- * failure that left Alpen Logistics unreachable for a day. When the mail did
- * not go, the link on screen is the whole delivery mechanism, so it is shown
- * either way and the wording changes to match.
+ * `emailSent` is reported rather than assumed: Resend is only configured in
+ * some environments and can refuse a send outright. The link itself is shown
+ * only when the mail did NOT go and the deployment runs with
+ * ADMIN_LINK_HANDOFF=true (DECISIONS.md ADR-016); otherwise `actionLink` is
+ * null and the dialog states the email status alone.
  */
 export interface PasswordResetOutcome {
   name: string;
   email: string;
-  actionLink: string;
+  actionLink: string | null;
   emailSent: boolean;
 }
 
@@ -28,12 +28,13 @@ export function PasswordResetDialog({
   outcome: PasswordResetOutcome | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("admin.linkHandoff");
   const [copied, setCopied] = useState(false);
 
   if (!outcome) return null;
 
   async function copy() {
-    if (!outcome) return;
+    if (!outcome?.actionLink) return;
     try {
       await navigator.clipboard.writeText(outcome.actionLink);
       setCopied(true);
@@ -57,14 +58,14 @@ export function PasswordResetDialog({
           </div>
           <div className="min-w-0 flex-1">
             <h2 id="password-reset-title" className="text-base font-semibold text-[var(--color-text-primary)]">
-              Recovery link for {outcome.name}
+              {t("resetTitle", { name: outcome.name })}
             </h2>
             <p className="mt-0.5 font-mono text-xs text-[var(--color-text-muted)]">{outcome.email}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("close")}
             className="rounded-lg p-1 text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
           >
             <X className="h-4 w-4" />
@@ -72,41 +73,38 @@ export function PasswordResetDialog({
         </div>
 
         {outcome.emailSent ? (
-          <p className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-[var(--color-surface-800)] p-3 text-sm text-[var(--color-text-secondary)]">
+          <p role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-[var(--color-surface-800)] p-3 text-sm text-[var(--color-text-secondary)]">
             <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
-            <span>The link was emailed. Below is the same link, in case it does not arrive.</span>
+            <span>{t("resetEmailSent")}</span>
           </p>
         ) : (
-          <p className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-[var(--color-surface-800)] p-3 text-sm text-[var(--color-text-secondary)]">
+          <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-[var(--color-surface-800)] p-3 text-sm text-[var(--color-text-secondary)]">
             <MailWarning className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
-            <span>
-              No email went out — outbound mail is not configured here. Hand this link over
-              yourself, through a channel you trust.
-            </span>
+            <span>{outcome.actionLink ? t("resetHandoff") : t("resetEmailFailedNoLink")}</span>
           </p>
         )}
 
-        <p className="mt-3 break-all rounded-lg bg-[var(--color-surface-800)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-primary)]">
-          {outcome.actionLink}
-        </p>
+        {outcome.actionLink && (
+          <p className="mt-3 break-all rounded-lg bg-[var(--color-surface-800)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-primary)]">
+            {outcome.actionLink}
+          </p>
+        )}
 
         <div className="mt-4 flex items-center gap-2">
-          <Button type="button" size="sm" variant="secondary" onClick={copy}>
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy link"}
-          </Button>
+          {outcome.actionLink && (
+            <Button type="button" size="sm" variant="secondary" onClick={copy}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? t("copied") : t("copyLink")}
+            </Button>
+          )}
           <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-            Done
+            {t("done")}
           </Button>
         </div>
 
-        {/* Said out loud because an administrator handing over a link needs to
-            know it does not wait for them. The reset screen offers a fresh one
-            when it has gone stale, so this is a nuisance rather than a dead end. */}
-        <p className="mt-3 text-[11px] text-[var(--color-text-muted)]">
-          The link expires shortly after it is first opened. Their current password keeps
-          working until a new one is set.
-        </p>
+        {(outcome.emailSent || outcome.actionLink) && (
+          <p className="mt-3 text-[11px] text-[var(--color-text-muted)]">{t("resetExpiry")}</p>
+        )}
       </div>
     </div>
   );

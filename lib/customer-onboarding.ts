@@ -91,24 +91,20 @@ export const NEEDS_CONFIRMATION_MESSAGE =
   "That email address already has an account on this instance, from another application. It is not a customer here yet. Confirm to link that account as a customer — no new account is created and its password is unchanged.";
 
 /**
- * Explains to the admin what they are holding. The link is returned rather
- * than emailed: there is no verified sender domain, so an automatic send would
- * fail silently, which is precisely the failure mode this whole branch exists
- * to remove.
+ * What the admin is told after onboarding. No sign-in link accompanies a
+ * linked or a normally invited account any more (DECISIONS.md ADR-016); the
+ * forms render translated text from the response's `link_handoff` code and
+ * these strings are the API's own plain-language fallback.
  */
 export const LINKED_ACCOUNT_NOTICE =
-  "Linked to an existing account. No invitation was sent and their password is unchanged — send them this sign-in link yourself.";
+  "Linked to an existing account. No invitation was sent and their password is unchanged — they sign in with the credentials they already have.";
 
-/**
- * The same link, for an account that *was* invited. The invitation email is
- * still sent, but it is not something to rely on: it can be swallowed by the
- * rate limit on the built-in SMTP, and even when it arrives the invitee has to
- * finish a set-password screen that nobody supervises. Alpen Logistics failed
- * at exactly that step and stayed unusable for a day. The admin now leaves the
- * form holding a link that works regardless.
- */
 export const INVITED_ACCOUNT_NOTICE =
-  "An invitation was emailed. If it does not arrive, or they never finish setting a password, send them this sign-in link instead — it signs them in without one.";
+  "An invitation was emailed. If they never finish setting a password, start a password reset for them from the user directory.";
+
+/** Only when the invitation mail failed and ADMIN_LINK_HANDOFF is on. */
+export const INVITE_HANDOFF_NOTICE =
+  "The invitation email could not be sent. Hand this invitation link over yourself, through a channel you trust — it lets them set their password.";
 
 /**
  * Has an invited account never once reached the application?
