@@ -53,26 +53,47 @@ begin;
 -- can be redirected.
 do $precheck$
 declare
-  v_fn text;
+  v_name text;
+  v_public regprocedure;
+  v_private regprocedure;
+  v_target regprocedure;
   v_proc record;
 begin
-  foreach v_fn in array array['public.current_profile_role()', 'public.current_profile_org_id()']
+  foreach v_name in array array['current_profile_role', 'current_profile_org_id']
   loop
-    if to_regprocedure(v_fn) is null then
-      raise exception 'customers_info RLS: required helper % is missing', v_fn;
+    v_public := to_regprocedure(format('public.%I()', v_name));
+    if v_public is null then
+      raise exception 'customers_info RLS: required helper public.%() is missing', v_name;
     end if;
+
+    -- Production shape: public.<name>() is a thin SECURITY INVOKER wrapper
+    -- around private_public.<name>(), which is the SECURITY DEFINER one. The
+    -- function that actually reads hd_profiles is the one that must be
+    -- DEFINER with a pinned search_path.
+    v_target := v_public;
+    if not (select p.prosecdef from pg_catalog.pg_proc p where p.oid = v_public) then
+      if to_regnamespace('private_public') is not null then
+        v_private := to_regprocedure(format('private_public.%I()', v_name));
+      end if;
+      if v_private is null then
+        raise exception 'customers_info RLS: public.%() is SECURITY INVOKER and has no private_public counterpart', v_name;
+      end if;
+      v_target := v_private;
+    end if;
+
     select p.prosecdef, p.proconfig into v_proc
       from pg_catalog.pg_proc p
-     where p.oid = to_regprocedure(v_fn);
+     where p.oid = v_target;
     if not v_proc.prosecdef then
-      raise exception 'customers_info RLS: % must be SECURITY DEFINER', v_fn;
+      raise exception 'customers_info RLS: % must be SECURITY DEFINER', v_target;
     end if;
     if not exists (
       select 1 from unnest(coalesce(v_proc.proconfig, array[]::text[])) c
        where c like 'search_path=%'
     ) then
-      raise exception 'customers_info RLS: % must pin search_path', v_fn;
+      raise exception 'customers_info RLS: % must pin search_path', v_target;
     end if;
+    v_private := null;
   end loop;
 end
 $precheck$;
