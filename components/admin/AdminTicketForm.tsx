@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/Button";
 import { CustomerPicker, type CustomerOption } from "@/components/admin/CustomerPicker";
@@ -44,6 +45,7 @@ export function AdminTicketForm({
   customers: CustomerOption[];
   teams: Team[];
 }) {
+  const tLink = useTranslations("admin.linkHandoff");
   const router = useRouter();
 
   const [mode, setMode] = useState<Mode>("existing");
@@ -107,12 +109,12 @@ export function AdminTicketForm({
       return null;
     }
 
-    if (data.access_link) {
-      // The onboarding screens hand this over on every alta; losing it here
-      // would leave a customer who exists and cannot get in.
-      toast.success("Customer created. Their sign-in link is on the user directory.", {
-        duration: 6000,
-      });
+    // No sign-in link comes back for a normal invitation any more
+    // (ADR-016); what matters here is whether the invitation mail went out.
+    if (data.email_sent === false) {
+      toast.warning(tLink("ticketCustomerHandoff"), { duration: 8000 });
+    } else if (data.email_sent === true) {
+      toast.success(tLink("ticketCustomerInvited"), { duration: 6000 });
     }
 
     return data.user.id as string;

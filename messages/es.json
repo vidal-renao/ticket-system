@@ -434,7 +434,27 @@
     "allAgents": "Todos los Agentes",
     "noTickets": "Ningún ticket coincide con los filtros",
     "totalShowing": "{count} tickets",
-    "clearFilters": "Limpiar filtros"
+    "clearFilters": "Limpiar filtros",
+    "linkHandoff": {
+      "invitedEmailSent": "Cliente creado. La invitación se envió por correo.",
+      "invitedEmailFailed": "Cliente creado, pero no se pudo enviar el correo de invitación.",
+      "linkedTitle": "Vinculado a una cuenta existente. No se envió ninguna invitación.",
+      "invitedNotice": "Aquí no se muestra ningún enlace de acceso. Si nunca termina de establecer la contraseña, inicia un restablecimiento desde el directorio de usuarios.",
+      "linkedNotice": "Su contraseña no cambia: inicia sesión con las credenciales que ya tiene. No se emite enlace de acceso para una cuenta vinculada.",
+      "inviteHandoffNotice": "Entrega tú este enlace de invitación por un canal de confianza. Permite establecer la contraseña, así que trátalo como una.",
+      "copyInviteLink": "Copiar enlace de invitación",
+      "copyLink": "Copiar enlace",
+      "copied": "Copiado",
+      "resetTitle": "Restablecimiento de contraseña para {name}",
+      "resetEmailSent": "El enlace de recuperación se envió a esta dirección. No se muestra aquí.",
+      "resetEmailFailedNoLink": "No se pudo enviar el correo de recuperación y la entrega de enlaces a administradores está desactivada en este entorno. Corrige el envío de correo e inténtalo de nuevo.",
+      "resetHandoff": "No se pudo enviar el correo de recuperación. Entrega tú este enlace por un canal de confianza.",
+      "resetExpiry": "El enlace caduca poco después de abrirse por primera vez. La contraseña actual sigue funcionando hasta que se establezca una nueva.",
+      "done": "Hecho",
+      "close": "Cerrar",
+      "ticketCustomerInvited": "Cliente creado. La invitación se envió por correo.",
+      "ticketCustomerHandoff": "Cliente creado, pero falló el correo de invitación. Inicia un restablecimiento de contraseña desde el directorio de usuarios."
+    }
   },
   "ops": {
     "title": "Consola de operaciones en vivo",

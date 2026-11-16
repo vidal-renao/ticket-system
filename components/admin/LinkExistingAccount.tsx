@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { AlertTriangle, Check, Copy, Link2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -59,24 +60,23 @@ export function LinkExistingAccountPrompt({
 }
 
 /**
- * The sign-in link, handed to the admin on every successful onboarding.
+ * What the admin is told after an onboarding, and -- in exactly one case --
+ * the invitation link itself.
  *
- * For a linked account there is no invitation email at all -- they were never
- * invited. For an invited one there is, but relying on it is what left Alpen
- * Logistics unusable for a day: the mail can be eaten by the SMTP rate limit,
- * and even when it lands the invitee has to finish a set-password screen that
- * nobody supervises. Either way the admin leaves holding something that works.
- *
- * Deliberately not emailed: there is no verified sender domain, and a silent
- * failure here would leave a customer who cannot get in and nobody knowing.
+ * A link appears only when the invitation email could not be sent and the
+ * deployment runs with ADMIN_LINK_HANDOFF=true (DECISIONS.md ADR-016). A
+ * linked account never gets one: it already has credentials. Otherwise the
+ * email is the delivery, and the admin is told its real status instead of
+ * being handed a second way in.
  */
 export function AccessLinkNotice({
-  notice,
+  linked,
   accessLink,
 }: {
-  notice: string;
+  linked: boolean;
   accessLink: string | null;
 }) {
+  const t = useTranslations("admin.linkHandoff");
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -92,26 +92,20 @@ export function AccessLinkNotice({
 
   return (
     <div className="mt-4 rounded-xl border border-[var(--color-surface-600)] bg-[var(--color-surface-900)] p-4 text-left">
-      <p className="text-xs text-[var(--color-text-secondary)]">{notice}</p>
+      <p className="text-xs text-[var(--color-text-secondary)]" role="status">
+        {linked ? t("linkedNotice") : accessLink ? t("inviteHandoffNotice") : t("invitedNotice")}
+      </p>
 
-      {accessLink ? (
+      {!linked && accessLink && (
         <>
           <p className="mt-3 break-all rounded-lg bg-[var(--color-surface-800)] px-3 py-2 font-mono text-[11px] text-[var(--color-text-primary)]">
             {accessLink}
           </p>
           <Button type="button" size="sm" variant="ghost" className="mt-2" onClick={copy}>
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy sign-in link"}
+            {copied ? t("copied") : t("copyInviteLink")}
           </Button>
         </>
-      ) : (
-        // The customer was created; only the link failed. Said plainly, because
-        // an admin who assumes there is a link will wait for one that is not
-        // coming.
-        <p className="mt-3 text-xs text-amber-300">
-          The sign-in link could not be generated. The customer exists and can use
-          &quot;Forgot password&quot; to get in.
-        </p>
       )}
     </div>
   );
