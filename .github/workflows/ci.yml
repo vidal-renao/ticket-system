@@ -424,6 +424,40 @@ jobs:
           fi
           echo "OK: pgTAP plan line found and no failed assertions."
 
+      # Phase 0 hardening (AI quota, hd_customers_info tenant isolation). Reuses
+      # this job's ephemeral server with a database of its own, because the two
+      # suites need a two-organization fixture the tickets suite does not have.
+      # Each migration is applied twice to assert it is idempotent.
+      - name: Phase 0 hardening -- apply fixture and migrations, run both pgTAP suites
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "postgresql://postgres@127.0.0.1:5434/postgres" -c "CREATE DATABASE ci_phase0_ci_test;"
+          DB_URL="postgresql://postgres@127.0.0.1:5434/ci_phase0_ci_test"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/phase0_base.sql
+          for migration in 202611160001_ai_quota 202611160002_customers_info_rls; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/migrations/${migration}.sql"
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/migrations/${migration}.sql"
+          done
+          for suite in ai_quota customers_info_rls; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/tests/${suite}.sql" | tee "phase0-${suite}-pgtap.log"
+            if grep -qE "not ok [0-9]" "phase0-${suite}-pgtap.log"; then
+              echo "::error::pgTAP (${suite}) reported at least one failed assertion"
+              grep -E "not ok [0-9]|# Failed test" "phase0-${suite}-pgtap.log"
+              exit 1
+            fi
+            if ! grep -qE "^\s*1\.\.[0-9]+\s*$" "phase0-${suite}-pgtap.log"; then
+              echo "::error::No pgTAP plan line found for ${suite} -- the suite may not have run at all"
+              exit 1
+            fi
+            if grep -q "Looks like you" "phase0-${suite}-pgtap.log"; then
+              echo "::error::pgTAP (${suite}) ran a different number of tests than planned"
+              exit 1
+            fi
+          done
+          echo "OK: Phase 0 pgTAP suites passed."
+
       - name: Publish pgTAP summary
         if: always()
         run: cat tickets-pgtap.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
