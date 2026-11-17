@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { logAdminEvent } from "@/lib/admin-audit";
 import { getCurrentProfile } from "@/lib/authz";
 import { setAccountFrozen } from "@/lib/user-lifecycle-server";
 import {
@@ -81,6 +82,15 @@ export async function POST(
     userId: targetId,
     frozen,
     organizationId: actor!.organization_id!,
+  });
+
+  await logAdminEvent({
+    organizationId: actor!.organization_id,
+    actorId: user.id,
+    action: frozen ? "user.frozen" : "user.unfrozen",
+    targetType: "user",
+    targetId,
+    outcome: result.ok ? "success" : "failure",
   });
 
   if (!result.ok) {

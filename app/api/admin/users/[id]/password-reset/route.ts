@@ -3,7 +3,8 @@ import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
 import { appUrl } from "@/lib/app-url";
 import { sendEmail } from "@/lib/email";
-import { decideLinkHandoff, logLinkIssuance } from "@/lib/link-handoff";
+import { decideLinkHandoff } from "@/lib/link-handoff";
+import { recordLinkIssuance } from "@/lib/admin-audit";
 import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 import {
   REFUSAL_MESSAGE,
@@ -146,7 +147,7 @@ export async function POST(
     flag: process.env.ADMIN_LINK_HANDOFF,
     link: actionLink,
   });
-  logLinkIssuance({
+  await recordLinkIssuance({
     source: "admin/users/password-reset",
     actorId: user.id,
     targetUserId: targetId,

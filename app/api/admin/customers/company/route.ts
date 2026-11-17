@@ -15,7 +15,8 @@ import {
 } from "@/lib/customer-onboarding";
 import { appUrl } from "@/lib/app-url";
 import { inviteCustomerAccount } from "@/lib/customer-invite";
-import { decideLinkHandoff, logLinkIssuance } from "@/lib/link-handoff";
+import { decideLinkHandoff } from "@/lib/link-handoff";
+import { logAdminEvent, recordLinkIssuance } from "@/lib/admin-audit";
 
 const APP_URL = appUrl();
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const svc = createServiceClientStatic();
   const { data: adminProfile } = await svc
     .from("hd_profiles")
-    .select("role")
+    .select("role, organization_id")
     .eq("id", user.id)
     .single();
 
@@ -63,6 +64,13 @@ export async function POST(request: Request) {
       { error: "Canonical organization is not configured or is ambiguous" },
       { status: 500 }
     );
+  }
+
+  // The customer is created in the canonical organization, so only an
+  // administrator of that organization may create it. Role alone is not
+  // enough on an instance that holds more than one organization.
+  if (adminProfile.organization_id !== organizationId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const lookup = await findAuthUserByEmail(svc, input.contact_email);
@@ -236,6 +244,17 @@ export async function POST(request: Request) {
     .eq("id", userId)
     .single();
 
+  // REQ-F1-06: who onboarded which customer, and whether an existing account
+  // was linked or a new one invited. No name, address or email is stored.
+  await logAdminEvent({
+    organizationId,
+    actorId: user.id,
+    action: "customer.created",
+    targetType: "user",
+    targetId: userId,
+    details: { customer_type: "company", mode: invitationState },
+  });
+
   // SEC-02 / ADR-016. No sign-in link is minted for the admin any more:
   //   - linked account: it has its own credentials and was sent nothing;
   //   - invited, mail accepted by Supabase Auth: the invitation is the way in;
@@ -247,7 +266,7 @@ export async function POST(request: Request) {
     link: inviteLink,
   });
   if (plan.kind === "invite") {
-    logLinkIssuance({
+    await recordLinkIssuance({
       source: "admin/customers/company",
       actorId: user.id,
       targetUserId: userId,
