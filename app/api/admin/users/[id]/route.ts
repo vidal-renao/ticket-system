@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { logAdminEvent } from "@/lib/admin-audit";
 
 export async function PATCH(
   request: Request,
@@ -25,7 +26,7 @@ export async function PATCH(
   // Verify target belongs to same org
   const { data: targetProfile } = await svc
     .from("hd_profiles")
-    .select("id, organization_id")
+    .select("id, organization_id, role")
     .eq("id", targetId)
     .single();
 
@@ -70,8 +71,23 @@ export async function PATCH(
     .update(updates)
     .eq("id", targetId)
     .eq("organization_id", adminProfile.organization_id);
+  // REQ-F1-06: a role change is a change of privilege; it is recorded
+  // whether or not it went through.
+  if (updates.role !== undefined) {
+    await logAdminEvent({
+      organizationId: adminProfile.organization_id,
+      actorId: user.id,
+      action: "user.role_changed",
+      targetType: "user",
+      targetId,
+      outcome: error ? "failure" : "success",
+      details: { from: targetProfile.role ?? null, to: String(updates.role) },
+    });
+  }
+
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[admin/users] update failed", { targetId, message: error.message });
+    return NextResponse.json({ error: "Could not update the user" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

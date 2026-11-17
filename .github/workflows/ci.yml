@@ -458,6 +458,47 @@ jobs:
           done
           echo "OK: Phase 0 pgTAP suites passed."
 
+      # Phase 1 (SLA sweep support, hd_tickets write lockdown, append-only audit,
+      # hd_admin_audit_logs, pg_cron scheduling). Two databases of their own:
+      # one for the integrity migrations, one for the pg_cron migration, which
+      # needs the pg_cron/pg_net/Vault test doubles. Each migration is applied
+      # twice to assert it is idempotent.
+      - name: Phase 1 -- apply fixtures and migrations, run pgTAP suites
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          ADMIN_URL="postgresql://postgres@127.0.0.1:5434/postgres"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$ADMIN_URL" -c "CREATE DATABASE ci_phase1_integrity;" -c "CREATE DATABASE ci_phase1_cron;"
+          INTEGRITY_URL="postgresql://postgres@127.0.0.1:5434/ci_phase1_integrity"
+          CRON_URL="postgresql://postgres@127.0.0.1:5434/ci_phase1_cron"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file=supabase/tests/fixtures/phase1_base.sql
+          for migration in 202611170001_sla_cron_support 202611170003_tickets_write_lockdown 202611170004_admin_audit_logs; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file="supabase/migrations/${migration}.sql"
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file="supabase/migrations/${migration}.sql"
+          done
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$CRON_URL" --file=supabase/tests/fixtures/phase1_base.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$CRON_URL" --file=supabase/tests/fixtures/pg_cron_stub.sql
+          run_suite() {
+            local name="$1" url="$2"; shift 2
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$url" "$@" --file="supabase/tests/${name}.sql" | tee "phase1-${name}-pgtap.log"
+            if grep -qE "not ok [0-9]" "phase1-${name}-pgtap.log"; then
+              echo "::error::pgTAP (${name}) reported at least one failed assertion"
+              grep -E "not ok [0-9]|# Failed test" "phase1-${name}-pgtap.log"
+              exit 1
+            fi
+            if ! grep -qE "^\s*1\.\.[0-9]+\s*$" "phase1-${name}-pgtap.log"; then
+              echo "::error::No pgTAP plan line found for ${name} -- the suite may not have run at all"
+              exit 1
+            fi
+            if grep -q "Looks like you" "phase1-${name}-pgtap.log"; then
+              echo "::error::pgTAP (${name}) ran a different number of tests than planned"
+              exit 1
+            fi
+          }
+          run_suite phase1_integrity "$INTEGRITY_URL"
+          run_suite sla_pg_cron "$CRON_URL" --set=migration=../migrations/202611170002_sla_pg_cron.sql
+
       - name: Publish pgTAP summary
         if: always()
         run: cat tickets-pgtap.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

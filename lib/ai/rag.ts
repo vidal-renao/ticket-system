@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Prerequisites:
  *   - npm install openai
  *   - OPENAI_API_KEY set in .env.local / Vercel env vars
- *   - docs/rag_migration.sql executed in Supabase
+ *   - docs/legacy/rag_migration.sql executed in Supabase
  */
 
 const EMBEDDING_MODEL = "text-embedding-3-small";

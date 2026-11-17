@@ -38,9 +38,21 @@ Public registration creates customers only. Staff accounts are created by authen
 - Prefer session clients and RLS.
 - Service clients bypass RLS and require explicit tenant/owner predicates.
 - Child resources inherit access from the parent ticket.
-- Apply `docs/migration_security_hardening.sql` followed by `docs/migration_enterprise_ticket_workflow.sql`, then test with at least two tenants before production promotion.
+- Schema changes go through `supabase/migrations/` with a pgTAP suite covering two tenants; the scripts in `docs/legacy/` are history and must not be executed.
 - `hd_customers_info` RLS is organization-scoped (migration `202611160002`): staff read only their own organization's customers, only that organization's admin writes or deletes, a customer reaches only their own row.
 - Customers are creator-scoped, agents are assignee-scoped, and only administrators can route, approve or soft-delete tickets.
+- `hd_tickets` accepts no writes from `anon` or `authenticated` (migration `202611170003`): every change goes through an API route using `service_role` with explicit tenant predicates.
+
+## Audit
+
+- `hd_ticket_audit_logs` and `hd_admin_audit_logs` are append-only for every role, `service_role` included: UPDATE, DELETE and TRUNCATE raise `HD001` (ADR-020).
+- Administrative actions (role change, user creation, freeze, soft-delete/restore, access-link issuance, customer creation, PII setting) and MCP status changes are recorded with actor, target and outcome; never links, passwords or ticket content.
+- `hd_admin_audit_logs` is readable only by administrators of the same organization.
+
+## Scheduled jobs
+
+- `/api/cron/sla` requires `Authorization: Bearer <CRON_SECRET>` (≥ 32 characters) and answers 503 when the secret is not configured.
+- The pg_cron job reads the same value from Supabase Vault (`hd_cron_secret`) at run time; the secret is never stored in a migration or in `cron.job`.
 
 ## Data and AI
 

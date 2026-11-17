@@ -77,7 +77,7 @@ Both customer onboarding routes returned a magic sign-in link on every request, 
 - **Rule.** One pure function, `decideLinkHandoff()` in `lib/link-handoff.ts`, is the only place that decides. A link is returned only when (a) the account was invited or is being recovered, never `link_existing`; (b) the email carrying the link was **not** delivered; and (c) `ADMIN_LINK_HANDOFF` is exactly `"true"`. Otherwise the response carries `email_sent` and a `link_handoff` reason code, and no link.
 - **What "email failed" means, per route.** Password reset: `sendEmail()` returned `delivered: false` (no Resend key, or Resend refused). Customer onboarding: `inviteUserByEmail` failed with GoTrue's mail rate-limit code or its "Error sending … email" message (`isInviteEmailFailure`). A successful invite means Supabase Auth accepted the message; later bounces are not observable and are not treated as failure.
 - **Onboarding fallback.** GoTrue creates no account when it cannot send the invitation. With the flag on, the route then creates the account through `generateLink({ type: "invite" })` and that invite link is what the administrator may hand over. With the flag off the request fails with 502 and nothing is created. The extra `magiclink` that used to be minted alongside every invitation is gone.
-- **Audit.** Every issuance is recorded with actor, target, organization, link type, delivery result and decision — never the link or an address. `hd_ticket_audit_logs` is ticket-scoped and cannot hold an account event, so the record is a structured server log line (`[audit] access link issued`) until a dedicated admin audit table exists (Phase 1).
+- **Audit.** Every issuance is recorded with actor, target, organization, link type, delivery result and decision — never the link or an address. `hd_ticket_audit_logs` is ticket-scoped and cannot hold an account event, so the record was a structured server log line (`[audit] access link issued`). Since Phase 1 it is stored in `hd_admin_audit_logs` (ADR-020) and the log line remains as a secondary trace.
 - **Consequences.** An invited customer who never finishes setting a password is helped through the administrator password reset, not a standing magic link. Without a verified sender domain and with the flag off, a failed recovery email leaves the administrator with a clear failure message and no link — deliberately. The flag is meant for the demo environment and should be `false` when the product is sold.
 - **Unverified assumption.** That GoTrue rolls the user back when the invitation mail fails is taken from its documented behaviour, not exercised against the live instance. If a user were left behind, the fallback's `generateLink` fails and the route returns the error unchanged.
 
@@ -93,3 +93,33 @@ Both customer onboarding routes returned a magic sign-in link on every request, 
 - **Fail closed.** If the function is missing or errors, the endpoints answer 503 and do not call the provider. The migration must therefore be applied before this code is deployed.
 - **One translation path.** `translateText` and `/api/translate` share `lib/ai/translate.ts`; the action moved from Sonnet to `claude-haiku-4-5-20251001`. Unsupported locales are now rejected instead of silently translated to English.
 - **Trade-offs.** One extra database round trip per AI request; windows are sliding and approximate under clock skew of a single database, which is acceptable at this volume. Revisit with a dedicated store when volume justifies it.
+
+## ADR-018: SLA sweep every five minutes from pg_cron, secret in Vault
+
+**Status:** Accepted (owner decision D5, 2026-11-17: "the most logical option"). **Context:** audit 2026-11-16 SCL-01 / DOM-01; production check 2026-11-17 showed `/api/cron/sla` answering 503 (no valid `CRON_SECRET`), so the daily sweep had never run. Spec REQ-F1-01/02.
+
+- **Schedule.** Vercel Hobby crons run at most daily, too coarse for a one-hour response target. A pg_cron job (`hd-sla-every-5-min`, migration `202611170002`) calls `GET /api/cron/sla` every five minutes through pg_net. The daily Vercel cron stays as a backup.
+- **One implementation.** The job calls the existing endpoint instead of re-implementing the SLA rules in SQL, so `lib/sla.ts` remains the only source of truth.
+- **Secret.** Read from Supabase Vault (`hd_cron_secret`) each time the job fires; it is not in the migration or in `cron.job`. It must equal `CRON_SECRET` in Vercel (≥ 32 characters).
+- **Scale.** The route walks active tickets in keyset pages of 200 within a time budget and stores its cursor in `hd_cron_state`, so a large backlog is completed across runs.
+- **Once-only notices.** A partial unique index on `hd_notifications (user_id, ticket_id, type)` for the two breach types makes overlapping runs safe; breaches now also notify every active admin of the organization.
+- **Overlap.** The Vercel backup runs at 00:02, off the five-minute grid, so the two schedules never start together.
+- **Operations.** No automatic alert exists for a failing job; `docs/runbooks/sla-cron.md` lists the checks (`cron.job_run_details`, `net._http_response`).
+- **Trade-off.** Same exposure level as the existing service-role key on the shared project. Revisit when HelpDesk moves to a dedicated project.
+
+## ADR-019: Local Supabase and CI instead of hosted staging
+
+**Status:** Accepted (owner decision D6-A, 2026-11-17). **Context:** spec REQ-F1-07; Supabase branching needs the Pro plan.
+
+- Developers use `supabase start` / `supabase db reset`; every pull request gets ephemeral PostgreSQL databases in CI where each new migration is applied twice and its pgTAP suite runs.
+- The pre-`hd_` bootstrap scripts moved to `docs/legacy/` (do not execute). A HelpDesk-only baseline of the shared production schema is pending (`docs/runbooks/baseline.md`).
+- Revisit with hosted staging (branching) when the project has the Pro plan.
+
+## ADR-020: Append-only administrative audit and write lockdown on tickets
+
+**Status:** Accepted (owner decision D7-A, 2026-11-17). **Context:** audit 2026-11-16 SEC-05, SEC-07, SEC-08; spec REQ-F1-04/05/06.
+
+- **`hd_tickets`.** `anon` and `authenticated` lose INSERT/UPDATE/DELETE/TRUNCATE and the write policies are dropped (migration `202611170003`). Every write goes through an API route with `service_role` and explicit tenant predicates; portal ticket creation moved to `service_role` in the same phase and **must be deployed before the migration**.
+- **`hd_ticket_audit_logs`.** Append-only for every role: triggers raise `HD001` on UPDATE, DELETE and TRUNCATE, and the privileges are revoked from the API roles and `service_role`. Retention, when required, is an explicit migration that disables the trigger in its own transaction.
+- **`hd_admin_audit_logs`** (migration `202611170004`): role changes, user creation, freeze, soft-delete/restore, access-link issuance, customer creation and the PII setting are recorded by `logAdminEvent()` with actor, target, outcome and non-sensitive details. The MCP server writes `ticket.status_changed` with actor type `mcp`. Readable only by admins of the same organization; append-only like the ticket audit.
+- **Failure mode.** `logAdminEvent()` never throws to the caller; a failed write is logged with its error code. The action is not rolled back, because refusing an administrative action for an audit outage would block operations; the gap is visible in the server log. An event without an organization (for example an administrator profile with no organization) cannot satisfy the table's `NOT NULL` tenant column and is recorded only in the server log.

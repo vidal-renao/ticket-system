@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/authz";
 import { canDecideTicketReview, canRequestTicketReview, type TicketReviewStatus } from "@/lib/ticket-workflow";
 import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
+import { recomputeSlaOnResolution } from "@/lib/sla";
 
 type ReviewAction = "request" | "approve" | "changes";
 
@@ -93,6 +94,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     old_values: { review_status: reviewStatus, status: ticket.status },
     new_values: { review_status: updated.review_status, status: updated.status },
   });
+
+  if (body.action === "approve") {
+    // REQ-F1-03: the verdict is fixed now, against the real resolution time.
+    await recomputeSlaOnResolution(svc, updated, user.id, profile.role);
+  }
 
   if (body.action === "request") {
     // Administrators must know work is waiting for their OK.

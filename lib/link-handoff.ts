@@ -96,9 +96,9 @@ export function linkIssuanceLogEntry(input: {
 /**
  * Writes the issuance record to the structured server log.
  *
- * The only audit table in this schema, hd_ticket_audit_logs, is keyed to a
- * ticket and cannot hold an account event; a dedicated admin audit table is
- * Phase 1 work. Until then this line is the record.
+ * The persistent record is written by recordLinkIssuance() in
+ * lib/admin-audit.ts (hd_admin_audit_logs), which calls this first; the log
+ * line stays so the event is visible even if that table cannot be written.
  */
 export function logLinkIssuance(input: Parameters<typeof linkIssuanceLogEntry>[0]) {
   console.info("[audit] access link issued", linkIssuanceLogEntry(input));
