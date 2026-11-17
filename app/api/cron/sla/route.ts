@@ -13,8 +13,8 @@ const JOB = "sla";
 const PAGE_SIZE = 200;
 const CONCURRENCY = 10;
 // maxDuration is 60s (vercel.json). The sweep yields at 45s so the auto-close
-// pass still fits; triage recovery, which makes model calls, is skipped once
-// 50s have gone. Whatever is left is picked up by the next run, five minutes
+// pass still fits; triage recovery, which makes model calls, starts only after
+// a finished sweep with more than 30s left. The rest waits for the next run, five minutes
 // later.
 const SWEEP_BUDGET_MS = 45_000;
 // Triage recovery calls the AI provider in series; it only starts when enough
