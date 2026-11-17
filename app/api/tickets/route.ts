@@ -72,13 +72,17 @@ export async function POST(request: Request) {
     slaPolicy
   );
 
-  const { data: ticket, error } = await supabase
+  // REQ-F1-04: written with service_role. The `authenticated` role holds no
+  // write grant on hd_tickets (202611170003), so the checks that RLS used to
+  // make are made here: the caller is a customer (above), and the tenant and
+  // the author come from the authenticated profile, never from the body.
+  const { data: ticket, error } = await svc
     .from("hd_tickets")
     .insert({
       title: title.trim(),
       description: description.trim(),
       organization_id: profile.organization_id,
-      created_by: user.id,
+      created_by: profile.id,
       status: "open",
       priority,
       source: "portal",
@@ -96,8 +100,8 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    console.error("[POST /api/tickets]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[POST /api/tickets] insert failed", { code: error.code ?? null, message: error.message });
+    return NextResponse.json({ error: "Could not create the ticket" }, { status: 500 });
   }
 
   if (assignment.assignedTo) {
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
       newAssignee: assignment.assignedTo,
     });
 
-    await notifyTicketAssigned(supabase, {
+    await notifyTicketAssigned(svc, {
       ticketId: ticket.id,
       ticketNumber: ticket.ticket_number,
       previousAssignee: null,
