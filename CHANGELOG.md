@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased — Phase 1: SLA, integrity and audit
+
+### Fixed
+
+- **SLA sweep never ran.** In production `/api/cron/sla` answered 503 because `CRON_SECRET` was unset or shorter than 32 characters (verified 2026-11-17). Configuring it is a deployment step (see Deploy).
+- **Resolution SLA verdict.** Resolving or approving a ticket now recomputes `sla_resolution_met` / `sla_resolution_breached` from the real resolution time, so analytics no longer counts late resolutions as on time (DOM-05).
+
+### Added
+
+- **Five-minute SLA sweep** (ADR-018): pg_cron job calling the endpoint with a bearer read from Vault (migration `202611170002`); keyset batches of 200 within a time budget with a stored cursor (`hd_cron_state`, migration `202611170001`); breach notices once-only (unique index) and sent to the assignee **and** every active admin.
+- **`hd_admin_audit_logs`** and `logAdminEvent()` for role changes, user creation, freeze, soft-delete/restore, access-link issuance, customer creation and the PII setting (ADR-020, migration `202611170004`).
+- **Authorization matrix tests** (no session / wrong role / other organization / correct) for `tickets/[id]`, `comments`, `admin/users*`, `admin/customers/*`, `auth/register`, `email/inbound` and `cron/sla`.
+- pgTAP suites `phase1_integrity` (36) and `sla_pg_cron` (8), run in CI with every migration applied twice.
+
+### Security
+
+- **No direct writes to `hd_tickets`** from `anon`/`authenticated`; portal ticket creation uses `service_role` with tenant and creator derived from the session (SEC-05, migration `202611170003`).
+- **Append-only `hd_ticket_audit_logs`** for every role, `service_role` included (SEC-07).
+
+### Changed
+
+- Pre-`hd_` SQL scripts moved to `docs/legacy/` (do not execute); baseline runbook in `docs/runbooks/baseline.md`; local development with `supabase start` (ADR-019).
+
+### Deploy (order matters)
+
+1. Deploy this code (portal ticket creation via `service_role`).
+2. Apply `202611170001`, `202611170003`, `202611170004` (and `202611170002` once the Vault secret exists).
+3. Set `CRON_SECRET` (≥ 32 characters) in Vercel, create the same value in Vault: `select vault.create_secret('<value>', 'hd_cron_secret');`, then (re)apply `202611170002`.
+4. Deploy vidal-helpdesk-mcp (it writes to `hd_admin_audit_logs`).
+
+Rollback notes are in each migration header.
+
 ## Unreleased — Phase 0 hardening
 
 ### Security
