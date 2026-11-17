@@ -262,10 +262,12 @@ export async function ensureSlaDeadlines(
     .update(patch)
     .eq("id", ticket.id)
     .eq("organization_id", ticket.organization_id)
-    .select("id, ticket_number, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at")
+    .select(SLA_TICKET_COLUMNS)
     .single();
 
-  return data ?? { ...ticket, ...patch };
+  // Same columns as the sweep reads, breach flags included, so the assessment
+  // that follows sees the stored verdict instead of undefined.
+  return (data as unknown as typeof ticket | null) ?? { ...ticket, ...patch };
 }
 
 /**

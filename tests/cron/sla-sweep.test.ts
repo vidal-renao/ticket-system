@@ -227,6 +227,66 @@ describe("GET /api/cron/sla — sweep (REQ-F1-02)", () => {
     expect(fake.db.rows("hd_ticket_audit_logs").map((row) => row.action)).toEqual(["ticket.auto_closed"]);
   });
 
+  it("keeps the progress of a run whose second page fails to load", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    seed(Array.from({ length: 250 }, (_, i) => activeTicket(i + 1)));
+    // The first page read succeeds; the second one fails.
+    let reads = 0;
+    const original = fake.client.from;
+    fake.client.from = (table: string) => {
+      if (table === "hd_tickets" && ++reads === 2) {
+        fake.db.fail("hd_tickets", "select", { code: "57014", message: "statement timeout" }, { once: true });
+      }
+      return original(table);
+    };
+    let result;
+    try {
+      result = await run();
+    } finally {
+      fake.client.from = original;
+    }
+    expect(result.status).toBe(500);
+    expect(cursor()).toBe("t-00200");
+  });
+
+  it("auto-closes with the tenant predicate on every write, one update per organization", async () => {
+    seed([
+      activeTicket(1, { status: "resolved", resolved_at: "2026-11-15T11:00:00.000Z" }),
+      activeTicket(2, { status: "resolved", resolved_at: "2026-11-15T11:00:00.000Z", organization_id: "org-b" }),
+    ]);
+    const { body } = await run();
+    expect(body.autoClosed).toBe(2);
+    const updates = fake.db.opsFor("hd_tickets", "update");
+    expect(updates).toHaveLength(2);
+    for (const update of updates) {
+      expect(update.filters.some((f) => f.kind === "eq" && f.column === "organization_id")).toBe(true);
+    }
+  });
+
+  it("skips triage recovery when a finished sweep already used more than 30 seconds", async () => {
+    seed([activeTicket(1)]);
+    const original = fake.client.from;
+    let reads = 0;
+    fake.client.from = (table: string) => {
+      if (table === "hd_tickets" && ++reads === 1) vi.setSystemTime(new Date(Date.now() + 31_000));
+      return original(table);
+    };
+    let result;
+    try {
+      result = await run();
+    } finally {
+      fake.client.from = original;
+    }
+    expect(result.body).toMatchObject({ completed: true, triageRecovery: null });
+    expect(recoverMissingTriage).not.toHaveBeenCalled();
+  });
+
+  it("runs the full triage recovery only after a completed sweep", async () => {
+    seed([activeTicket(1)]);
+    await run();
+    expect(recoverMissingTriage).toHaveBeenCalledTimes(1);
+  });
+
   it("still runs triage recovery and reports it", async () => {
     recoverMissingTriage.mockResolvedValue({ candidates: 2, recovered: 1, failed: 1 });
     const { body } = await run();

@@ -18,6 +18,9 @@ const CONCURRENCY = 10;
 // later.
 const SWEEP_BUDGET_MS = 45_000;
 const RUN_BUDGET_MS = 50_000;
+// Triage recovery calls the AI provider in series; it only starts when enough
+// of the 60 s function limit is left for it to finish.
+const TRIAGE_RECOVERY_START_BEFORE_MS = 30_000;
 
 /**
  * SLA sweep, auto-close and triage recovery.
@@ -64,7 +67,9 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
     if (error) {
-      console.error("[cron/sla] ticket scan failed", error.message);
+      console.error("[cron/sla] ticket scan failed", { code: error.code ?? null });
+      // Keep what this run already handled so the next run resumes after it.
+      await writeCursor(svc, cursor);
       return NextResponse.json({ error: "SLA sweep failed" }, { status: 500 });
     }
 
@@ -116,7 +121,10 @@ export async function GET(request: Request) {
   // Tickets whose creation-time triage never landed are picked up here, so a
   // dropped background task self-heals on the next run instead of leaving the
   // ticket reading "Processing…" forever.
-  const triageRecovery = elapsed() < RUN_BUDGET_MS ? await recoverMissingTriage(svc) : null;
+  // Only after a finished sweep and with enough time left: an unfinished
+  // sweep has already spent its budget, and the next run comes in 5 minutes.
+  const triageRecovery =
+    completed && elapsed() < TRIAGE_RECOVERY_START_BEFORE_MS ? await recoverMissingTriage(svc) : null;
 
   return NextResponse.json({
     ok: true,
@@ -143,9 +151,13 @@ async function readCursor(svc: ServiceClient): Promise<string | null> {
       .select("cursor")
       .eq("job", JOB)
       .maybeSingle();
-    if (error) return null;
+    if (error) {
+      console.warn("[cron/sla] cursor not read; starting from the first ticket", error.code ?? "unknown");
+      return null;
+    }
     return (data?.cursor as string | null | undefined) ?? null;
   } catch {
+    console.warn("[cron/sla] cursor not read; starting from the first ticket", "exception");
     return null;
   }
 }
@@ -185,13 +197,29 @@ async function autoCloseConfirmedResolutions(
 
   if (!stale?.length) return 0;
 
-  const ids = stale.map((ticket) => ticket.id);
-  const { error } = await svc
-    .from("hd_tickets")
-    .update({ status: "closed", closed_at: now })
-    .in("id", ids)
-    .eq("status", "resolved")
-    .is("deleted_at", null);
+  // Closed per organization so every write carries its tenant predicate
+  // (AGENTS.md rule 3), even though the ids come from the query above.
+  const idsByOrganization = new Map<string, string[]>();
+  for (const ticket of stale) {
+    const ids = idsByOrganization.get(ticket.organization_id) ?? [];
+    ids.push(ticket.id);
+    idsByOrganization.set(ticket.organization_id, ids);
+  }
+
+  let error: { message: string } | null = null;
+  for (const [organizationId, ids] of idsByOrganization) {
+    const result = await svc
+      .from("hd_tickets")
+      .update({ status: "closed", closed_at: now })
+      .eq("organization_id", organizationId)
+      .in("id", ids)
+      .eq("status", "resolved")
+      .is("deleted_at", null);
+    if (result.error) {
+      error = result.error;
+      break;
+    }
+  }
 
   if (error) {
     console.error("[cron/sla] auto-close failed", error.message);
@@ -213,6 +241,6 @@ async function autoCloseConfirmedResolutions(
     )
   );
 
-  return ids.length;
+  return stale.length;
 }
 
