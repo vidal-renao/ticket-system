@@ -1,6 +1,5 @@
 import type { TicketStatus } from "@/lib/supabase/types";
 import { createServiceClientStatic } from "@/lib/supabase/server";
-import { createTicketNotification, notifyOrgManagers } from "@/lib/notifications";
 
 type QueryClient = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,6 +27,14 @@ export interface SlaTicketState {
   sla_resolution_due?: string | null;
   response_due_at?: string | null;
   resolution_due_at?: string | null;
+  // Stored verdicts. When the caller supplies them (the cron sweep does),
+  // applySlaAssessment can tell a first breach from a known one and skip the
+  // write for a ticket whose verdict has not changed.
+  sla_response_breached?: boolean | null;
+  sla_resolution_breached?: boolean | null;
+  sla_breached?: boolean | null;
+  sla_first_response_met?: boolean | null;
+  sla_resolution_met?: boolean | null;
 }
 
 export function addHours(date: string | Date, hours: number): string {
@@ -119,9 +126,10 @@ export function assessSla(ticket: SlaTicketState, now = new Date()) {
     resolutionDue &&
       (!isResolved
         ? now.getTime() > new Date(resolutionDue).getTime()
-        : resolvedAt
-          ? new Date(resolvedAt).getTime() > new Date(resolutionDue).getTime()
-          : false)
+        : // The real resolution time decides. A resolved ticket that carries no
+          // resolved_at is judged at the evaluation time instead of being
+          // assumed on time (DOM-05).
+          new Date(resolvedAt ?? now).getTime() > new Date(resolutionDue).getTime())
   );
 
   return {
@@ -133,13 +141,34 @@ export function assessSla(ticket: SlaTicketState, now = new Date()) {
   };
 }
 
+const SLA_FLAG_COLUMNS = [
+  "sla_response_breached",
+  "sla_resolution_breached",
+  "sla_breached",
+  "sla_first_response_met",
+  "sla_resolution_met",
+] as const;
+
+/**
+ * Evaluates a ticket and stores the verdict.
+ *
+ * Order matters. The breach is audited and notified *before* the flag is
+ * stored: both steps are idempotent, so a run that dies in between is simply
+ * repeated by the next one. Stored the other way round, the flag would say
+ * "known breach" and the notice would never be sent.
+ *
+ * A breach whose flag is already stored is a known breach: nothing is audited
+ * or notified again, and if no verdict changed nothing is written at all. That
+ * is what lets the five-minute sweep pass over thousands of tickets cheaply.
+ */
 export async function applySlaAssessment(
   supabase: QueryClient,
   ticket: SlaTicketState,
   actorId: string | null,
-  actorRole: string | null
+  actorRole: string | null,
+  options: { now?: Date } = {}
 ) {
-  const assessment = assessSla(ticket);
+  const assessment = assessSla(ticket, options.now ?? new Date());
 
   const patch: Record<string, unknown> = {
     sla_response_breached: assessment.responseBreached,
@@ -155,23 +184,62 @@ export async function applySlaAssessment(
     patch.sla_resolution_met = assessment.resolutionMet;
   }
 
-  await supabase
-    .from("hd_tickets")
-    .update(patch)
-    .eq("id", ticket.id)
-    .eq("organization_id", ticket.organization_id);
-
-  if (assessment.responseBreached) {
-    await logSlaEventOnce(ticket, "ticket.sla_response_breached", actorId, actorRole);
+  if (assessment.responseBreached && ticket.sla_response_breached !== true) {
+    await logSlaEventOnce(ticket, "ticket.sla_response_breached", actorId, actorRole, assessment);
     await notifySlaBreachOnce(ticket, "sla.response_breached", "SLA response breached");
   }
 
-  if (assessment.resolutionBreached) {
-    await logSlaEventOnce(ticket, "ticket.sla_resolution_breached", actorId, actorRole);
+  if (assessment.resolutionBreached && ticket.sla_resolution_breached !== true) {
+    await logSlaEventOnce(ticket, "ticket.sla_resolution_breached", actorId, actorRole, assessment);
     await notifySlaBreachOnce(ticket, "sla.resolution_breached", "SLA resolution breached");
   }
 
+  const stored = ticket as unknown as Record<string, unknown>;
+  const unchanged = SLA_FLAG_COLUMNS.every(
+    (column) => !(column in patch) || (stored[column] !== undefined && stored[column] === patch[column])
+  );
+
+  if (!unchanged) {
+    await supabase
+      .from("hd_tickets")
+      .update(patch)
+      .eq("id", ticket.id)
+      .eq("organization_id", ticket.organization_id);
+  }
+
   return assessment;
+}
+
+/** The columns an SLA evaluation reads from hd_tickets. */
+export const SLA_TICKET_COLUMNS =
+  "id, ticket_number, organization_id, priority, status, assigned_to, created_at, resolved_at, first_response_at, first_agent_response_at, sla_first_response_due, sla_resolution_due, response_due_at, resolution_due_at, sla_response_breached, sla_resolution_breached, sla_breached, sla_first_response_met, sla_resolution_met";
+
+/**
+ * Stores the final SLA verdict of a ticket that has just been resolved or
+ * closed, measured against its real resolution time (REQ-F1-03).
+ *
+ * The periodic sweep only looks at active tickets, so without this a ticket
+ * resolved after its deadline but before the next sweep kept
+ * `sla_resolution_breached = false` for ever and was reported as on time.
+ *
+ * Never throws: the resolution has already been written, and failing the
+ * request now would tell the caller it had not.
+ */
+export async function recomputeSlaOnResolution(
+  supabase: QueryClient,
+  ticket: SlaTicketState,
+  actorId: string | null,
+  actorRole: string | null
+): Promise<void> {
+  try {
+    const withDeadlines = await ensureSlaDeadlines(supabase, ticket);
+    await applySlaAssessment(supabase, withDeadlines, actorId, actorRole);
+  } catch (error) {
+    console.error("[sla] recomputation after resolution failed", {
+      ticketId: ticket.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
 }
 
 export async function ensureSlaDeadlines(
@@ -200,50 +268,74 @@ export async function ensureSlaDeadlines(
   return data ?? { ...ticket, ...patch };
 }
 
+/**
+ * Tells the assignee and every active administrator of the ticket's
+ * organization about a breach, once per person and breach type.
+ *
+ * An unassigned ticket also reaches the managers, as it always has: with no
+ * owner, they are the people who can give it one.
+ *
+ * "Once" is enforced twice. The lookup below skips anyone who already holds
+ * this notice; the partial unique index from 202611170001 catches two runs
+ * racing each other, and its 23505 is read as "already notified".
+ */
 async function notifySlaBreachOnce(
   ticket: SlaTicketState,
-  type: string,
+  type: "sla.response_breached" | "sla.resolution_breached",
   title: string
-) {
+): Promise<number> {
   const svc = createServiceClientStatic();
-  const recipientId = ticket.assigned_to;
 
-  if (recipientId) {
-    const { data: existing } = await svc
-      .from("hd_notifications")
-      .select("id")
-      .eq("user_id", recipientId)
-      .eq("ticket_id", ticket.id)
-      .eq("type", type)
-      .limit(1);
+  const { data: staff } = await svc
+    .from("hd_profiles")
+    .select("id")
+    .eq("organization_id", ticket.organization_id)
+    .in("role", ticket.assigned_to ? ["admin"] : ["admin", "manager"])
+    .eq("is_active", true);
 
-    if (!existing?.length) {
-      await createTicketNotification(svc, {
-        userId: recipientId,
-        ticketId: ticket.id,
+  const recipients = [
+    ...new Set<string>([
+      ...(ticket.assigned_to ? [ticket.assigned_to] : []),
+      ...((staff ?? []) as { id: string }[]).map((profile) => profile.id),
+    ]),
+  ];
+  if (recipients.length === 0) return 0;
+
+  const { data: existing } = await svc
+    .from("hd_notifications")
+    .select("user_id")
+    .eq("ticket_id", ticket.id)
+    .eq("type", type)
+    .in("user_id", recipients);
+
+  const alreadyNotified = new Set(((existing ?? []) as { user_id: string }[]).map((row) => row.user_id));
+  const pending = recipients.filter((id) => !alreadyNotified.has(id));
+
+  const results = await Promise.all(
+    pending.map(async (userId) => {
+      const { error } = await svc.from("hd_notifications").insert({
+        user_id: userId,
+        ticket_id: ticket.id,
         type,
         title,
         message: `${formatTicketNumber(ticket.ticket_number)} requires attention.`,
+        action_url: `/tickets/${ticket.id}`,
+        is_read: false,
       });
-    }
-    return;
-  }
+      if (!error) return true;
+      if (error.code !== "23505") {
+        console.error("[sla] breach notification failed", {
+          type,
+          ticketId: ticket.id,
+          userId,
+          error: error.message,
+        });
+      }
+      return false;
+    })
+  );
 
-  const { data: existingManagerNotice } = await svc
-    .from("hd_notifications")
-    .select("id")
-    .eq("ticket_id", ticket.id)
-    .eq("type", type)
-    .limit(1);
-
-  if (existingManagerNotice?.length) return;
-
-  await notifyOrgManagers(ticket.organization_id, {
-    ticketId: ticket.id,
-    type,
-    title,
-    message: `${formatTicketNumber(ticket.ticket_number)} requires attention.`,
-  });
+  return results.filter(Boolean).length;
 }
 
 function formatTicketNumber(ticketNumber: number | null | undefined) {
@@ -254,12 +346,14 @@ async function logSlaEventOnce(
   ticket: SlaTicketState,
   action: string,
   actorId: string | null,
-  actorRole: string | null
+  actorRole: string | null,
+  assessment: ReturnType<typeof assessSla>
 ) {
   const svc = createServiceClientStatic();
   const { data: existing } = await svc
     .from("hd_ticket_audit_logs")
     .select("id")
+    .eq("organization_id", ticket.organization_id)
     .eq("resource_type", "ticket")
     .eq("resource_id", ticket.id)
     .eq("action", action)
@@ -275,6 +369,6 @@ async function logSlaEventOnce(
     resource_type: "ticket",
     resource_id: ticket.id,
     old_values: null,
-    new_values: assessSla(ticket),
+    new_values: assessment,
   });
 }
