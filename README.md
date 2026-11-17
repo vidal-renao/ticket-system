@@ -163,16 +163,20 @@ npm audit --audit-level=high
 
 ## Database
 
-Repository SQL files describe an ordered bootstrap/hardening path but do not prove the deployed schema. Verify the Supabase migration history before promotion:
+`supabase/migrations/` is the source of truth for every schema change since the `hd_` prefix (2026-08). Each migration is idempotent, carries its rollback in the header, and its pgTAP suite runs in CI against an ephemeral PostgreSQL with two organizations.
 
-1. `docs/migration_v1_final.sql`
-2. `docs/migration_schema_consistency.sql`
-3. `docs/migration_phase1_routing.sql`
-4. `docs/migration_rls_profiles_fix.sql`
-5. `docs/migration_security_hardening.sql`
-6. `docs/rag_migration.sql` only when RAG is enabled
+- The original bootstrap scripts live in `docs/legacy/` and **must not be executed** (they predate the `hd_` prefix).
+- A reproducible baseline of the production schema is pending; see `docs/runbooks/baseline.md`.
+- Never edit a historical migration to represent a production change. Add an idempotent forward migration with rollback notes and test it against two tenants.
 
-Never edit a historical migration to represent a production change. Add an idempotent forward migration with rollback notes and test it against two tenants.
+### Local development
+
+```bash
+supabase start      # local Supabase stack (Docker)
+supabase db reset   # applies supabase/migrations/
+```
+
+Hosted staging is deferred until the Supabase Pro plan (branching); CI provides the isolated database for every pull request.
 
 ## Release checklist
 
