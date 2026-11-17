@@ -194,6 +194,12 @@ export async function resolveTicketAccess<T>(
     return { kind: "not_found" };
   }
 
+  // A ticket of another organization does not exist as far as this caller is
+  // concerned: answering "forbidden" would confirm that the id is real.
+  if (!profile.organization_id || baseTicket.organization_id !== profile.organization_id) {
+    return { kind: "not_found" };
+  }
+
   if (!canProfileAccessTicket(profile, baseTicket as TicketAccessRow)) {
     debugWarn("[TicketAccess] policy denied access", {
       ticketId,
