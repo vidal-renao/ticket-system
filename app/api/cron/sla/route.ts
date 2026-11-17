@@ -17,7 +17,6 @@ const CONCURRENCY = 10;
 // 50s have gone. Whatever is left is picked up by the next run, five minutes
 // later.
 const SWEEP_BUDGET_MS = 45_000;
-const RUN_BUDGET_MS = 50_000;
 // Triage recovery calls the AI provider in series; it only starts when enough
 // of the 60 s function limit is left for it to finish.
 const TRIAGE_RECOVERY_START_BEFORE_MS = 30_000;
