@@ -1,14 +1,42 @@
 # Changelog
 
-## Unreleased — Account actions leave an audit trail
-
-### Added
-
-- Freezing, unfreezing, deleting and restoring an account now writes a row to `hd_ticket_audit_logs` (`resource_type: "user"`, actions `user.frozen`, `user.unfrozen`, `user.deleted`, `user.restored`) naming the administrator, the target account id and role, and the before/after `is_active` / deleted state. Until now a freeze left no record of who applied it: the only trace was the ban timestamp in GoTrue. The row carries ids and role only, no email or name, because the table is readable by every staff member of the organization. The rows appear in the `/ops` activity feed with the other audit events. A failed audit write is logged and does not fail the request, because the account action has already happened. No migration: the table and its RLS are unchanged.
+## Unreleased — /ops reads the current SLA report subject
 
 ### Fixed
 
-- `/ops` would have stopped showing SLA compliance from 2026-10-03. It parsed the percentage from the daily report subject ("N% compliance"), and vidal-helpdesk-mcp now writes "N% SLA" or "SLA not measured". The parser (`lib/ops/audit-subject.ts`, now tested) reads both formats. "SLA not measured" reads as no value instead of a number.
+- `/ops` showed no SLA compliance for deliveries since 2026-10-03. It parsed the percentage from the daily report subject and only recognised "N% compliance", while vidal-helpdesk-mcp has since written "N% SLA" and now "SLA 30d N%". The parser (`lib/ops/audit-subject.ts`, now tested) reads all three formats. Subjects with nothing to measure ("SLA not measured", "SLA 30d not measured", "no resolved tickets in 30d") read as no value instead of a number.
+
+## Unreleased — Phase 1: SLA, integrity and audit
+
+### Fixed
+
+- **SLA sweep never ran.** In production `/api/cron/sla` answered 503 because `CRON_SECRET` was unset or shorter than 32 characters (verified 2026-11-17). Configuring it is a deployment step (see Deploy).
+- **Resolution SLA verdict.** Resolving or approving a ticket now recomputes `sla_resolution_met` / `sla_resolution_breached` from the real resolution time, so analytics no longer counts late resolutions as on time (DOM-05).
+
+### Added
+
+- **Five-minute SLA sweep** (ADR-018): pg_cron job calling the endpoint with a bearer read from Vault (migration `202611170002`); keyset batches of 200 within a time budget with a stored cursor (`hd_cron_state`, migration `202611170001`); breach notices once-only (unique index) and sent to the assignee **and** every active admin.
+- **`hd_admin_audit_logs`** and `logAdminEvent()` for role changes, user creation, freeze, soft-delete/restore, access-link issuance, customer creation and the PII setting (ADR-020, migration `202611170004`).
+- **Authorization matrix tests** (no session / wrong role / other organization / correct) for `tickets/[id]`, `comments`, `admin/users*`, `admin/customers/*`, `auth/register`, `email/inbound` and `cron/sla`.
+- pgTAP suites `phase1_integrity` (36) and `sla_pg_cron` (8), run in CI with every migration applied twice.
+
+### Security
+
+- **No direct writes to `hd_tickets`** from `anon`/`authenticated`; portal ticket creation uses `service_role` with tenant and creator derived from the session (SEC-05, migration `202611170003`).
+- **Append-only `hd_ticket_audit_logs`** for every role, `service_role` included (SEC-07).
+
+### Changed
+
+- Pre-`hd_` SQL scripts moved to `docs/legacy/` (do not execute); baseline runbook in `docs/runbooks/baseline.md`; local development with `supabase start` (ADR-019).
+
+### Deploy (order matters)
+
+1. Deploy this code (portal ticket creation via `service_role`).
+2. Apply `202611170001`, `202611170003`, `202611170004` (and `202611170002` once the Vault secret exists).
+3. Set `CRON_SECRET` (≥ 32 characters) in Vercel, create the same value in Vault: `select vault.create_secret('<value>', 'hd_cron_secret');`, then (re)apply `202611170002`.
+4. Deploy vidal-helpdesk-mcp (it writes to `hd_admin_audit_logs`).
+
+Rollback notes are in each migration header.
 
 ## Unreleased — Phase 0 hardening
 

@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
+import { logAdminEvent } from "@/lib/admin-audit";
 
 interface OrgSettings {
   pii_scrubbing_enabled: boolean;
@@ -104,6 +105,18 @@ export async function setPiiScrubbing(
     .from("organizations")
     .update({ settings: { ...current, pii_scrubbing_enabled: enabled } })
     .eq("id", orgId);
+
+  // REQ-F1-06: switching PII scrubbing changes what leaves the organization
+  // for the model provider, so the change is recorded either way.
+  await logAdminEvent({
+    organizationId: orgId,
+    actorId: user.id,
+    action: "org.pii_scrubbing_changed",
+    targetType: "organization",
+    targetId: orgId,
+    outcome: error ? "failure" : "success",
+    details: { enabled, previous: current.pii_scrubbing_enabled === true },
+  });
 
   if (error) return { error: normalizeSupabaseErrorMessage(error) };
 

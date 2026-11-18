@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { logAdminEvent } from "@/lib/admin-audit";
 import { getCurrentProfile } from "@/lib/authz";
-import { recordAccountLifecycle, setAccountFrozen } from "@/lib/user-lifecycle-server";
+import { setAccountFrozen } from "@/lib/user-lifecycle-server";
 import {
   REFUSAL_MESSAGE,
   REFUSAL_STATUS,
-  buildAccountAuditEntry,
   canAdministerUser,
 } from "@/lib/user-lifecycle";
 
@@ -38,7 +38,7 @@ export async function POST(
 
   const { data: target } = await svc
     .from("hd_profiles")
-    .select("id, role, organization_id, deleted_at, is_active")
+    .select("id, role, organization_id, deleted_at")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -84,22 +84,18 @@ export async function POST(
     organizationId: actor!.organization_id!,
   });
 
+  await logAdminEvent({
+    organizationId: actor!.organization_id,
+    actorId: user.id,
+    action: frozen ? "user.frozen" : "user.unfrozen",
+    targetType: "user",
+    targetId,
+    outcome: result.ok ? "success" : "failure",
+  });
+
   if (!result.ok) {
     return NextResponse.json({ error: result.message }, { status: 502 });
   }
-
-  await recordAccountLifecycle(
-    svc,
-    buildAccountAuditEntry({
-      action: frozen ? "freeze" : "unfreeze",
-      organizationId: actor!.organization_id!,
-      actorId: user.id,
-      actorRole: actor!.role,
-      targetId,
-      targetRole: permission.role,
-      wasActive: target!.is_active !== false,
-    })
-  );
 
   return NextResponse.json({ ok: true, is_active: !frozen });
 }

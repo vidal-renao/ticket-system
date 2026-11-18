@@ -268,6 +268,34 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["hd_notifications"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["hd_notifications"]["Insert"]>;
       };
+      // Administrative actions (202611170004). Append-only for every role;
+      // written with service_role by lib/admin-audit.ts and by the MCP server.
+      hd_admin_audit_logs: {
+        Row: {
+          id: number;
+          organization_id: string;
+          actor_id: string | null;
+          actor_type: "user" | "system" | "mcp";
+          action: string;
+          target_type: string | null;
+          target_id: string | null;
+          outcome: "success" | "failure";
+          details: Json;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["hd_admin_audit_logs"]["Row"], "id" | "created_at">;
+        Update: never;
+      };
+      // Resume point of the SLA sweep (202611170001). service_role only.
+      hd_cron_state: {
+        Row: {
+          job: string;
+          cursor: string | null;
+          updated_at: string;
+        };
+        Insert: Database["public"]["Tables"]["hd_cron_state"]["Row"];
+        Update: Partial<Database["public"]["Tables"]["hd_cron_state"]["Row"]>;
+      };
       audit_runs: {
         Row: {
           id: string;
