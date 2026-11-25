@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — /ops reads the current SLA report subject
+
+### Fixed
+
+- `/ops` showed no SLA compliance for deliveries since 2026-10-03. It parsed the percentage from the daily report subject and only recognised "N% compliance", while vidal-helpdesk-mcp has since written "N% SLA" and now "SLA 30d N%". The parser (`lib/ops/audit-subject.ts`, now tested) reads all three formats. Subjects with nothing to measure ("SLA not measured", "SLA 30d not measured", "no resolved tickets in 30d") read as no value instead of a number.
+
 ## Unreleased — Phase 1: SLA, integrity and audit
 
 ### Fixed
