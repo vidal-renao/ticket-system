@@ -107,7 +107,7 @@ export function LoginForm({ error, debug = false }: LoginFormProps) {
             </label>
             <a
               href="forgot-password"
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              className="auth-inline-link inline-flex min-h-6 items-center text-xs transition-colors"
             >
               {t("forgotPassword")}
             </a>
