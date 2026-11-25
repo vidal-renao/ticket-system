@@ -1,5 +1,7 @@
 # Current state
 
+> **Superseded in part (2026-11-25):** this snapshot predates Phase 0 (AI quota, `hd_customers_info` RLS) and Phase 1 (SLA sweep, `hd_tickets` write lockdown, append-only audit, `hd_admin_audit_logs`). See `CHANGELOG.md` and ADR-016 to ADR-020 for the current state; whether each migration is applied in production must be verified against the database, not this file.
+
 Status as inspected on 2026-07-25. Runtime deployment claims require owner/platform confirmation.
 
 | Capability | Evidence | Status |

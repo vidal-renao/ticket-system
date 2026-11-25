@@ -62,6 +62,13 @@
 /* ── Day mode (data-theme="light") ─────────────────────────────
    The app is dark-first; light mode remaps the surface/text scale so the
    interface stays readable under direct sunlight. "Auto" follows the OS. */
+/* Accent for workflow progress and ticket references. It was used in several
+   components but never declared, so completed chain-of-custody stages rendered
+   with no colour. Plain :root so it is emitted even if no utility references it. */
+:root {
+  --color-signal-blue: #2f6fed;
+}
+
 :root[data-theme="light"] {
   --color-surface-950: #eef2f7;
   --color-surface-900: #ffffff;

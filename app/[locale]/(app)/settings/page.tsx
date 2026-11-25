@@ -13,6 +13,7 @@ import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailability
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 import { AvatarUpload } from "@/components/settings/AvatarUpload";
 import { generateCif } from "@/lib/tax-id";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,7 @@ export default async function SettingsPage({
   }
 
   const lastLogin = user.last_sign_in_at
-    ? new Date(user.last_sign_in_at).toLocaleString(locale === "de" ? "de-CH" : "en-GB", { dateStyle: "medium", timeStyle: "short" })
+    ? new Date(user.last_sign_in_at).toLocaleString(locale === "de" ? "de-CH" : "en-GB", { timeZone: APP_TIME_ZONE, dateStyle: "medium", timeStyle: "short" })
     : "—";
 
   return (

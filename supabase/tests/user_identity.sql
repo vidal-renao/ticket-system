@@ -31,33 +31,33 @@ SELECT ok(
 -- ---------------------------------------------------------------------------
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, customer_type)
-     VALUES ('00000000-0000-4000-8000-000000000001', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', NULL) $$,
+     VALUES ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000c1a0', 'customer', NULL) $$,
   'a customer profile with no customer_type yet is accepted (transitional state matching handle_new_user()''s bare insert)'
 );
 
 SELECT throws_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, customer_type)
-     VALUES ('00000000-0000-4000-8000-000000000013', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'not-a-real-type') $$,
+     VALUES ('00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-00000000c1a0', 'customer', 'not-a-real-type') $$,
   '23514', NULL,
   'a customer profile with an invalid customer_type value violates the CHECK constraint'
 );
 
 SELECT throws_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, customer_type)
-     VALUES ('00000000-0000-4000-8000-000000000002', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', 'individual') $$,
+     VALUES ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-00000000c1a0', 'admin', 'individual') $$,
   '23514', NULL,
   'a non-customer profile with a customer_type violates the CHECK constraint'
 );
 
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, customer_type)
-     VALUES ('00000000-0000-4000-8000-000000000003', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'individual') $$,
+     VALUES ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-00000000c1a0', 'customer', 'individual') $$,
   'an individual customer with customer_type=individual is accepted'
 );
 
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, customer_type)
-     VALUES ('00000000-0000-4000-8000-000000000004', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'customer', 'company') $$,
+     VALUES ('00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-00000000c1a0', 'customer', 'company') $$,
   'a company customer with customer_type=company is accepted'
 );
 
@@ -75,7 +75,7 @@ SELECT ok(
 
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role)
-     VALUES ('00000000-0000-4000-8000-000000000005', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin') $$,
+     VALUES ('00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-00000000c1a0', 'admin') $$,
   'an admin profile (no customer_type needed) inserts cleanly'
 );
 SELECT ok(
@@ -85,7 +85,7 @@ SELECT ok(
 
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role)
-     VALUES ('00000000-0000-4000-8000-000000000006', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'agent') $$,
+     VALUES ('00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-00000000c1a0', 'agent') $$,
   'an agent profile inserts cleanly'
 );
 SELECT ok(
@@ -120,7 +120,7 @@ SELECT ok(
 -- ---------------------------------------------------------------------------
 SELECT lives_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role)
-     VALUES ('00000000-0000-4000-8000-000000000008', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'agent') $$,
+     VALUES ('00000000-0000-4000-8000-000000000008', '00000000-0000-4000-8000-00000000c1a0', 'agent') $$,
   'a fresh agent profile inserts cleanly and gets an EMP code immediately'
 );
 SELECT lives_ok(
@@ -153,7 +153,7 @@ SELECT ok(
 SELECT throws_ok(
   format(
     $$ INSERT INTO public.hd_profiles (id, organization_id, role, reference_code)
-       VALUES ('00000000-0000-4000-8000-000000000010', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', %L) $$,
+       VALUES ('00000000-0000-4000-8000-000000000010', '00000000-0000-4000-8000-00000000c1a0', 'admin', %L) $$,
     (SELECT reference_code FROM public.hd_profiles WHERE id = '00000000-0000-4000-8000-000000000005')
   ),
   '23505', NULL,
@@ -165,14 +165,14 @@ SELECT throws_ok(
 -- ---------------------------------------------------------------------------
 SELECT throws_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, reference_code)
-     VALUES ('00000000-0000-4000-8000-000000000011', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', 'not-a-valid-code') $$,
+     VALUES ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-00000000c1a0', 'admin', 'not-a-valid-code') $$,
   '23514', NULL,
   'a malformed reference_code violates the format CHECK constraint'
 );
 
 SELECT throws_ok(
   $$ INSERT INTO public.hd_profiles (id, organization_id, role, reference_code)
-     VALUES ('00000000-0000-4000-8000-000000000012', '921f56a8-b2fe-4f24-bae9-fdf4863d4240', 'admin', 'VRE-XXX-AAAA-AAAA') $$,
+     VALUES ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-00000000c1a0', 'admin', 'VRE-XXX-AAAA-AAAA') $$,
   '23514', NULL,
   'a reference_code with an unrecognized role prefix violates the format CHECK constraint'
 );

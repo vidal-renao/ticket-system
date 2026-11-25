@@ -9,6 +9,7 @@ import { priorityColor, sentimentIcon } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AIAnalysis } from "@/lib/supabase/types";
 import { TranslateButton } from "@/components/tickets/TranslateButton";
+import { isFailedTriage } from "@/lib/ai/triage-constants";
 
 interface AITriagePanelProps {
   analysis: AIAnalysis;
@@ -24,6 +25,29 @@ export function AITriagePanel({ analysis }: AITriagePanelProps) {
     setCopied(true);
     toast.success("Response copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  // A failed run stores placeholder values (category "Other", 0% confidence,
+  // 24h ETA). Showing them as suggestions would read as a real analysis.
+  if (isFailedTriage(analysis)) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">AI Triage</span>
+            </div>
+            <span className="text-xs font-medium text-amber-500">Unavailable</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+            AI triage did not complete. Category and priority need a manual review.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   const confidenceColor =

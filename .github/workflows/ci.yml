@@ -44,7 +44,13 @@ jobs:
             // unrelated parts of the eslint dependency tree far more than they
             // fixed. Revisit once Next.js publishes a 15.x patch. Critical-severity
             // findings are never allowed through this list, regardless of name.
-            const knownHighWithNoSafeFix = new Set(["next", "postcss", "sharp", "brace-expansion"]);
+            //
+            // Updated 2026-11-13: next itself left the list (15.5.29 fixes the
+            // critical image-optimizer RCE). zod joins it: the only fix is zod 4,
+            // a major migration (openai@6 still pulls zod 3). Exposure is
+            // server-side validation of oversized collections; the API routes
+            // already cap request bodies. Revisit with the zod 4 migration.
+            const knownHighWithNoSafeFix = new Set(["postcss", "sharp", "brace-expansion", "zod"]);
 
             let criticalCount = 0;
             const unexpected = [];
@@ -117,6 +123,21 @@ jobs:
           set -euo pipefail
           docker exec rag-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgvector postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart rag-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec rag-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec rag-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server; ubuntu-latest's default repo only has an older client)
         run: |
@@ -214,6 +235,21 @@ jobs:
           set -euo pipefail
           docker exec identity-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart identity-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec identity-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec identity-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |
@@ -322,6 +358,21 @@ jobs:
           set -euo pipefail
           docker exec tickets-ci-postgres bash -c \
             "apt-get update -qq && apt-get install -y --no-install-recommends postgresql-17-pgtap"
+          # PGDG extension packages require the newest postgresql-17 minor, so apt
+          # upgrades the server binaries under the running image version. Restart
+          # so the server and its plpgsql.so come from the same build (otherwise:
+          # "undefined symbol" on CREATE EXTENSION / plpgsql). Minor upgrades keep
+          # the data directory compatible.
+          docker restart tickets-ci-postgres >/dev/null
+          for _ in $(seq 1 30); do
+            if docker exec tickets-ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              docker exec tickets-ci-postgres postgres --version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::PostgreSQL did not come back after the extension install"
+          exit 1
 
       - name: Install psql client on the runner (PGDG repo, pinned to client 17 to match the server)
         run: |
@@ -358,6 +409,7 @@ jobs:
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/tickets_write_base.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202608040001_tickets_write_policies.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202608040002_fix_customer_update_guard.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/migrations/202611140001_closed_ticket_comment_guard.sql
           psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/tickets_write_policies.sql | tee tickets-pgtap.log
           # "not ok" is matched unanchored: psql indents NOTICE/output lines, and
           # an anchored ^not ok once let real pgTAP failures through as green.
@@ -371,6 +423,81 @@ jobs:
             exit 1
           fi
           echo "OK: pgTAP plan line found and no failed assertions."
+
+      # Phase 0 hardening (AI quota, hd_customers_info tenant isolation). Reuses
+      # this job's ephemeral server with a database of its own, because the two
+      # suites need a two-organization fixture the tickets suite does not have.
+      # Each migration is applied twice to assert it is idempotent.
+      - name: Phase 0 hardening -- apply fixture and migrations, run both pgTAP suites
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "postgresql://postgres@127.0.0.1:5434/postgres" -c "CREATE DATABASE ci_phase0_ci_test;"
+          DB_URL="postgresql://postgres@127.0.0.1:5434/ci_phase0_ci_test"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file=supabase/tests/fixtures/phase0_base.sql
+          for migration in 202611160001_ai_quota 202611160002_customers_info_rls; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/migrations/${migration}.sql"
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/migrations/${migration}.sql"
+          done
+          for suite in ai_quota customers_info_rls; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$DB_URL" --file="supabase/tests/${suite}.sql" | tee "phase0-${suite}-pgtap.log"
+            if grep -qE "not ok [0-9]" "phase0-${suite}-pgtap.log"; then
+              echo "::error::pgTAP (${suite}) reported at least one failed assertion"
+              grep -E "not ok [0-9]|# Failed test" "phase0-${suite}-pgtap.log"
+              exit 1
+            fi
+            if ! grep -qE "^\s*1\.\.[0-9]+\s*$" "phase0-${suite}-pgtap.log"; then
+              echo "::error::No pgTAP plan line found for ${suite} -- the suite may not have run at all"
+              exit 1
+            fi
+            if grep -q "Looks like you" "phase0-${suite}-pgtap.log"; then
+              echo "::error::pgTAP (${suite}) ran a different number of tests than planned"
+              exit 1
+            fi
+          done
+          echo "OK: Phase 0 pgTAP suites passed."
+
+      # Phase 1 (SLA sweep support, hd_tickets write lockdown, append-only audit,
+      # hd_admin_audit_logs, pg_cron scheduling). Two databases of their own:
+      # one for the integrity migrations, one for the pg_cron migration, which
+      # needs the pg_cron/pg_net/Vault test doubles. Each migration is applied
+      # twice to assert it is idempotent.
+      - name: Phase 1 -- apply fixtures and migrations, run pgTAP suites
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.password }}
+        run: |
+          set -euo pipefail
+          ADMIN_URL="postgresql://postgres@127.0.0.1:5434/postgres"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$ADMIN_URL" -c "CREATE DATABASE ci_phase1_integrity;" -c "CREATE DATABASE ci_phase1_cron;"
+          INTEGRITY_URL="postgresql://postgres@127.0.0.1:5434/ci_phase1_integrity"
+          CRON_URL="postgresql://postgres@127.0.0.1:5434/ci_phase1_cron"
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file=supabase/tests/fixtures/phase1_base.sql
+          for migration in 202611170001_sla_cron_support 202611170003_tickets_write_lockdown 202611170004_admin_audit_logs; do
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file="supabase/migrations/${migration}.sql"
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$INTEGRITY_URL" --file="supabase/migrations/${migration}.sql"
+          done
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$CRON_URL" --file=supabase/tests/fixtures/phase1_base.sql
+          psql --no-psqlrc --set=ON_ERROR_STOP=1 "$CRON_URL" --file=supabase/tests/fixtures/pg_cron_stub.sql
+          run_suite() {
+            local name="$1" url="$2"; shift 2
+            psql --no-psqlrc --set=ON_ERROR_STOP=1 "$url" "$@" --file="supabase/tests/${name}.sql" | tee "phase1-${name}-pgtap.log"
+            if grep -qE "not ok [0-9]" "phase1-${name}-pgtap.log"; then
+              echo "::error::pgTAP (${name}) reported at least one failed assertion"
+              grep -E "not ok [0-9]|# Failed test" "phase1-${name}-pgtap.log"
+              exit 1
+            fi
+            if ! grep -qE "^\s*1\.\.[0-9]+\s*$" "phase1-${name}-pgtap.log"; then
+              echo "::error::No pgTAP plan line found for ${name} -- the suite may not have run at all"
+              exit 1
+            fi
+            if grep -q "Looks like you" "phase1-${name}-pgtap.log"; then
+              echo "::error::pgTAP (${name}) ran a different number of tests than planned"
+              exit 1
+            fi
+          }
+          run_suite phase1_integrity "$INTEGRITY_URL"
+          run_suite sla_pg_cron "$CRON_URL" --set=migration=../migrations/202611170002_sla_pg_cron.sql
 
       - name: Publish pgTAP summary
         if: always()

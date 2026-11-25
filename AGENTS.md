@@ -26,7 +26,7 @@ Read `README.md`, `ARCHITECTURE.md`, `DOMAIN.md`, `SECURITY.md`, the active sect
 14. Agents are assignment-scoped: never expose an unassigned or another agent's ticket, and never add self-assignment.
 15. Assignment, category/priority override, review approval and ticket cleanup are administrator-only capabilities.
 16. Operational cleanup is soft deletion; permanent ticket destruction is not an application dashboard action.
-14. Shared UI must remain keyboard accessible, responsive and usable with reduced motion.
+17. Shared UI must remain keyboard accessible, responsive and usable with reduced motion.
 
 ## Sensitive Areas
 

@@ -3,6 +3,8 @@ import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/authz";
 import { appUrl } from "@/lib/app-url";
 import { sendEmail } from "@/lib/email";
+import { decideLinkHandoff } from "@/lib/link-handoff";
+import { recordLinkIssuance } from "@/lib/admin-audit";
 import { normalizeSupabaseErrorMessage } from "@/lib/validation/security";
 import {
   REFUSAL_MESSAGE,
@@ -30,13 +32,13 @@ import {
  * browser. The reset screen already handles that shape; invitations arrive the
  * same way.
  *
- * One link, delivered twice. `auth.one_time_tokens` is unique on
+ * One link, one delivery. `auth.one_time_tokens` is unique on
  * (user_id, token_type), so minting a second recovery token silently voids the
  * first -- calling `resetPasswordForEmail` for the email *and* `generateLink`
  * for the administrator's copy would hand over a link that had already been
  * invalidated by the other. So the link is generated once and this route mails
- * that exact link itself, which also means the administrator's copy and the
- * recipient's copy are the same working link.
+ * that exact link itself. The administrator receives a copy only when that
+ * mail failed and ADMIN_LINK_HANDOFF=true (lib/link-handoff.ts, ADR-016).
  */
 export async function POST(
   _request: Request,
@@ -137,12 +139,31 @@ export async function POST(
       `still works until a new one is set.\n`,
   });
 
+  // SEC-02 / ADR-016: the administrator's copy exists only when the mail did
+  // not go out AND the deployment opted in with ADMIN_LINK_HANDOFF=true.
+  const handoff = decideLinkHandoff({
+    kind: "recovery",
+    emailDelivered: delivery.delivered,
+    flag: process.env.ADMIN_LINK_HANDOFF,
+    link: actionLink,
+  });
+  await recordLinkIssuance({
+    source: "admin/users/password-reset",
+    actorId: user.id,
+    targetUserId: targetId,
+    organizationId: target!.organization_id ?? null,
+    linkType: "recovery",
+    emailDelivered: delivery.delivered,
+    decision: handoff,
+  });
+
   return NextResponse.json({
     email,
-    action_link: actionLink,
+    action_link: handoff.link,
+    link_handoff: handoff.reason,
     // The administrator is told the truth about the mail rather than a hopeful
-    // "sent", because the fallback -- handing the link over directly -- is only
-    // taken by someone who knows the mail did not go.
+    // "sent": with no link on screen, knowing the mail did not go is what
+    // tells them to fix delivery or try again.
     email_sent: delivery.delivered,
     email_skipped_reason: delivery.delivered ? null : delivery.reason,
   });

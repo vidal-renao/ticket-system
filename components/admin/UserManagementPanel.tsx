@@ -273,7 +273,8 @@ export function UserManagementPanel({
       setResetOutcome({
         name: u.full_name?.trim() || data.email,
         email: data.email,
-        actionLink: data.action_link,
+        // Present only when the mail failed and ADMIN_LINK_HANDOFF is on.
+        actionLink: typeof data.action_link === "string" ? data.action_link : null,
         emailSent: Boolean(data.email_sent),
       });
     } catch {

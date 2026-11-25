@@ -14,7 +14,7 @@ import { applySlaAssessment, ensureSlaDeadlines } from "@/lib/sla";
 import { createTicketNotification } from "@/lib/notifications";
 import { planCommentNotification } from "@/lib/comment-notifications";
 import { getAuthUserEmail, sendEmail, ticketEmailSubject } from "@/lib/email";
-import { canAgentSetExecutionStatus } from "@/lib/ticket-workflow";
+import { canAgentSetExecutionStatus, canPostTicketComment } from "@/lib/ticket-workflow";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -67,6 +67,13 @@ export async function POST(request: Request) {
   }
 
   const ticket = access.ticket;
+
+  if (!canPostTicketComment(profile.role, ticket.status)) {
+    return NextResponse.json(
+      { error: "This ticket is closed. Please open a new ticket." },
+      { status: 409 }
+    );
+  }
 
   const requestedStatus = body.status_after_comment
     ? normalizeStatusInput(body.status_after_comment)

@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/authz";
 import { logTicketLifecycleEvents } from "@/lib/ticket-events";
 import { createTicketNotification } from "@/lib/notifications";
 import { legacyToCanonicalStatus } from "@/lib/ticket-lifecycle";
+import { SLA_TICKET_COLUMNS, recomputeSlaOnResolution } from "@/lib/sla";
 import {
   canForceClose,
   reviewStatusAfterForceClose,
@@ -94,7 +95,7 @@ export async function POST(
     // second audit entry for a close that already happened.
     .neq("status", "closed")
     .is("deleted_at", null)
-    .select("id, ticket_number, status, assigned_to")
+    .select(SLA_TICKET_COLUMNS)
     .maybeSingle();
 
   if (error) {
@@ -104,6 +105,10 @@ export async function POST(
   if (!updated) {
     return NextResponse.json({ error: "Ticket changed; refresh and retry" }, { status: 409 });
   }
+
+  // REQ-F1-03: a forced close ends the ticket, so its resolution verdict is
+  // fixed here against the resolution time that was just stored.
+  await recomputeSlaOnResolution(svc, updated, user.id, profile.role);
 
   // The ordinary lifecycle entry, so the ticket's timeline has no gap where
   // the status changed without an event.

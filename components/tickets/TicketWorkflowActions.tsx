@@ -30,6 +30,10 @@ export function TicketWorkflowActions({ ticketId, role, status, reviewStatus }: 
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error ?? "Request failed");
         toast.success(success);
+        // Called inside the transition on purpose: `pending` stays true until
+        // the refreshed server render (status badge, chain of custody, these
+        // buttons) has committed, so the controls cannot be clicked against
+        // the old state in between.
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Request failed");
@@ -64,6 +68,7 @@ export function TicketWorkflowActions({ ticketId, role, status, reviewStatus }: 
               <RotateCcw className="h-4 w-4" /> Resume work
             </Button>
           )}
+          {pending && <Loader2 className="h-4 w-4 animate-spin self-center text-[var(--color-text-muted)]" aria-label="Updating" />}
         </div>
         {reviewStatus === "pending" && (
           <p className="text-xs text-[var(--color-sla-warning)]">Submitted for administrator review. Execution controls are locked until a decision.</p>

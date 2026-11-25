@@ -18,6 +18,149 @@
 - Copy now claims only what the code does: the AI insights card describes category-acceptance, confidence and sentiment per organization (the "continuous model improvement on your data" line had no implementation behind it); the auth screens list technical controls instead of "Protected by DSG/nDSG"; the illustrative control panel is labelled "Example view" rather than "Live workflow".
 - The language switcher is visible on mobile, with 24px+ targets; the landing uses the same lightning mark as the app and favicon.
 
+## Unreleased — /ops reads the current SLA report subject
+
+### Fixed
+
+- `/ops` showed no SLA compliance for deliveries since 2026-10-03. It parsed the percentage from the daily report subject and only recognised "N% compliance", while vidal-helpdesk-mcp has since written "N% SLA" and now "SLA 30d N%". The parser (`lib/ops/audit-subject.ts`, now tested) reads all three formats. Subjects with nothing to measure ("SLA not measured", "SLA 30d not measured", "no resolved tickets in 30d") read as no value instead of a number.
+
+## Unreleased — Phase 1: SLA, integrity and audit
+
+### Fixed
+
+- **SLA sweep never ran.** In production `/api/cron/sla` answered 503 because `CRON_SECRET` was unset or shorter than 32 characters (verified 2026-11-17). Configuring it is a deployment step (see Deploy).
+- **Resolution SLA verdict.** Resolving or approving a ticket now recomputes `sla_resolution_met` / `sla_resolution_breached` from the real resolution time, so analytics no longer counts late resolutions as on time (DOM-05).
+
+### Added
+
+- **Five-minute SLA sweep** (ADR-018): pg_cron job calling the endpoint with a bearer read from Vault (migration `202611170002`); keyset batches of 200 within a time budget with a stored cursor (`hd_cron_state`, migration `202611170001`); breach notices once-only (unique index) and sent to the assignee **and** every active admin.
+- **`hd_admin_audit_logs`** and `logAdminEvent()` for role changes, user creation, freeze, soft-delete/restore, access-link issuance, customer creation and the PII setting (ADR-020, migration `202611170004`).
+- **Authorization matrix tests** (no session / wrong role / other organization / correct) for `tickets/[id]`, `comments`, `admin/users*`, `admin/customers/*`, `auth/register`, `email/inbound` and `cron/sla`.
+- pgTAP suites `phase1_integrity` (36) and `sla_pg_cron` (8), run in CI with every migration applied twice.
+
+### Security
+
+- **No direct writes to `hd_tickets`** from `anon`/`authenticated`; portal ticket creation uses `service_role` with tenant and creator derived from the session (SEC-05, migration `202611170003`).
+- **Append-only `hd_ticket_audit_logs`** for every role, `service_role` included (SEC-07).
+
+### Changed
+
+- Pre-`hd_` SQL scripts moved to `docs/legacy/` (do not execute); baseline runbook in `docs/runbooks/baseline.md`; local development with `supabase start` (ADR-019).
+
+### Deploy (order matters)
+
+1. Deploy this code (portal ticket creation via `service_role`).
+2. Apply `202611170001`, `202611170003`, `202611170004` (and `202611170002` once the Vault secret exists).
+3. Set `CRON_SECRET` (≥ 32 characters) in Vercel, create the same value in Vault: `select vault.create_secret('<value>', 'hd_cron_secret');`, then (re)apply `202611170002`.
+4. Deploy vidal-helpdesk-mcp (it writes to `hd_admin_audit_logs`).
+
+Rollback notes are in each migration header.
+
+## Unreleased — Phase 0 hardening
+
+### Security
+
+- **AI endpoints (SEC-01).** `/api/translate`, `/api/ai/wiki-chat` and the `translateText` action now require an active profile with an organization (401 / 403), validate input with Zod (400: text ≤ 5000 characters; chat ≤ 20 messages, ≤ 12000 characters, roles `user`/`assistant`) and consume a quota before calling the provider (429 with `Retry-After`: 30/hour and 200/day per user, 1000/day per organization). Provider and quota failures return a generic 503.
+- **AI quota store.** Migration `202611160001_ai_quota.sql`: table `hd_ai_usage` (RLS on, no policies) and `hd_consume_ai_quota` (SECURITY DEFINER, pinned `search_path`, `service_role` only, atomic, 7-day retention). **Must be applied before deploying this code** — without it the AI endpoints answer 503. Rollback in the migration header.
+- **Access links (SEC-02).** The customer onboarding routes no longer return a magic link, and never for a linked account. The password-reset route no longer returns the recovery link when the email was sent. A link reaches the administrator only when the email failed **and** `ADMIN_LINK_HANDOFF=true`; every issuance is logged without the link (ADR-016).
+- **`hd_customers_info` RLS (SEC-03).** Migration `202611160002_customers_info_rls.sql` replaces the four `codex_*` policies, which had no organization filter, with owner-or-same-organization rules (SELECT: staff of the customer's organization; INSERT/UPDATE: its admin; DELETE: its admin only). The application is unaffected (it writes with `service_role`). Rollback in the migration header.
+- **Fixtures (SEC-10).** The production organization UUID was replaced by a fictitious one in `supabase/tests`.
+
+### Changed
+
+- API contract: `POST /api/admin/customers/{individual,company}` now returns `email_sent` (`true`/`false`, `null` for a linked account) and `link_handoff`; `access_link` is `null` unless handed off. A failed invitation email returns 502 when hand-off is disabled. `POST /api/admin/users/[id]/password-reset` returns `action_link: null` unless handed off, plus `link_handoff`.
+- `translateText` uses Haiku through the shared `lib/ai/translate.ts` and rejects unsupported locales instead of defaulting to English.
+- Admin customer forms, the admin ticket form and the password-reset dialog show the email status when there is no link; new `admin.linkHandoff` messages in DE/EN/ES.
+- New environment variable `ADMIN_LINK_HANDOFF` (default `false`).
+
+### Tests
+
+- Vitest: AI guard, schemas, quota helper, the three AI entry points, link hand-off decision, invite fallback (290 → 350 tests).
+- pgTAP: `supabase/tests/ai_quota.sql` (36) and `supabase/tests/customers_info_rls.sql` (38, two organizations), on the new `fixtures/phase0_base.sql`, added to the `tickets-write-policies` CI job.
+
+## Unreleased — Theme Auto follows time of day
+
+### Changed
+
+- The sidebar theme control's "Auto" setting now follows the viewer's local time of day instead of the operating system's colour scheme: light from 07:00 to 18:59, dark from 19:00 to 06:59. Before this, Auto showed the light theme at 01:00 whenever the OS was in light mode.
+- The boundaries live in one place, `lib/theme-schedule.ts` (`DAY_START_HOUR`, `NIGHT_START_HOUR`, `resolveAutoTheme`). The pre-paint boot script moved to `lib/theme-boot-script.ts` and takes the hours from those constants, so first paint and the client control cannot drift apart.
+- While Auto is selected, the theme is checked again every minute and whenever the tab becomes visible, so it switches at the boundary without a reload. Choosing Day or Night stops these checks.
+- Day and Night still force light/dark. Stored `hd_theme` values stay valid; an unrecognised value falls back to Auto. Sidebar state and brightness handling in the boot script are unchanged.
+- Button tooltips now describe each mode (e.g. "Auto: light by day (07:00–19:00), dark at night").
+- Tests: rule edges (00:00, 06:59, 07:00, 18:59, 19:00, 23:59), and the boot script run in a sandbox, checked against the same rule, forced modes, sidebar and brightness.
+
+## Unreleased — Swiss display time and honest new-ticket copy
+
+### Fixed
+
+- Timestamps were formatted in the runtime's zone: UTC on the server, local in the browser. On TK-0084 the same first response read "13 Nov, 23:38" after a full load and "14 Nov, 00:38" after a client refresh. All `toLocale*` calls now use `APP_TIME_ZONE` (`Europe/Zurich`, `lib/datetime.ts`).
+- The new-ticket form promised that "our AI will prioritize and route it automatically". With the AI service unavailable that was not true; the copy (DE/EN/ES) now says the request is prioritized and routed to a specialist, and that AI classification applies when the service is available.
+
+## Unreleased — Closed-ticket comment guard in the database
+
+### Security
+
+- Migration `202611140001_closed_ticket_comment_guard.sql`: a BEFORE INSERT trigger on `hd_ticket_comments` rejects customer comments on closed tickets (SQLSTATE 23514). The API already returned 409, but `authenticated` holds INSERT and the policy did not check the status, so a direct PostgREST call could still write. Staff are unaffected; `resolved` stays open for the customer. Covered by 3 new pgTAP assertions in the tickets-write-policies CI job. Rollback in the migration header.
+
+## Unreleased — Admin user manual
+
+### Added
+
+- `/admin/manual`: a step-by-step staff manual for the ticket lifecycle (TK-xxxx), structured by the six chain-of-custody stages (Intake, Routing, Execution, Admin OK, Resolved, Customer OK), with roles, a table of contents, exact button labels, the resulting status per stage, screenshots and a "Good to know" section (SLA card, AI triage "Unavailable", internal notes, Force close).
+- Administrator-only, enforced on the server from the authenticated profile (non-admins, including managers, are redirected). Entry points: "User manual" in the Admin Panel header and "Manual" in the sidebar, both shown to administrators only.
+- Text in DE/EN/ES under the new `manual` message namespace. Every statement was checked against the code; the 48h reopen/auto-close window is shared through `lib/manual-content.ts` and a test fails if the reopen route, the customer card or the SLA cron drift from it.
+- Screenshots in `public/manual/` as cropped WebP (4–41 KB each). Customer e-mail addresses are blurred; areas showing UI defects under repair (SLA countdown after response, presence) are cropped out. Note: files in `public/` are served without authentication.
+- Tests: identical `manual` key sets across DE/EN/ES, every rendered key present, no "ß" in DE, every screenshot shipped.
+
+## Unreleased — Ticket workflow fixes from the end-to-end run
+
+Found while running TK-0081 through the full lifecycle in production on 2026-11-13.
+
+### Security
+
+- Customers received internal notes in the ticket page payload. The page loads comments with the service client (RLS bypassed) and only the browser component hid internal ones. The query now excludes `is_internal` notes for every non-staff role (`applyCommentVisibilityScope`, fails closed). The realtime refetch in the browser was already protected by the `ticket_comments_read_authorized` policy.
+- AI provider errors no longer reach the browser: "AI Suggest Response" showed the raw provider message (billing state, request id) in a toast. Both AI features now return a generic error; the server log records stage, HTTP status and error class only.
+
+### Fixed
+
+- Presence showed an active agent as "Offline". The app shell marked the profile offline on `beforeunload`, which also fires on every reload and full-page navigation, and the heartbeat never restores the declared status — so one reload meant "Offline" until the next login. The unload beacon is removed; a closed tab still drops to offline after the 3-minute heartbeat window. Agents already affected recover at their next login or with the availability toggle in Settings.
+- The SLA card kept counting after the SLA was met: the Response countdown (with warning icon) ran on after the first response, and both countdowns ran on after resolution/closure. Finished targets now read "Responded" / "Resolved on time" (or late) with the time, and the header badge shows the final outcome ("SLA met" or "Breached"). Logic in `lib/sla-display.ts`, strings DE/EN/ES.
+- A closed ticket still offered the customer the reply box and "AI Support Assistant — No agents available — AI Assistant active". It now shows "This ticket is closed. Open a new ticket if you need more help." with a link to New Ticket, and no assistant. `POST /api/comments` and the AI-chat save reject customer comments on closed tickets (409). Resolved tickets keep the reply and Confirm/Reopen flow.
+- The customer AI assistant said "AI Assistant active" while the provider could not answer. On failure it now says "The assistant is not available right now. A specialist will answer your ticket." and disables its input. The route fails closed when no API key is configured. No provider call is made on page load.
+- Ticket page refresh after workflow actions: the page is now `force-dynamic` like the other authenticated pages, comments refresh the page (the first public reply stops the SLA response clock), the comment list takes the refreshed server data, and agent controls show a pending indicator until the refreshed render commits.
+
+## Unreleased — Security patch, page language and CI
+
+### Security
+
+- `next` 15.5.21 → 15.5.29 (patch release). Fixes the critical npm-audit finding, including unauthenticated RCE in the Image Optimization API with AVIF files. `eslint-config-next` aligned.
+- Overrides raised for `js-yaml` (^4.3.2), `source-map-js` (^1.2.2) and `vite` (^8.3.8, dev only).
+- `zod` stays on 3.x and is added to the dated triaged list in CI: the only fix is zod 4 (major, and `openai@6` still depends on zod 3).
+
+### Fixed
+
+- `<html lang>` was hard-coded to `de` on every page and only corrected in the browser after hydration. On `/en` pages Chrome treated the page as German and machine-translated it into the viewer's language (the login appeared in Spanish). The root layout now renders the request locale on the server; the client-side `HtmlLang` patch is removed.
+- CI database jobs: installing pgTAP/pgvector from PGDG upgrades `postgresql-17` inside the 17.6 container (current pgTAP requires > 17.12), and the still-running server then failed to load `plpgsql.so` (`undefined symbol`). The container is now restarted after the extension install, so the server runs the same build as its libraries. CI therefore tests on the newest 17.x minor rather than exactly 17.6.
+
+## Unreleased — Password reset: refused password shown as expired link
+
+### Fixed
+
+- Choosing a new password equal to the current one made `/reset-password` say the link had expired. GoTrue answers `updateUser` with 422 `same_password`, and the classifier treated every 422 as an expired PKCE flow, so the person was sent to request a new link that could never work. Password-rule refusals (`same_password`, `weak_password`) now keep the form open with a specific message (DE/EN/ES); a bare 422 from the PKCE grant still reads as expired. Found in the auth log on 2026-11-13: three successful recovery logins, each followed by `same_password`.
+
+## Unreleased — Dashboard and triage coherence
+
+### Fixed
+
+- The executive dashboard's AI Performance card was hard-coded to 0% acceptance, 0% confidence and "0 analyzed tickets". It now aggregates the tenant's `hd_ai_analysis` rows, scoped through the organization's own ticket ids, and shows "—" instead of 0% when there is no data or no staff feedback yet.
+- Failure-path placeholders written by `runAITriage` (`model_used = "n/a"`, confidence 0) no longer count as analysed tickets or pull the average confidence down. Dashboard and Analytics share one helper (`lib/ai/metrics.ts`), so both report the same figures.
+- The dashboard card titled "By Category" listed priority counts; it is now labelled "By priority" (DE/EN/ES).
+- A ticket whose triage never landed no longer shows "Processing…" indefinitely. After the stale window it reads "AI triage did not complete — manual review needed", with the existing admin re-run action. The code comment now states the real cron cadence (daily).
+- A failed triage stored the AI provider's raw error in `reasoning` (billing state, request id), and staff could read it in the ticket. The row now stores a generic reason (timeout or provider error); the full error stays in the server log only (AGENTS.md rule 10).
+- The AI Triage panel showed the failure placeholders (category "Other", 0% confidence, ~24h ETA) as if they were suggestions. A failed run now shows "Unavailable" and asks for a manual review. Existing failure rows are covered by the same check, so no data migration is needed.
+- Ticket headers, ticket rows and the agent workspace showed the tenant slug (e.g. "VIDAL-REAL-ESTATE") as a company code. In this single-tenant deployment it carried no information for staff and confused customers, so it is no longer shown. The customer portal header now names the customer's own company instead of the support organization. The slug itself is unchanged (it identifies the canonical tenant, ADR-015).
+- Completed chain-of-custody stages had no colour: `--color-signal-blue` was used by the progress bar, ticket references and the workflow panel but was never declared. It is now declared in `app/globals.css`.
+
 ## Unreleased — Password recovery
 
 ### Fixed

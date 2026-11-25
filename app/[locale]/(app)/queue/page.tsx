@@ -48,18 +48,15 @@ export default async function QueuePage({
       : (locale === "de" ? "/tickets" : `/${locale}/tickets`));
   }
 
-  const [{ data: ticketRows, error }, { data: organization }] = await Promise.all([
-    getTicketsByRole(
-      svc,
-      profile,
-      "id, ticket_number, title, status, priority, created_at, assigned_to, sla_breached, review_status"
-    )
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("sla_breached", { ascending: false })
-      .order("created_at", { ascending: false }),
-    svc.from("organizations").select("name, slug").eq("id", profile.organization_id).single(),
-  ]);
+  const { data: ticketRows, error } = await getTicketsByRole(
+    svc,
+    profile,
+    "id, ticket_number, title, status, priority, created_at, assigned_to, sla_breached, review_status"
+  )
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .order("sla_breached", { ascending: false })
+    .order("created_at", { ascending: false });
   if (error) console.error("[AgentWorkspace] ticket query failed", { actorId: user.id, error: error.message });
 
   const allTickets = (ticketRows ?? []) as AgentTicket[];
@@ -123,7 +120,7 @@ export default async function QueuePage({
           <PresenceAvatar name={profile.full_name?.trim() || "Agent"} status={profile.availability_status} queueCount={activeCount} size="md" />
           <div>
             <p className="text-sm font-semibold text-[var(--color-text-primary)]">{profile.full_name?.trim() || "Agent"}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">{profile.specialty?.trim() || "General support"} · {organization?.slug?.toUpperCase() ?? "ORG"}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">{profile.specialty?.trim() || "General support"}</p>
           </div>
         </Card>
       </header>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { logAdminEvent } from "@/lib/admin-audit";
 import { getCurrentProfile } from "@/lib/authz";
 import { setAccountFrozen } from "@/lib/user-lifecycle-server";
 import {
@@ -99,6 +100,15 @@ export async function POST(
   }
 
   const organizationId = actor!.organization_id!;
+  const audit = (outcome: "success" | "failure") =>
+    logAdminEvent({
+      organizationId,
+      actorId: user.id,
+      action: action === "delete" ? "user.deleted" : "user.restored",
+      targetType: "user",
+      targetId,
+      outcome,
+    });
 
   if (action === "delete") {
     // Freeze first. If the mark lands and the ban does not, the account is
@@ -110,6 +120,7 @@ export async function POST(
       organizationId,
     });
     if (!frozen.ok) {
+      await audit("failure");
       return NextResponse.json({ error: frozen.message }, { status: 502 });
     }
   }
@@ -132,8 +143,11 @@ export async function POST(
       // account is left exactly as it was found.
       await setAccountFrozen(svc, { userId: targetId, frozen: false, organizationId });
     }
+    await audit("failure");
     return NextResponse.json({ error: "Could not update the account" }, { status: 500 });
   }
+
+  await audit("success");
 
   return NextResponse.json({
     ok: true,

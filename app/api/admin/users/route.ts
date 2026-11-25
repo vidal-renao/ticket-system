@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClientStatic } from "@/lib/supabase/server";
+import { logAdminEvent } from "@/lib/admin-audit";
 import { normalizeSupabaseErrorMessage, passwordSchema } from "@/lib/validation/security";
 import { generateCif } from "@/lib/tax-id";
 import { adoptUnassignedTicketsForNewAgent } from "@/lib/ticket-inheritance";
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
     .eq("id", user.id)
     .single();
 
-  if (!adminProfile || adminProfile.role !== "admin") {
+  // An administrator with no organization would create accounts that belong
+  // to no tenant; fail closed, as PATCH /api/admin/users/[id] already does.
+  if (!adminProfile || adminProfile.role !== "admin" || !adminProfile.organization_id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -118,6 +121,15 @@ export async function POST(request: Request) {
     await svc.auth.admin.deleteUser(userId);
     return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
   }
+
+  await logAdminEvent({
+    organizationId: adminProfile.organization_id,
+    actorId: user.id,
+    action: "user.created",
+    targetType: "user",
+    targetId: userId,
+    details: { role },
+  });
 
   // Inherit the backlog: any ticket left unassigned only because no
   // specialist existed for this specialty yet is handed to the new agent now.

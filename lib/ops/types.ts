@@ -5,7 +5,7 @@ import type { CanonicalTicketStatus } from "@/lib/ticket-lifecycle";
  * Shared contracts for the live operations console (/ops).
  *
  * Column lists are written against the *deployed* schema (verified against the
- * live database), not against docs/schema.sql: `tickets.tags` for example is
+ * live database), not against docs/legacy/schema.sql: `tickets.tags` for example is
  * declared in types.ts but does not exist in this project, so selecting it
  * would fail the whole query.
  */

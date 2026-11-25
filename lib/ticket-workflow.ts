@@ -58,3 +58,17 @@ export function getTicketBusinessStage(ticket: {
   if (ticket.assigned_to) return "assigned";
   return "new";
 }
+
+/**
+ * Whether a new comment may be posted on a ticket in `status`.
+ *
+ * A closed ticket is finished for the customer: they confirmed it (or it
+ * auto-closed) and further help is a new ticket. A `resolved` ticket stays
+ * open to the customer, who can still reply or reopen within the window.
+ * Staff are not restricted here; their workflow controls own closed tickets.
+ */
+export function canPostTicketComment(role: UserRole | string | null | undefined, status: string): boolean {
+  const isStaff = role === "agent" || role === "manager" || role === "admin";
+  if (isStaff) return true;
+  return status !== "closed";
+}

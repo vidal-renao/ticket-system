@@ -7,6 +7,8 @@ interface SlaCountdownProps {
   dueAt: string;
   label: string;
   breached?: boolean;
+  /** Shown instead of the clock once the due date passes. */
+  overdueLabel?: string;
 }
 
 function formatCountdown(ms: number): string {
@@ -23,7 +25,7 @@ function formatCountdown(ms: number): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function SlaCountdown({ dueAt, label, breached = false }: SlaCountdownProps) {
+export function SlaCountdown({ dueAt, label, breached = false, overdueLabel = "BREACHED" }: SlaCountdownProps) {
   const [remaining, setRemaining] = useState(() => new Date(dueAt).getTime() - Date.now());
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export function SlaCountdown({ dueAt, label, breached = false }: SlaCountdownPro
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span className="text-[var(--color-text-muted)]">{label}:</span>
       <span className={`font-mono tabular-nums font-semibold ${colorClass}`}>
-        {isBreached ? "BREACHED" : formatCountdown(remaining)}
+        {isBreached ? overdueLabel : formatCountdown(remaining)}
       </span>
     </div>
   );

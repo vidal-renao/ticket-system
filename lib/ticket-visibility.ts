@@ -56,6 +56,24 @@ export function applyTicketVisibilityScope(
   return scoped.eq("assigned_to", profile.id);
 }
 
+/**
+ * Internal notes are staff-only (DOMAIN.md). Pages load comments with the
+ * service client, which bypasses RLS, so the filter has to be in the query:
+ * hiding internal notes in a client component still ships them in the page
+ * payload. Fails closed: any role that is not explicitly staff gets public
+ * comments only.
+ */
+export function canReadInternalComments(role: string | null | undefined): boolean {
+  return role === "agent" || role === "manager" || role === "admin";
+}
+
+export function applyCommentVisibilityScope<Q extends { eq(column: string, value: boolean): Q }>(
+  query: Q,
+  role: string | null | undefined
+): Q {
+  return canReadInternalComments(role) ? query : query.eq("is_internal", false);
+}
+
 export function canProfileAccessTicket(
   profile: Pick<CurrentProfile, "id" | "role" | "organization_id">,
   ticket: Pick<TicketAccessRow, "organization_id" | "created_by" | "assigned_to">
@@ -173,6 +191,12 @@ export async function resolveTicketAccess<T>(
   }
 
   if (!baseTicket) {
+    return { kind: "not_found" };
+  }
+
+  // A ticket of another organization does not exist as far as this caller is
+  // concerned: answering "forbidden" would confirm that the id is real.
+  if (!profile.organization_id || baseTicket.organization_id !== profile.organization_id) {
     return { kind: "not_found" };
   }
 

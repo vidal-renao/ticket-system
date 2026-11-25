@@ -19,6 +19,8 @@ import { formatTicketRef } from "@/lib/utils";
 import { AgentAvailabilityToggle } from "@/components/settings/AgentAvailabilityToggle";
 import { effectivePresence } from "@/lib/presence";
 import { getLastSeenMap } from "@/lib/presence-server";
+import { summarizeAiAnalysis, type AiAnalysisMetricRow } from "@/lib/ai/metrics";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
@@ -197,9 +199,24 @@ async function AdminDashboard({
     (a, b) => b[1] - a[1]
   );
 
-  const aiAccuracy = 0;
-  const avgConfidence = 0;
-  const aiTotal = 0;
+  // hd_ai_analysis has no organization column: scope it through the tenant's
+  // own ticket ids (explicit tenant predicate on the first query).
+  const { data: orgTicketIds } = await svc
+    .from("hd_tickets")
+    .select("id")
+    .eq("organization_id", orgId)
+    .is("deleted_at", null);
+  const ticketIds = (orgTicketIds ?? []).map((row: { id: string }) => row.id);
+  const { data: aiRows } = ticketIds.length
+    ? await svc
+        .from("hd_ai_analysis")
+        .select("confidence_score, category_accepted, model_used")
+        .in("ticket_id", ticketIds)
+    : { data: [] as AiAnalysisMetricRow[] };
+  const aiSummary = summarizeAiAnalysis((aiRows ?? []) as AiAnalysisMetricRow[]);
+  const aiAccuracy = aiSummary.acceptanceRate ?? 0;
+  const avgConfidence = aiSummary.avgConfidence ?? 0;
+  const aiTotal = aiSummary.analyzed;
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
@@ -409,7 +426,7 @@ async function AdminDashboard({
                   {t("acceptanceRate")}
                 </span>
                 <span className="text-sm font-semibold text-green-400">
-                  {aiAccuracy}%
+                  {aiSummary.acceptanceRate === null ? "—" : `${aiAccuracy}%`}
                 </span>
               </div>
               <ProgressBar value={aiAccuracy} className="bg-green-500" />
@@ -418,7 +435,7 @@ async function AdminDashboard({
                   {t("avgConfidence")}
                 </span>
                 <span className="text-sm font-semibold text-indigo-400">
-                  {avgConfidence}%
+                  {aiSummary.avgConfidence === null ? "—" : `${avgConfidence}%`}
                 </span>
               </div>
               <ProgressBar value={avgConfidence} className="bg-indigo-500" />
@@ -433,7 +450,7 @@ async function AdminDashboard({
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-[var(--color-text-muted)]" />
                 <span className="text-sm font-medium text-[var(--color-text-secondary)]">
-                  {t("byCategory")}
+                  {t("byPriority")}
                 </span>
               </div>
             </CardHeader>
@@ -737,7 +754,8 @@ async function CustomerDashboard({
           {(recentTickets ?? []).map((ticket, i) => {
             const ticketPath = `${prefix}/tickets/${ticket.id}`;
             const updatedAt = new Date(ticket.created_at).toLocaleDateString(
-              locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB"
+              locale === "de" ? "de-CH" : locale === "es" ? "es-ES" : "en-GB",
+              { timeZone: APP_TIME_ZONE }
             );
             return (
               <Link href={ticketPath} key={ticket.id}>

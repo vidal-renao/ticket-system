@@ -35,6 +35,7 @@ import { OpsActivityFeed } from "./_components/OpsActivityFeed";
 import { OpsAuditPanel } from "./_components/OpsAuditPanel";
 import { OpsAiPanel } from "./_components/OpsAiPanel";
 import { OPS } from "./_components/tokens";
+import { APP_TIME_ZONE } from "@/lib/datetime";
 
 const HIGHLIGHT_MS = 1_600;
 const KPI_DEBOUNCE_MS = 180;
@@ -371,7 +372,7 @@ export function OpsConsole({
             <MonoText>
               {t(`realtime.${realtimeStatus}`)}
               {lastEventAt && now
-                ? ` · ${t("realtime.lastEvent")} ${new Date(lastEventAt).toLocaleTimeString(locale, {
+                ? ` · ${t("realtime.lastEvent")} ${new Date(lastEventAt).toLocaleTimeString(locale, { timeZone: APP_TIME_ZONE,
                     hour: "2-digit",
                     minute: "2-digit",
                     second: "2-digit",

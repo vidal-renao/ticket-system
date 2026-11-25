@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -43,7 +44,8 @@ export function CompanyCustomerForm() {
   const [invitationState, setInvitationState] = useState<string | null>(null);
   const [linkPrompt, setLinkPrompt] = useState<string | null>(null);
   const [accessLink, setAccessLink] = useState<string | null>(null);
-  const [linkNotice, setLinkNotice] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState<boolean | null>(null);
+  const tLink = useTranslations("admin.linkHandoff");
 
   function buildPayload() {
     return {
@@ -98,9 +100,11 @@ export function CompanyCustomerForm() {
       }
       setInvitationState(data.invitationState ?? "invited");
       setAccessLink(data.access_link ?? null);
-      setLinkNotice(data.notice ?? null);
+      setEmailSent(typeof data.email_sent === "boolean" ? data.email_sent : null);
       setState("success");
-      toast.success("Company created — invitation sent");
+      if (data.invitationState === "linked_existing_user") toast.success(tLink("linkedTitle"));
+      else if (data.email_sent === false) toast.warning(tLink("invitedEmailFailed"));
+      else toast.success(tLink("invitedEmailSent"));
     } catch {
       setError("Network error — check the connection and try again");
       setState("form");
@@ -115,12 +119,17 @@ export function CompanyCustomerForm() {
         <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-emerald-300" />
         <p className="text-sm font-semibold text-emerald-200">
           {invitationState === "linked_existing_user"
-            ? "Linked to an existing account. No invitation was sent."
-            : "Company created. A secure email invitation was sent to the contact."}
+            ? tLink("linkedTitle")
+            : emailSent === false
+              ? tLink("invitedEmailFailed")
+              : tLink("invitedEmailSent")}
         </p>
-        {/* Shown on both paths now. An emailed invitation is not proof of
-            access -- see AccessLinkNotice. */}
-        {linkNotice && <AccessLinkNotice notice={linkNotice} accessLink={accessLink} />}
+        {/* Email status, and the invitation link only when the mail failed
+            and ADMIN_LINK_HANDOFF is on -- see AccessLinkNotice. */}
+        <AccessLinkNotice
+          linked={invitationState === "linked_existing_user"}
+          accessLink={accessLink}
+        />
         <Button className="mt-4" onClick={() => router.push("/admin/users")}>
           Back to user management
         </Button>
